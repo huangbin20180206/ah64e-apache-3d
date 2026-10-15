@@ -29,12 +29,12 @@ def run(pg):
     print('E2 PASS: startMission spawn 2 机巡逻（enabled=true）')
 
     # ---- E3: 索敌链——玩家悬停敌机视距内 → search → attack（条件等待） ----
-    # 悬停 (30, alt 14, 60)：长机 spawn 位置 (30,18,42) 机头朝 +z——玩家恰在
+    # 悬停 (30, alt 14, 93)：长机 spawn 位置 (30,18,75)（基地 BASE_C z=75，2026-10-15 由 42 挪远） 机头朝 +z——玩家恰在
     # 其正前方 18u（与纯 pytest chain 用例同款确定性几何，无需等巡逻相位）。
     # 注意不能悬停在巡逻环心附近（如 z=30 距锚 12u）——巡逻切线视锥与
     # 环心方向 dot≈0，30s 内永远扫不到（首轮实测超时的根因）。
     # 命中链的概率确定性已由纯 pytest 覆盖，此处断言状态机推进到攻击态。
-    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=30; F.z=60;
+    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=30; F.z=93;
       F.yaw=0; F.pitch=0; F.roll=0; F.comp=0; F.fp=false; __dbg.S._alt=0; __dbg.S.running=true; })()""")
     pg.evaluate("(() => { const m=__dbg.S._mission; m.phase='active'; if(m.t0==null) m.t0=__dbg.S.time; __dbg.beginMission(); })()")
     pg.wait_for_function("() => __dbg.enemyAir.state().attacking > 0", timeout=30000)
