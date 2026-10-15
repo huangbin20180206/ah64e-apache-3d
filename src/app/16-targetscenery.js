@@ -8,10 +8,10 @@
 // ============================================================
 
 // ---------- P31-B 军事场景布景 ----------
-// 阵地感四件：掩体土墙（B1）/沙袋工事（B2）/油料围堰（B3）/警戒桩（B5）
-// 同走沙色材质 bake 后 mergeGeos 成 1 mesh；车辙地贴（B4）独立半透材质
-// 1 mesh——合计 +2 draw（靶场禁用/湖面时整体隐藏，恒 0）。沙袋/围堰
-// 与 81-narrative strikes[].pos（radar=-16,46 / ammo=-11,40，BC 相对）
+// 阵地感：掩体土墙（B1）/沙袋工事（B2）/油料围堰（B3）同走沙色材质 bake 后
+// mergeGeos 成 1 mesh；B5 围墙+门禁+哨塔+营区建筑（2026-10-15）顶点色 1 mesh；
+// 车辙地贴（B4）独立半透材质 1 mesh——合计 +3 draw（靶场禁用/湖面时整体隐藏，恒 0）。
+// 沙袋/围堰与 81-narrative strikes[].pos（radar=BC+(-16,4) / ammo=BC+(-11,-2)）
 // 保持硬编码同步——若移设施须两处同改（总指挥配合项）。
 function buildRangeScenery(range, BC, layout) {
   if (range.scenery) { range.scene.remove(range.scenery); disposeObject3D(range.scenery); }
@@ -64,27 +64,105 @@ function buildRangeScenery(range, BC, layout) {
   push(sandGeos, new THREE.BoxGeometry(bw + 0.8, 0.34, 0.4), bp.x, 0.17, bp.z + bd / 2);
   push(sandGeos, new THREE.BoxGeometry(0.4, 0.34, bd), bp.x - bw / 2, 0.17, bp.z);
   push(sandGeos, new THREE.BoxGeometry(0.4, 0.34, bd), bp.x + bw / 2, 0.17, bp.z);
-  // B5 警戒线：基地外缘一圈 HESCO 挡墙块（0.55×0.95×0.55，40u 俯瞰可辨；
-  // 细桩方案 0.1u 在远景亚像素不可读，弃）。
-  // 2026-10-12 修正：旧坐标是绝对值却又加了一次 BC，整圈墙被推到基地后方
-  // z=74~92（离车辆 30u）。现改为 BC 相对矩形 x∈[-19,19]、z∈[-14.6,+12]：
-  //   · 包住防空车(12,-6)/探照灯(14,8)/雷达(-16,4)/弹药库(-11,-2) 与全部靶标；
-  //   · 包住 B2 疏散环路（x∈[-3,17]、z∈[-13,+8.5]，墙块边缘到车道中线 ≥1.3u，卡车半宽 0.55）；
-  //   · 西南角块外缘 (-19.3,27.1) 方位角 0.618 <0.62——整圈在 duneFarH 平地走廊内；
-  //   · 南墙正中留 5.2u 正门（进场主路），北墙正中留门通往城镇（16-town）。
-  const per = [[-19, -14.6], [19, -14.6], [19, 12], [-19, 12]];
-  const GATE = 2.6;                                  // 门洞半宽（|x|<GATE 不放块）
-  for (let s = 0; s < 4; s++) {
-    const [ax, az] = per[s], [bx2, bz2] = per[(s + 1) % 4];
+  // B5 基地围墙（2026-10-15 真实化：旧版是间隔 3.4u 的孤立白方块，像墓碑）——
+  // 连续的 HESCO 防爆墙（军用土工布石笼，单格 ≈2.1m 宽 × 2.2m 高 ≈0.93u × 0.95u），
+  // 每格带深色顶框与竖向接缝，颜色逐格微差。BC 相对矩形 x∈[-25,25]、z∈[-16,+15]：
+  //   · 包住全部靶标、雷达/防空车/弹药库/探照灯、B2 疏散环路（x∈[-3,17]、z∈[-13,8.5]）
+  //     与 3-1 关的补给车环线（x 4~20 / -8~-12，见 91-levels）；
+  //   · 南墙正中留 6u 正门（进场主路），北墙正中留门通往城镇（16-town）；
+  //   · 基地已整体位于远景沙丘环（r 31.5~48u）之外的平地，不受 duneFarH 影响。
+  // 围墙 + 门禁 + 哨塔 + 营区建筑全部烘进 1 个顶点色 mesh（+1 draw）。
+  const K = vcKit();
+  const HX = 25, HZ0 = -16, HZ1 = 15, GATE = 3.0, CELL = 0.93, HH = 0.95;
+  const per = [[-HX, HZ0], [HX, HZ0], [HX, HZ1], [-HX, HZ1]];
+  let cellN = 0;
+  for (let sgi = 0; sgi < 4; sgi++) {
+    const [ax, az] = per[sgi], [bx2, bz2] = per[(sgi + 1) % 4];
     const len = Math.hypot(bx2 - ax, bz2 - az);
-    const n = Math.max(3, Math.round(len / 3.4));
-    for (let i = 0; i <= n; i++) {                   // 含角点：四角各放一块
-      if (i === n) continue;                         // 终点 = 下一段起点，避免重复
-      const px = ax + (bx2 - ax) * i / n, pz = az + (bz2 - az) * i / n;
-      if (az === bz2 && Math.abs(px) < GATE) continue;   // 南/北墙门洞
-      push(sandGeos, new THREE.BoxGeometry(0.55, 0.95, 0.55), BC.x + px, 0.47, BC.z + pz);
+    const n = Math.round(len / CELL);
+    const alongX = az === bz2;
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) / n;
+      const px = ax + (bx2 - ax) * t, pz = az + (bz2 - az) * t;
+      if (alongX && Math.abs(px) < GATE) continue;           // 南/北门洞
+      const w = len / n;
+      const sx = alongX ? w - 0.02 : CELL, sz = alongX ? CELL : w - 0.02;
+      const tone = (cellN++ * 7919 % 13) / 13;              // 逐格微差（确定性，非随机）
+      const col = new THREE.Color(0xb3a07a).offsetHSL(0, 0, (tone - 0.5) * 0.06).getHex();
+      K.box(sx, HH, sz, col, BC.x + px, HH / 2, BC.z + pz);
+      K.box(sx + 0.03, 0.06, sz + 0.03, 0x6e6a5e, BC.x + px, HH - 0.02, BC.z + pz);   // 顶部钢丝框
+      K.box(alongX ? 0.03 : sz + 0.02, HH, alongX ? sz + 0.02 : 0.03, 0x7c776a,
+        BC.x + px + (alongX ? w / 2 : 0), HH / 2, BC.z + pz + (alongX ? 0 : w / 2));   // 竖向接缝
     }
   }
+  // 门禁：南门两侧混凝土防撞墩（错位迷宫）+ 红白道闸
+  for (const sx of [-1, 1]) {
+    K.box(1.4, 0.36, 0.30, 0xa8a59c, BC.x + sx * 1.6, 0.18, BC.z + HZ0 - 1.6);
+    K.box(0.30, 0.55, 0.30, 0x55574f, BC.x + sx * (GATE - 0.1), 0.275, BC.z + HZ0);
+  }
+  K.box(1.4, 0.36, 0.30, 0xa8a59c, BC.x, 0.18, BC.z + HZ0 - 3.0);
+  for (let i = 0; i < 6; i++) {
+    K.box(0.86, 0.07, 0.07, i % 2 ? 0xd8d8d0 : 0xb02a22, BC.x - GATE + 0.45 + i * 0.86, 0.55, BC.z + HZ0);
+  }
+  // 四角哨塔：4 腿 + 平台 + 沙袋胸墙 + 顶棚（台高 ≈2.6u≈6m）
+  const tower = (cx, cz) => {
+    for (const ox of [-0.55, 0.55]) for (const oz of [-0.55, 0.55]) {
+      K.box(0.09, 3.6, 0.09, 0x4a3f2e, cx + ox, 1.8, cz + oz);
+    }
+    K.box(1.5, 0.10, 1.5, 0x5a4c36, cx, 2.6, cz);
+    for (const [ox, oz, w, d] of [[0, 0.7, 1.5, 0.12], [0, -0.7, 1.5, 0.12], [0.7, 0, 0.12, 1.5], [-0.7, 0, 0.12, 1.5]]) {
+      K.box(w, 0.42, d, 0x9c8b67, cx + ox, 2.86, cz + oz);
+    }
+    K.box(1.75, 0.07, 1.75, 0x3f4636, cx, 3.62, cz);
+    K.box(0.06, 2.6, 0.06, 0x3a3226, cx + 0.62, 1.3, cz + 0.85, 0.25, 0, 0);   // 梯子
+  };
+  for (const [ox, oz] of per) tower(BC.x + ox - Math.sign(ox) * 1.0, BC.z + oz - Math.sign(oz) * 1.0);
+  // 营区（北侧 z∈[+10,+14]）：3 顶班用帐篷（8m×5m≈3.6u×2.2u）+ 指挥方舱 + 卫星天线
+  const tent = (cx, cz) => {
+    K.prism([[-1.1, 0], [1.1, 0], [1.1, 0.72], [0, 1.30], [-1.1, 0.72]], 3.6, 0x5d6644, cx, 0, cz, 0, Math.PI / 2, 0);
+    K.prism([[-1.16, 0.70], [0, 1.34], [1.16, 0.70], [1.16, 0.76], [0, 1.40], [-1.16, 0.76]], 3.7, 0x4b5337, cx, 0, cz, 0, Math.PI / 2, 0);
+    K.box(0.02, 0.55, 0.60, 0x2c3022, cx + 1.81, 0.30, cz);   // 门帘
+    K.box(0.30, 0.50, 0.30, 0x3a3f2e, cx - 1.2, 0.25, cz - 1.25);   // 发电机/箱
+  };
+  tent(BC.x - 21, BC.z + 12); tent(BC.x - 15.5, BC.z + 12); tent(BC.x - 10, BC.z + 12);
+  // 指挥所：两只 20 尺集装箱（6.1m≈2.7u）并排 + 沙袋 + 天线
+  K.box(2.68, 1.13, 1.07, 0x5b6147, BC.x + 7.0, 0.565, BC.z + 11.6);
+  K.box(2.68, 1.13, 1.07, 0x666b52, BC.x + 7.0, 0.565, BC.z + 12.8);
+  for (let i = 0; i < 5; i++) K.box(0.03, 1.15, 0.03, 0x4c513c, BC.x + 5.75 + i * 0.62, 0.575, BC.z + 11.06);
+  K.box(0.36, 0.62, 0.03, 0x2b2e24, BC.x + 6.0, 0.36, BC.z + 11.05);   // 门
+  K.cyl(0.025, 0.035, 3.2, 6, 0x2a2c26, BC.x + 8.1, 2.73, BC.z + 12.8);   // 鞭状天线
+  K.cyl(0.025, 0.035, 2.6, 6, 0x2a2c26, BC.x + 5.9, 2.43, BC.z + 12.3);
+  K.cyl(0.38, 0.10, 0.10, 14, 0xb8bcb4, BC.x + 7.0, 1.42, BC.z + 12.8, -0.7, 0, 0);   // 卫星锅
+  // 油料区：两只卧式储油罐（Φ2.5m×6m）+ 鞍座
+  for (const oz of [11.3, 13.2]) {
+    K.cyl(0.55, 0.55, 2.7, 16, 0x6a7058, BC.x + 19.5, 0.85, BC.z + oz, 0, 0, Math.PI / 2);
+    for (const ox of [-0.9, 0.9]) K.box(0.18, 0.40, 0.95, 0x3d3f36, BC.x + 19.5 + ox, 0.20, BC.z + oz);
+    K.box(0.2, 0.18, 0.2, 0x3d3f36, BC.x + 19.5, 1.46, BC.z + oz);
+  }
+  // 东侧车棚（开放式：6 柱 + 顶棚），给疏散车道留 ≥4u
+  for (const oz of [-9, -6, -3]) for (const ox of [21.8, 24.0]) K.box(0.1, 1.55, 0.1, 0x44463c, BC.x + ox, 0.78, BC.z + oz);
+  K.box(2.7, 0.07, 6.6, 0x575b4c, BC.x + 22.9, 1.58, BC.z - 6, 0, 0, 0.06);
+  // 西侧通信塔（三角桁架，高 ≈6u≈14m）+ 设备方舱
+  {
+    const tx = BC.x - 22.3, tz = BC.z - 9.5, H = 6.0;
+    for (let i = 0; i < 3; i++) {
+      const a = i * Math.PI * 2 / 3;
+      const r0 = 0.62, r1 = 0.14;
+      const x0 = Math.sin(a) * r0, z0 = Math.cos(a) * r0, x1 = Math.sin(a) * r1, z1 = Math.cos(a) * r1;
+      const tilt = Math.atan2(r0 - r1, H);
+      K.box(0.05, H, 0.05, 0x8d8f86, tx + (x0 + x1) / 2, H / 2, tz + (z0 + z1) / 2, Math.cos(a) * tilt, 0, -Math.sin(a) * tilt);
+    }
+    for (let k = 1; k < 6; k++) {
+      const r = 0.62 - (0.62 - 0.14) * k / 6;
+      K.cyl(r, r, 0.03, 3, 0x8d8f86, tx, H * k / 6, tz);
+    }
+    K.box(0.30, 0.45, 0.06, 0xd0d0c8, tx, H - 0.5, tz + 0.2);   // 定向天线板
+    K.box(0.22, 0.09, 0.22, 0xb02a22, tx, H + 0.02, tz);        // 航空警示顶
+    K.box(1.6, 0.95, 1.0, 0x5d6346, tx + 1.6, 0.475, tz + 0.4);
+  }
+  const compound = new THREE.Mesh(K.build(), vcMat(0.92, 0.05));
+  compound.name = 'base-compound';
+  compound.castShadow = true; compound.receiveShadow = true;
   // B4 车辙：停放线与迎敌弧的深色半透地贴（成对轮迹 + 一条进场路辙）
   const rut = (x, z, ang, w, l) => {
     const g = new THREE.PlaneGeometry(w, l);
@@ -112,12 +190,13 @@ function buildRangeScenery(range, BC, layout) {
   // 进场路辙：双辙主路纵贯——南接停放线（z≈47）、北到迎敌弧后方（z≈37）
   rut(BC.x - 1.1, BC.z, 0, 0.22, 10);
   rut(BC.x + 0.5, BC.z, 0, 0.22, 10);
-  // —— 合批：沙色件 1 mesh + 车辙半透 1 mesh ——
+  // —— 合批：沙色件 1 mesh + 围墙营区 1 mesh + 车辙半透 1 mesh ——
   const g = new THREE.Group();
   const sandMesh = new THREE.Mesh(mergeGeos(sandGeos),
-    targetMat(0xb9a284, 0.95, 0.02));
+    targetMat(0x9c8964, 0.95, 0.02));   // 2026-10-15 压暗：旧 0xb9a284 在沙漠日光下发白像石膏
   sandMesh.castShadow = false; sandMesh.receiveShadow = true;
   g.add(sandMesh);
+  g.add(compound);
   const trackMesh = new THREE.Mesh(mergeGeos(trackGeos),
     new THREE.MeshBasicMaterial({ color: 0x241d14, transparent: true, opacity: 0.30, depthWrite: false }));
   trackMesh.renderOrder = 2;
