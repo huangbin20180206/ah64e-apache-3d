@@ -14,8 +14,8 @@ def run(pg):
     # ① 引导完成：载入遮罩收起（finish() 末尾 setTimeout 260ms 才加 done 类——
     #    与 wait_for_function(__dbg) 之间存在 260ms 竞态，须显式等待该类）
     #    + __dbg 就绪（boot 是有界工作，与帧率无关）
-    pg.wait_for_function("() => !!(window.__dbg && __dbg.apache && __dbg.fp)", timeout=120000, polling=100)   # boot 就绪：加载期主线程空闲，间隔轮询比 rAF 稳
-    pg.wait_for_function("() => document.getElementById('loading').classList.contains('done')", timeout=30000, polling=100)
+    pg.wait_for_function("() => !!(window.__dbg && __dbg.apache && __dbg.fp)", timeout=180000, polling=100)   # boot 就绪：加载期主线程空闲，间隔轮询比 rAF 稳
+    pg.wait_for_function("() => document.getElementById('loading').classList.contains('done')", timeout=60000, polling=100)   # CI 实测资产加载最慢 ~23s，预算留 2.5 倍余量
     pg.evaluate("document.querySelector('#hint-close') && document.querySelector('#hint-close').click()")
     # ② FPV 进入 + 鼠标水平/垂直输入各自只计算一次（纯状态断言）
     pg.evaluate("__dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.FLY.x=0; __dbg.FLY.z=0; "
@@ -81,13 +81,19 @@ def run(pg):
     print('ci smoke OK: A1 _qCool/_qAutoOff + A3 _guide + A6 progressbar aria + load-fill 一致')
 
     # ---- Phase 2-B 结构断言（帧率无关：全部同步 DOM/状态操作） ----
-    # B2: 键盘切机位 → 一次性 toast 报机位名（setView/toast 均为同步操作）
-    pg.evaluate("document.activeElement && document.activeElement.blur()")
-    pg.keyboard.press('2')
-    H.step_until(pg, "() => document.getElementById('toast').classList.contains('show') && document.getElementById('toast').textContent.includes('正侧')", 5)   # setView/toast 同步——游戏时间步进
-    b2 = pg.evaluate("""(() => ({ txt: document.getElementById('toast').textContent,
-                                   show: document.getElementById('toast').classList.contains('show'),
-                                   view: __dbg.S.view }))()""")
+    # B2: 键盘切机位 → 一次性 toast 报机位名（setView/toast 均为同步操作）。
+    # 合成 keydown 与状态读取合并进同一 evaluate（先例：P5-D visibilitychange
+    # 段同款原子化）——toast 仅 2s 墙钟寿命（01-host.js setTimeout 摘 show 类），
+    # CI 单程往返 1-14s，"先发键→等待→再读"必过期；同任务内 dispatch+read
+    # 原子成立。window 合成键是本代码库既有范式（74-tour tourKey）。
+    b2 = pg.evaluate("""(() => {
+        document.activeElement && document.activeElement.blur();
+        dispatchEvent(new KeyboardEvent('keydown', { key: '2' }));
+        const t = document.getElementById('toast');
+        const r = { txt: t.textContent, show: t.classList.contains('show'), view: __dbg.S.view };
+        dispatchEvent(new KeyboardEvent('keyup', { key: '2' }));   // 配对，防 keys 表卡住
+        return r;
+    })()""")
     assert b2['show'] and '正侧' in b2['txt'] and b2['view'] == 1, ('B2 toast', b2)
     # B3: LABELS 已扩为三元组（节点名/显示名/解说），14 条且解说非空
     labs = pg.evaluate("(() => __dbg.LABELS.map(l => [l[0], l[1], typeof l[2] === 'string' && l[2].length > 10]))()")
