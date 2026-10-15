@@ -74,7 +74,7 @@ class TargetRange {
     });
   }
 
-  // 军事基地布阵（2026-09-02 用户需求）：靶标从环形阵列改为 42u 外一座
+  // 军事基地布阵（2026-09-02 用户需求）：靶标从环形阵列改为远处一座（位置见 05-config BASE_C，2026-10-15 由 42u 挪到 75u）
   // 有组织的基地——装甲排迎敌弧、车辆停放线、油料区各自成区；直升机
   // "起飞→搜索→接近→锁定→攻击→摧毁"的叙事由此展开。
   // 基地扇区（|方位角|<~25°）在 duneFarH 中保持平地（远景沙丘环让位）。
@@ -82,7 +82,7 @@ class TargetRange {
     // 清场
     for (const t of this.targets) this.scene.remove(t.group);
     this.targets.length = 0;
-    const BC = { x: 0, z: 42 };                        // 基地中心（机头 +Z 正前方）
+    const BC = { x: BASE_C.x, z: BASE_C.z };            // 基地中心（机头 +Z 正前方，05-config BASE_C）
     const layout = {
       tank:   [[0, -7], [-6.5, -4], [6.5, -4]],        // 装甲排：迎敌弧形
       truck:  [[-3, 5], [2, 5.5], [7, 5], [12, 4.5]],  // 车辆停放线
