@@ -1,6 +1,7 @@
 // ============================================================
 // 48-rescue.js — 绞车救援任务（P2-3）
 // 幸存者随场地生成（沙漠/草原各一处，水上/棚拍无），信标闪烁+信号烟
+// P4g：幸存者为飞行服机组成员模型（挥手求救 / 吊带上举），与 AH-64E 同比例（1u≈2.27m）。
 // 辅助寻找。玩法闭环：悬停对位 → K 放绞车 → 吊钩落地自动挂接 →
 // 收绞车救起 → 低空返回停机坪 → 救援完成。
 // 吊钩跟随机腹，随悬停移动自然摆动；K 可中途收回（幸存者原地放下）。
@@ -15,15 +16,58 @@ class Rescue {
     this._sway = 0;
     this.onToast = null;
 
-    // 幸存者低模：躯干胶囊 + 头部
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.7, 4, 8),
-      new THREE.MeshStandardMaterial({ color: 0xd8b26a, roughness: 0.8 }));
-    body.position.y = 0.55;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8),
-      new THREE.MeshStandardMaterial({ color: 0xe0c090, roughness: 0.8 }));
-    head.position.y = 1.25;
+    // 幸存者：被击落的机组成员（P4g 替换旧"胶囊+球"木头人）
+    // 按米建模再整体缩放到模型单位（1u≈2.27m，身高约 1.85m≈0.81u，与 AH-64E 同比例）。
+    // 4 个网格：躯干/腿/头盔合批 1 个 + 左右臂各 1 个（可动：地面挥手、吊起时抓吊带）+ 救援吊带 1 个。
+    const SUIT = 0x6c7150, VEST = 0x45473a, BOOT = 0x2a2420, SKIN = 0xc79a74,
+      HELM = 0x5a5e49, VISOR = 0x181b20, GLOVE = 0x2c2924, PATCH = 0xe0702c;
+    const kb = vcKit();
+    for (const sx of [-1, 1]) {
+      kb.box(0.13, 0.12, 0.29, BOOT, sx * 0.11, 0.06, 0.03);            // 靴
+      kb.cyl(0.066, 0.06, 0.44, 8, SUIT, sx * 0.11, 0.34, 0);           // 小腿
+      kb.cyl(0.088, 0.07, 0.42, 8, SUIT, sx * 0.11, 0.76, 0);           // 大腿
+      kb.box(0.07, 0.12, 0.05, VEST, sx * 0.19, 0.78, 0.04);            // 腿袋
+    }
+    kb.box(0.36, 0.2, 0.22, SUIT, 0, 0.99, 0);                          // 胯
+    kb.box(0.38, 0.5, 0.23, SUIT, 0, 1.28, 0);                          // 躯干（飞行服）
+    kb.box(0.41, 0.36, 0.27, VEST, 0, 1.33, 0);                         // 救生背心
+    kb.box(0.1, 0.1, 0.04, VEST, -0.1, 1.27, 0.15);                     // 胸袋
+    kb.box(0.1, 0.1, 0.04, VEST, 0.1, 1.27, 0.15);
+    kb.box(0.08, 0.05, 0.02, PATCH, 0.12, 1.44, 0.145);                 // 臂章/反光片
+    kb.box(0.3, 0.28, 0.1, VEST, 0, 1.3, -0.17);                        // 背后救生包
+    kb.cyl(0.055, 0.06, 0.1, 8, SKIN, 0, 1.57, 0);                      // 颈
+    kb.sph(0.105, SKIN, 0, 1.69, 0.01);                                 // 脸
+    kb.sph(0.135, HELM, 0, 1.735, -0.015, 1, 0.92, 1.12);               // 飞行头盔
+    kb.box(0.2, 0.06, 0.05, VISOR, 0, 1.71, 0.115);                     // 护目镜
+    const mat = vcMat(0.85, 0.05);
+    const fig = new THREE.Group();
+    fig.add(new THREE.Mesh(mergeGeos(kb.list), mat));
+    // 手臂：枢轴在肩部，零件沿 -Y 下垂
+    const arm = (sx) => {
+      const ka = vcKit();
+      ka.sph(0.07, SUIT, 0, 0, 0);
+      ka.cyl(0.056, 0.05, 0.3, 8, SUIT, 0, -0.16, 0);
+      ka.cyl(0.048, 0.042, 0.28, 8, SUIT, 0, -0.45, 0);
+      ka.sph(0.052, GLOVE, 0, -0.62, 0);
+      const pv = new THREE.Group();
+      pv.position.set(sx * 0.235, 1.5, 0);
+      pv.add(new THREE.Mesh(mergeGeos(ka.list), mat));
+      fig.add(pv);
+      return pv;
+    };
+    this.armL = arm(-1); this.armR = arm(1);
+    // 救援吊带（腋下环 + 向上连到吊钩的短带），挂接后才显示
+    const ks = vcKit();
+    ks.add(new THREE.TorusGeometry(0.24, 0.03, 6, 16), PATCH, 0, 1.4, 0, Math.PI / 2, 0, 0);
+    ks.box(0.04, 0.5, 0.03, PATCH, 0, 1.65, 0.2);
+    ks.box(0.04, 0.5, 0.03, PATCH, 0, 1.65, -0.2);
+    this.strap = new THREE.Mesh(mergeGeos(ks.list), mat);
+    this.strap.visible = false;
+    fig.add(this.strap);
+    fig.scale.setScalar(1 / 2.27 * 0.99);
+    this.HANG = 1.92 / 2.27;                  // 吊钩到脚底的距离（u）
     this.g = new THREE.Group();
-    this.g.add(body, head);
+    this.g.add(fig);
     this.g.visible = false;
     scene.add(this.g);
 
@@ -42,17 +86,17 @@ class Rescue {
     scene.add(this.smoke);
 
     // 信标灯（橙红闪烁，夜间/远处可见）
-    this.beacon = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8),
+    this.beacon = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8),
       new THREE.MeshBasicMaterial({ color: 0xff7038 }));
     this.beacon.visible = false;
     scene.add(this.beacon);
 
     // 绞车绳索（细圆柱，按绳长缩放）+ 吊钩
-    this.rope = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1, 6),
+    this.rope = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1, 6),
       new THREE.MeshBasicMaterial({ color: 0x14140f }));
     this.rope.visible = false;
     scene.add(this.rope);
-    this.hook = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.04, 6, 12),
+    this.hook = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.022, 6, 12),
       new THREE.MeshBasicMaterial({ color: 0x2a2a26 }));
     this.hook.visible = false;
     scene.add(this.hook);
@@ -95,7 +139,7 @@ class Rescue {
     this._home = { x: px, z: pz };
     this.g.position.set(px, 0, pz);
     this.smoke.position.set(px, 2.4, pz);
-    this.beacon.position.set(px, 0.22, pz);
+    this.beacon.position.set(px + 0.45, 0.07, pz + 0.3);   // 地面频闪灯放在人身旁，不挡人
     this.g.visible = this.smoke.visible = this.beacon.visible = true;
     if (wasBusy && this.onToast) this.onToast('场地切换——绞车操作已取消，幸存者已重新定位');
   }
@@ -126,7 +170,7 @@ class Rescue {
     this._home = { x: px, z: pz };
     this.g.position.set(px, 0, pz);
     this.smoke.position.set(px, 2.4, pz);
-    this.beacon.position.set(px, 0.22, pz);
+    this.beacon.position.set(px + 0.45, 0.07, pz + 0.3);   // 地面频闪灯放在人身旁，不挡人
     this.g.visible = this.smoke.visible = this.beacon.visible = true;
   }
 
@@ -188,7 +232,7 @@ class Rescue {
       // 幸存者随吊钩移动
       const hx = bx + Math.sin(this._sway * 1.3) * Math.min(0.3, this.ropeLen * 0.04);
       const hz = bz + Math.cos(this._sway * 1.3) * Math.min(0.3, this.ropeLen * 0.04);
-      this.g.position.set(hx, Math.max(by - this.ropeLen, 0.3), hz);
+      this.g.position.set(hx, Math.max(by - this.ropeLen - this.HANG, 0), hz);
     } else if (this.state === 'retracting') {
       this.ropeLen = Math.max(this.ropeLen - 3 * dt, 0);
       if (this.ropeLen <= 0) { this._forceIdle(); }
@@ -215,7 +259,19 @@ class Rescue {
         by - this.ropeLen, bz + Math.cos(this._sway * 1.4) * Math.min(0.3, this.ropeLen * 0.04));
       // 挂接后幸存者跟随吊钩
       if (this.attached) {
-        this.g.position.set(this.hook.position.x, Math.max(by - this.ropeLen - 0.4, 0.4), this.hook.position.z);
+        this.g.position.set(this.hook.position.x, Math.max(by - this.ropeLen - this.HANG, 0), this.hook.position.z);
+      }
+    }
+    // 姿态：地面上面朝直升机挥手求救；挂上吊带后双臂上举抓带、吊带显示
+    if (this.g.visible) {
+      this.strap.visible = this.attached;
+      if (this.attached) {
+        this.armL.rotation.set(0, 0, -2.75); this.armR.rotation.set(0, 0, 2.75);
+        this.g.rotation.y += dt * 0.6;       // 吊在绳上缓慢自转
+      } else {
+        this.g.rotation.y = Math.atan2(heliPos.x - this.g.position.x, heliPos.z - this.g.position.z);
+        this.armL.rotation.set(0, 0, -0.12);
+        this.armR.rotation.set(0, 0, 2.55 + 0.4 * Math.sin(this._sway * 5));
       }
     }
     // 信号烟上升 + 信标闪烁（幸存者在场且未救起时）
