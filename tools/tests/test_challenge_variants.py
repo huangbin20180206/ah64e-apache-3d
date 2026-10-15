@@ -114,8 +114,8 @@ def run(pg):
     assert s4a['phase'] == 'active' and not s4a['done'], ('C4: 地面全歼但雷达/防空车未毁不应结算', s4a)
     # ② 摧毁雷达(hp2)+防空车(hp3) → SEAD 达成 → 结算，结算面板含变体名
     pg.evaluate("""(() => {
-        __dbg.narrative.hitTest({ x: -16, y: 0.8, z: 46 }, 3);   // 雷达
-        __dbg.narrative.hitTest({ x: 12, y: 0.8, z: 36 }, 3);    // 防空车
+        __dbg.narrative.hitTest({ x: -16, y: 0.8, z: 79 }, 3);   // 雷达
+        __dbg.narrative.hitTest({ x: 12, y: 0.8, z: 69 }, 3);    // 防空车
     })()""")
     H.step_until(pg, "() => __dbg.mission.phase === 'done'", 15)
     s4b = pg.evaluate("({phase:__dbg.mission.phase, done:__dbg.mission.done, body:document.getElementById('mission-body').innerHTML})")
