@@ -90,7 +90,12 @@ def run(pg):
     H.step(pg, 0.2)
     pg.evaluate("__dbg.beginMission()")
     H.step(pg, 0.3)
-    pg.evaluate("__dbg.mission.t0 = __dbg.S.time - 400")     # > 360s 超时
+    # 有效时限 = 变体时限 × 难度系数（P18：limited_ammo 360×1.2=432）——读真源不硬编码：
+    # Phase 18 前本测试按旧 360s 基础时限篡改 "S.time-400"，够不着 432s 有效时限，
+    # 超时失败永不触发（step_until 15 游戏秒内 elapsed 仅到 415<432，实测 TimeoutError）。
+    to = pg.evaluate("__dbg.missionTimeout()")
+    assert to > 0, ('C2: missionTimeout 真源读口异常', to)
+    pg.evaluate("__dbg.mission.t0 = __dbg.S.time - (%s + 5)" % to)     # > 有效时限 → 超时失败
     H.step_until(pg, "() => __dbg.mission.phase === 'failed'", 15)
     st3 = pg.evaluate("({phase:__dbg.mission.phase, reason:__dbg.mission.failedReason, body:document.getElementById('mission-body').innerHTML})")
     assert st3['phase'] == 'failed' and st3['reason'] == 'timeout', ('C2: 受限弹药超时未失败', st3)

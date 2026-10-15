@@ -79,8 +79,13 @@ def run(pg):
     assert pg.evaluate("__dbg.mission.phase") == 'briefing', 'M6: retryMission 后应回到 briefing'
     pg.evaluate("__dbg.beginMission()")
     pg.wait_for_function("() => __dbg.mission.phase === 'active'", timeout=5000)
-    # 直接篡改 t0 制造超时（MISSION_TIMEOUT=360s）
-    pg.evaluate("__dbg.mission.t0 = __dbg.S.time - 400")
+    # 直接篡改 t0 制造超时。有效时限 = 变体时限 × 难度系数（P18：standard 360×1.2=432），
+    # 必须读页面真源 __dbg.missionTimeout()——Phase 18 上线时本测试沿用旧硬编码
+    # "S.time-400"（按 360s 基础时限设计），够不着 432s 有效时限，超时失败永不触发
+    # （2026-10-15 实测挂 15s 墙钟，根因即此；与 test_arcade A5 同款真源读法）。
+    to = pg.evaluate("__dbg.missionTimeout()")
+    assert isinstance(to, (int, float)) and to > 0, ('M6: missionTimeout 真源读口异常', to)
+    pg.evaluate("__dbg.mission.t0 = __dbg.S.time - (%s + 60)" % to)
     pg.wait_for_function("() => __dbg.mission.phase === 'failed' && __dbg.mission.failedReason === 'timeout'", timeout=15000)   # B4：loop 0.5s 节流判定
     st = pg.evaluate("(() => ({ phase: __dbg.mission.phase, reason: __dbg.mission.failedReason, done: __dbg.mission.done }))()")
     assert st['phase'] == 'failed' and st['reason'] == 'timeout', ('M6: 超时未失败', st)
