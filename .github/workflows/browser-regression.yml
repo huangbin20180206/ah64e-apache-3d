@@ -55,7 +55,7 @@ jobs:
           echo "static server ready (pid $(cat "$APACHE_TEST_OUT/server.pid"))"
       - name: CI smoke gate (frame-rate independent)
         env:
-          APACHE_TEST_URL: http://127.0.0.1:8642
+          APACHE_TEST_URL: http://127.0.0.1:8642/?nocine=1&nocut=1
           APACHE_TEST_OUT: ${{ runner.temp }}/apache-test-output
         run: |
           # GitHub 托管 runner 无 GPU：SwiftShader 软渲染下游戏时间约 1/50 实速
@@ -69,7 +69,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
         continue-on-error: true
         env:
-          APACHE_TEST_URL: http://127.0.0.1:8642
+          APACHE_TEST_URL: http://127.0.0.1:8642/?nocine=1&nocut=1
           APACHE_TEST_OUT: ${{ runner.temp }}/apache-test-output
         run: |
           # 完整清单试跑（与本地同一份 test-manifest.json，零删减）。软件渲染下
