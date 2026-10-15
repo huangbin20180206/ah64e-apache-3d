@@ -1,0 +1,96 @@
+name: browser-regression
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '23 20 * * 1'   # 每周一 04:23 Asia/Shanghai——完整清单试跑归档（见下）
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: astral-sh/setup-uv@v5
+      - name: Build bundle
+        run: node build.mjs
+      - name: Syntax checks
+        run: |
+          node --check build.mjs
+          node --check dist/app-check.mjs
+          node tools/check_dom_ids.mjs
+          # Phase 1-B：拓扑检查器自测（build.mjs 内已含真实源码的 assertTopology）
+          node tools/check_topology_selftest.mjs
+      - name: Pure logic tests (no browser, no GPU)
+        # tools/tests_pure：node 桩驱动的纯逻辑回归（战役/损伤/敌机/SAM/资源/合并几何），
+        # 帧率无关、秒级跑完——此前未进任何门禁，加关卡时无人跑到（见 AUDIT_VERDICT §D）
+        run: uv run --with pytest pytest -q tools/tests_pure
+      - name: Install Playwright
+        run: uv run --with playwright playwright install --with-deps chromium
+      - name: Start static server
+        env:
+          APACHE_TEST_OUT: ${{ runner.temp }}/apache-test-output
+        run: |
+          mkdir -p "$APACHE_TEST_OUT"
+          nohup uv run python -m http.server 8642 --directory dist \
+            > "$APACHE_TEST_OUT/server.log" 2>&1 &
+          echo $! > "$APACHE_TEST_OUT/server.pid"
+          ok=""
+          for i in $(seq 1 30); do
+            if curl -fsS "http://127.0.0.1:8642/index.html" > /dev/null; then ok=1; break; fi
+            sleep 1
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::static server not ready in 30s"
+            cat "$APACHE_TEST_OUT/server.log" || true
+            exit 1
+          fi
+          echo "static server ready (pid $(cat "$APACHE_TEST_OUT/server.pid"))"
+      - name: CI smoke gate (frame-rate independent)
+        env:
+          APACHE_TEST_URL: http://127.0.0.1:8642
+          APACHE_TEST_OUT: ${{ runner.temp }}/apache-test-output
+        run: |
+          # GitHub 托管 runner 无 GPU：SwiftShader 软渲染下游戏时间约 1/50 实速
+          # （实测 2026-09-03 run 33745063095：1/21，唯一通过项恰好全是状态断言），
+          # 实时 WebGL 断言在 CI 物理不可行。CI 门禁 = build + 静态检查 + 本冒烟
+          # 测试（帧率无关：引导完成 / FPV 鼠标 dx、dy 各自单次累加 / 轴间隔离）。
+          # 完整回归的权威门禁在本地：powershell -File tools/run_tests.ps1（约 7 分钟）。
+          xvfb-run -a -s "-screen 0 1280x800x24" \
+            uv run --with playwright python tools/tests/test_ci_smoke.py
+      - name: Full regression attempt (software-GL reference run)
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        continue-on-error: true
+        env:
+          APACHE_TEST_URL: http://127.0.0.1:8642
+          APACHE_TEST_OUT: ${{ runner.temp }}/apache-test-output
+        run: |
+          # 完整清单试跑（与本地同一份 test-manifest.json，零删减）。软件渲染下
+          # 实时断言预期失败——本作业仅归档完整输出供比对，不计入门禁结果。
+          # 真正的全量权威门禁在本地：powershell -File tools/run_tests.ps1。
+          echo "::warning::BLOCKED: GitHub-hosted runner has no GPU — realtime WebGL assertions are expected to fail under SwiftShader (~1/50 game speed). This run is archived for reference only; the authoritative full gate is tools/run_tests.ps1 on a GPU machine."
+          xvfb-run -a -s "-screen 0 1280x800x24" \
+            uv run --with playwright --with pillow python tools/tests/run_all.py
+      - name: Stop static server
+        if: always()
+        env:
+          APACHE_TEST_OUT: ${{ runner.temp }}/apache-test-output
+        run: |
+          if [ -f "$APACHE_TEST_OUT/server.pid" ]; then
+            kill "$(cat "$APACHE_TEST_OUT/server.pid")" 2>/dev/null || true
+          fi
+          pkill -f "http.server 8642" 2>/dev/null || true
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apache-browser-test-output
+          path: ${{ runner.temp }}/apache-test-output
+          if-no-files-found: ignore

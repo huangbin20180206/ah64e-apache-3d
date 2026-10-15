@@ -1,0 +1,267 @@
+// ============================================================
+// 16-targetmodels.js — 靶标程序化建模 + AI 高模换壳 + 静态几何合批
+// ============================================================
+// 2026-10-12 批 E 自 16-targets.js 拆出（纯搬移，行为不变）。同前缀 16-* 在
+// 拓扑检查里同级；文件名按字典序排在 16-targets.js 之前（"m" < "s"）。
+// 提供：targetMat / addBox / makeTank|Truck|BarrelTarget / TARGET_TYPES /
+//       TARGET_MODELS / loadTargetModels / applyModelToTarget / mergeTargetStatics
+// ============================================================
+
+// ---------- 靶标程序化建模 ----------
+
+function targetMat(color, roughness = 0.75, metalness = 0.1) {
+  return new THREE.MeshStandardMaterial({ color, roughness, metalness });
+}
+
+function addBox(g, geo, mat, pos, rot = null) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(...pos);
+  if (rot) m.rotation.set(...rot);
+  g.add(m);
+  return m;
+}
+
+// 装甲靶车：楔形车体 + 侧裙/履带轮 + 炮塔/炮管 + 光电头 + 靶板
+// P31-A1 兜底同步真实化：GLB 是实机所见，这里是 GLB 加载失败时的兜底——
+// 车体沿 Z×2（车体 3.30/履带 3.62），履带间距收窄到全宽≈1.6u：对齐真实
+// M1（1u≈2.27m：3.66m 宽=1.6u × 车体 7.9m≈3.5u），长宽比≈2.26。
+function makeTankTarget() {
+  const g = new THREE.Group();
+  const armor = targetMat(0x4f5947, 0.88, 0.22);
+  const edge = targetMat(0x293029, 0.92, 0.28);
+  const glass = targetMat(0x18292a, 0.28, 0.36);
+  const target = targetMat(0xd0c8ad, 0.76, 0.05);
+  const red = targetMat(0xa83228, 0.68, 0.18);
+
+  // 楔形车体：上下两层形成装甲折面（宽 1.35→1.20，长 1.65→3.30）
+  addBox(g, new THREE.BoxGeometry(1.20, 0.38, 3.30), armor, [0, 0.42, 0]);
+  addBox(g, new THREE.BoxGeometry(0.95, 0.25, 2.70), armor, [0, 0.70, -0.16], [0.10, 0, 0]);
+  // 侧裙板与前装甲斜板（裙板长 1.45→2.90；前板随新车头 0.82→1.60）
+  for (const sx of [-0.62, 0.62]) addBox(g, new THREE.BoxGeometry(0.10, 0.34, 2.90), edge, [sx, 0.40, 0]);
+  addBox(g, new THREE.BoxGeometry(1.00, 0.30, 0.10), edge, [0, 0.61, 1.60], [0.16, 0, 0]);
+
+  // 两条履带 + 8 个路轮（履带长 1.78→3.62；轮距 ±0.62，全宽≈1.65）
+  for (const sx of [-0.62, 0.62]) {
+    addBox(g, new THREE.BoxGeometry(0.25, 0.46, 3.62), edge, [sx, 0.30, 0]);
+    for (let iz = -1.38; iz <= 1.38; iz += 0.39) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.27, 12), armor);
+      w.rotation.z = PI / 2; w.position.set(sx, 0.30, iz); g.add(w);
+    }
+  }
+
+  // 炮塔、炮盾、炮管、顶部传感器（炮塔保持车体中前部；炮口前伸至新车头）
+  const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.40, 0.48, 0.34, 12), armor);
+  turret.position.set(0, 0.93, 0.25); g.add(turret);
+  addBox(g, new THREE.BoxGeometry(0.44, 0.28, 0.18), edge, [0, 0.96, 0.63], [0.05, 0, 0]);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.075, 1.45, 10), edge);
+  barrel.rotation.x = PI / 2; barrel.position.set(0, 0.96, 0.90); g.add(barrel);
+  const sight = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.11, 0.22), glass);
+  sight.position.set(0.22, 1.16, 0.37); g.add(sight);
+
+  // 前方靶板：立柱 + 白板 + 红色命中圈（随新车头前移）
+  addBox(g, new THREE.BoxGeometry(0.07, 0.58, 0.07), edge, [0, 1.18, 1.62]);
+  addBox(g, new THREE.BoxGeometry(0.80, 0.84, 0.06), target, [0, 1.12, 1.66]);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.055, 8, 24), red);
+  ring.position.set(0, 1.12, 1.695); g.add(ring);
+  return { group: g, hp: 2, hp0: 2, radius: 1.6, label: '装甲靶车' };
+}
+
+// 卡车靶：带驾驶室、挡风玻璃、后视镜、货箱骨架、保险杠、轮毂和底盘
+// P31-A2 兜底同步真实化：总长≈3.15u/宽≈1.10u（真实军卡 2.5m×7m ≈ 1.1u×3.1u），
+// 长宽比≈2.9——GLB 失败时兜底也不再矮胖。
+function makeTruckTarget() {
+  const g = new THREE.Group();
+  const cargoMat = targetMat(0x706b55, 0.86, 0.12);
+  const cabMat = targetMat(0x536772, 0.68, 0.24);
+  const glass = targetMat(0x182a31, 0.22, 0.45);
+  const dark = targetMat(0x1f2423, 0.94, 0.28);
+  const metal = targetMat(0x68706d, 0.48, 0.55);
+  const red = targetMat(0x9d3a2d, 0.72, 0.16);
+
+  // 底盘与货箱：货箱边框留空，避免“一个实心盒子”
+  addBox(g, new THREE.BoxGeometry(1.10, 0.16, 3.10), dark, [0, 0.46, 0]);
+  addBox(g, new THREE.BoxGeometry(0.98, 0.68, 2.10), cargoMat, [0, 0.88, -0.45]);
+  for (const sx of [-0.47, 0.47]) {
+    addBox(g, new THREE.BoxGeometry(0.06, 0.78, 2.20), metal, [sx, 0.90, -0.45]);
+  }
+  for (const z of [-1.45, 0.40]) addBox(g, new THREE.BoxGeometry(0.95, 0.07, 0.07), metal, [0, 0.55, z]);
+
+  // 驾驶室：下层车头 + 倾斜挡风玻璃 + 车顶（最前部 z≈1.12）
+  addBox(g, new THREE.BoxGeometry(1.02, 0.42, 0.72), cabMat, [0, 0.72, 1.12]);
+  addBox(g, new THREE.BoxGeometry(0.88, 0.25, 0.05), glass, [0, 0.98, 1.21], [0.30, 0, 0]);
+  addBox(g, new THREE.BoxGeometry(0.98, 0.08, 0.62), cabMat, [0, 1.08, 1.06]);
+  // 车窗侧面、后视镜、前保险杠与车灯
+  for (const sx of [-0.53, 0.53]) {
+    addBox(g, new THREE.BoxGeometry(0.035, 0.22, 0.36), glass, [sx, 0.91, 1.07]);
+    addBox(g, new THREE.BoxGeometry(0.10, 0.06, 0.13), dark, [sx * 1.08, 0.98, 0.88]);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), targetMat(0xd7b85c, 0.35, 0.10));
+    lamp.position.set(sx * 0.40, 0.77, 1.50); g.add(lamp);
+  }
+  addBox(g, new THREE.BoxGeometry(1.04, 0.12, 0.10), red, [0, 0.55, 1.52]);
+
+  // 三轴车轮：轮胎 + 金属轮毂，轮轴方向沿 X——前 1 后 2 真实轴距
+  const tire = new THREE.CylinderGeometry(0.27, 0.27, 0.22, 14);
+  const hub = new THREE.CylinderGeometry(0.11, 0.11, 0.235, 12);
+  for (const [wx, wz] of [[-0.50, 1.10], [0.50, 1.10], [-0.50, -0.80], [0.50, -0.80], [-0.50, -1.38], [0.50, -1.38]]) {
+    const w = new THREE.Mesh(tire, dark); w.rotation.z = PI / 2; w.position.set(wx, 0.27, wz); g.add(w);
+    const h = new THREE.Mesh(hub, metal); h.rotation.z = PI / 2; h.position.set(wx, 0.27, wz); g.add(h);
+  }
+  return { group: g, hp: 1, hp0: 1, radius: 1.08, label: '卡车靶' };
+}
+
+// 油桶阵：带底座、桶盖、双箍和危险标识的小型燃料堆
+// P31-A3 真实化：单桶从 φ0.46u/高0.66u（≈1.04m×1.5m）收到 φ0.34u/高0.50u
+//（≈0.77m×1.14m——真实 0.58m 径在 FPV 交战距离难辨认，取可读性折中），
+// 簇间距/底座同比例收小，保持双箍/桶盖/堆叠比例——读作"一堆小桶"非"大罐"。
+function makeBarrelTarget() {
+  const g = new THREE.Group();
+  const red = targetMat(0x8d3329, 0.66, 0.22);
+  const darkRed = targetMat(0x4c211d, 0.78, 0.18);
+  const band = targetMat(0xb9a77d, 0.52, 0.45);
+  const black = targetMat(0x171a18, 0.9, 0.12);
+  const base = addBox(g, new THREE.BoxGeometry(1.00, 0.07, 0.95), black, [0, 0.05, 0]);
+  base.rotation.y = 0.12;
+  const bg = new THREE.CylinderGeometry(0.17, 0.17, 0.50, 14);
+  const lid = new THREE.CylinderGeometry(0.150, 0.150, 0.028, 14);
+  for (const [px, py, pz] of [[0, 0, 0], [0.36, 0, 0.07], [-0.36, 0, -0.07], [0.07, 0, -0.38], [-0.22, 0, 0.36],
+                              [0, 0.50, 0], [0.36, 0.50, 0.07], [-0.36, 0.50, -0.07]]) {
+    const b = new THREE.Mesh(bg, py ? darkRed : red);
+    b.position.set(px, py + 0.29, pz); g.add(b);
+    const cap = new THREE.Mesh(lid, band); cap.position.set(px, py + 0.555, pz); g.add(cap);
+    for (const hy of [-0.13, 0.13]) {
+      const r = new THREE.Mesh(new THREE.TorusGeometry(0.173, 0.016, 7, 18), band);
+      r.rotation.x = PI / 2; r.position.set(px, py + 0.29 + hy, pz); g.add(r);
+    }
+  }
+  // 一个高对比但不喧宾夺主的危险菱形
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.17), targetMat(0xe2c24f, 0.7, 0.05));
+  sign.position.set(0, 0.34, 0.18); sign.rotation.x = PI / 2; sign.rotation.z = PI / 4; g.add(sign);
+  addBox(g, new THREE.BoxGeometry(0.04, 0.06, 0.09), black, [0, 0.35, 0.21]);
+  return { group: g, hp: 1, hp0: 1, radius: 0.7, label: '油桶阵' };
+}
+
+const TARGET_TYPES = {
+  tank:   { make: makeTankTarget,   count: 3, hint: '地狱火 / 火箭' },
+  truck:  { make: makeTruckTarget, count: 4, hint: '机炮 / 火箭' },
+  barrel: { make: makeBarrelTarget, count: 3, hint: '火箭 / 机炮' },
+};
+
+// ---------- AI 生成高质量模型（Tripo/Rodin 文生 3D → Blender 归一化 GLB）----------
+// 异步渐进替换：GLB 就位前用程序化模型兜底，不阻塞靶场构建。
+// 命中/瞄准/动目标链路全部走 group/pos/radius，换壳零影响。
+// P31-A 尺寸比例真实化（1u≈2.27m，基准=AC 旋翼直径 6.4583u=14.63m）：
+// len 此前是死元数据（声明未消费）——现在激活为【唯一确定尺寸源】：
+// applyModelToTarget 量 yaw 后水平长轴，等比 setScalar(len/curLen) 缩放，
+// GLB 按真实车长上屏且换模型后不用手调。真实基准：
+//   tank  M1 含炮 9.77m=4.3u（车体 7.9m≈3.5u）×宽 3.66m=1.6u
+//   truck 军卡 7m=3.1u ×宽 2.5m=1.1u
+// truck GLB 宽经 uniform 缩放≈1.55u（3.5m，比真实军卡宽）——C004 起用 wNarrow
+// 做横向收窄（见 applyModelToTarget）。运行时探针实测（group 局部空间，GLB 换壳后）：
+// truck 局部 X≈1.42~1.54=车宽、Z≈2.83~3.08=车长、Y≈1.39~1.52=车高 ⇒ 只压 X 即压车宽。
+const TARGET_MODELS = {
+  // wNarrow：横向收窄系数（只作用于实例局部 X，长/高不变）=目标宽/实测宽
+  // 2.5m/3.5m≈0.714 → 车宽 1.55u×0.714≈1.11u≈2.5m
+  truck: { url: 'assets/targets/truck.glb', yaw: 0,  len: 3.1, wNarrow: 2.5 / 3.5 },
+  // T-80U（CC0）：模型长度/炮管沿自身 X 轴，yaw +90° 转到 +Z 前向（-90° 实测反向）
+  tank:  { url: 'assets/targets/tank.glb',  yaw: Math.PI / 2, len: 4.3 },
+};
+let _targetModelCache = null;
+function loadTargetModels(scene) {
+  if (_targetModelCache) return _targetModelCache;
+  const loader = new THREE.GLTFLoader();
+  const out = {};
+  _targetModelCache = new Promise((resolve) => {
+    let pending = Object.keys(TARGET_MODELS).length;
+    for (const [key, def] of Object.entries(TARGET_MODELS)) {
+      loader.load(def.url, (gltf) => {
+        const m = gltf.scene;
+        m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        out[key] = m;
+        if (--pending === 0) resolve(out);
+      }, undefined, () => { if (--pending === 0) resolve(out); });
+    }
+  });
+  return _targetModelCache;
+}
+
+// 用 GLB 替换程序化模型：保留原 group 的位置/朝向，清空子节点换壳
+function applyModelToTarget(t, model) {
+  while (t.group.children.length) t.group.remove(t.group.children[0]);
+  const inst = model.clone(true);
+  inst.rotation.y = TARGET_MODELS[t.type].yaw;
+  t.group.add(inst);
+  // P31-A：激活 len——量 yaw 后水平长轴实际值，等比缩放到确定车长。
+  // 等比（setScalar）保模型比例完整；缩放发生在合批烘焙之前，世界矩阵
+  // 已含缩放，mergeTargetStatics 之后 draw/材质零变化。
+  const defLen = TARGET_MODELS[t.type].len;
+  if (defLen) {
+    // C006：车长测量必须**与 group 的场景朝向 yaw 无关**。旧实现直接量世界 AABB，
+    // 而 build() 给每个 group 一个朝向来袭方向的 yaw（绕圈巡逻卡车 :688 每帧还改
+    // 朝向），旋转后的水平投影 max(sz.x,sz.z) 随 yaw 变大 ⇒ 缩放系数偏小且随 yaw /
+    // 换壳时机浮动（实测修正前：truck 车长 2.827~3.081 漂移 8.98%、tank 4.193~4.259
+    // 漂移 1.58%，均短于 defLen）。
+    // 修法：量之前把 group 的**场景旋转临时归零**（保留模型自身固定的
+    // TARGET_MODELS.yaw 与 inst 的全部变换），量完立即恢复原 rotation——量到的是
+    // 模型自身长轴，任意 group yaw / 任意换壳时机都恒等 ⇒ 缩放系数稳定 ⇒
+    // 车长精确等于 defLen。位置不参与 getSize（平移无关），故无需动 position。
+    const rx = t.group.rotation.x, ry = t.group.rotation.y, rz = t.group.rotation.z;
+    t.group.rotation.set(0, 0, 0);
+    t.group.updateMatrixWorld(true);
+    // precise=true：逐顶点求 AABB（默认实现是"各几何自身 AABB 的再包围盒"，
+    // 对带自身旋转的模型会高估长轴——tank 的 yaw=π/2 实测高估 0.03%）。
+    // 只换壳时跑一次（7 个目标），一次性开销可忽略。
+    const bb = new THREE.Box3().setFromObject(t.group, true);
+    t.group.rotation.set(rx, ry, rz);
+    t.group.updateMatrixWorld(true);
+    const sz = bb.getSize(new THREE.Vector3());
+    const curLen = Math.max(sz.x, sz.z);
+    if (curLen > 1e-4) inst.scale.setScalar(defLen / curLen);
+  }
+  // C004：横向收窄（仅 truck）。inst.scale 在实例自身旋转之前生效
+  // （Object3D 矩阵 = T·R·S），而 truck 的 yaw=0 且模型车长沿自身 Z 轴
+  // ⇒ 压局部 X 即压车宽，车长/车高不受影响。必须放在上面等比缩放之后：
+  // 长轴测量读的是世界包围盒，先收窄会把"长轴"量成收窄后的值。
+  // 非均匀缩放的着色影响：法线由 normalMatrix（inverse-transpose）处理，
+  // 合批烘焙走 BufferGeometry.applyMatrix4 亦同样变换法线 ⇒ 光照正常。
+  const wNarrow = TARGET_MODELS[t.type].wNarrow;
+  if (wNarrow) inst.scale.x *= wNarrow;
+  // 观感提示：系数为"只压 X"的横向收窄，轮胎在侧视面（Y-Z）仍为正圆、
+  // 仅胎宽变窄；若模型正面存在 X-Y 平面内的圆形件（圆形车灯/侧挂备胎）
+  // 会被压成椭圆——交付前已按俯视+斜视截图核验（见 C004 回执）。
+  // PERF-AUDIT C2：换壳后立即按材质合批（tank GLB 多原语收敛）；
+  // 合并体打 noMerge 防重复合并，幂等
+  mergeTargetStatics(t);
+}
+
+// ---------- PERF-AUDIT C2：靶标静态几何按材质合批 ----------
+// 靶标组内所有 mesh 的局部变换构造后不变（mov 目标只动 group 层），
+// 同材质烘焙合并为每材质 1 个 mesh——barrel 程序化模型 35 mesh/个 → ~4，
+// tank GLB 多原语同样收敛。合并失败保底不合并（几何零丢失）；命中闪烁
+// flashHit 按材质实例操作，合并体材质引用不变，闪烁语义不受影响。
+function mergeTargetStatics(t) {
+  const g = t.group;
+  g.updateMatrixWorld(true);
+  const rel = new THREE.Matrix4();
+  const buckets = new Map();   // 材质实例 -> { geos, nodes }
+  g.traverse(m => {
+    if (!m.isMesh || !m.visible || m.userData.noMerge) return;
+    rel.copy(g.matrixWorld).invert().multiply(m.matrixWorld);
+    const geo = m.geometry.clone().applyMatrix4(rel);
+    let b = buckets.get(m.material);
+    if (!b) { b = { geos: [], nodes: [] }; buckets.set(m.material, b); }
+    b.geos.push(geo);
+    b.nodes.push(m);
+  });
+  let merged = 0;
+  for (const [mk, b] of buckets) {
+    const mg = mergeGeos(b.geos);
+    if (!mg) continue;                    // 保底：属性集不齐放弃该桶
+    for (const n of b.nodes) { if (n.parent) n.parent.remove(n); }
+    const m = new THREE.Mesh(mg, mk);
+    m.castShadow = true; m.receiveShadow = true;
+    m.userData.noMerge = true;             // 防重复合并（重复调用幂等）
+    g.add(m);
+    merged++;
+  }
+  return merged;
+}

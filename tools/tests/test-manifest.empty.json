@@ -1,0 +1,4 @@
+{
+  "_comment": "空清单——仅供 test_gate_harness 的嵌套门禁自测用（2026-09-17 D3）。嵌套门禁只验证 run_tests.ps1 的前置检查快速路径（toplevel / expected SHA / dirty），本不该跑到测试循环；此清单是保险丝：万一脏树检测回归（历史 R28' 真实发生过），嵌套门禁也只做 构建+起服务+0 个测试（~15s、零浏览器），而不是跑满 71 项直到 subprocess 超时（300s、71 个 Chromium、重建 dist、杀掉外层服务）。权威清单是 test-manifest.json，绝不使用本文件。",
+  "tests": []
+}

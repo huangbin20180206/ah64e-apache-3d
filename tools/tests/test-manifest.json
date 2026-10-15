@@ -1,0 +1,469 @@
+{
+ "tests": [
+  {
+   "name": "test_ci_smoke",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_fpv",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_navlights",
+   "pillow": true,
+   "mobile": false
+  },
+  {
+   "name": "test_weapons_air",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_water_ripple",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_reflection",
+   "pillow": true,
+   "mobile": false
+  },
+  {
+   "name": "test_wind",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_sand_tracks",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_edge_cases",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_grass",
+   "pillow": true,
+   "mobile": false
+  },
+  {
+   "name": "test_desert",
+   "pillow": true,
+   "mobile": false
+  },
+  {
+   "name": "test_desert_sink",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_targets_mov",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_tour",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_tour_full",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_view_anchor",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_hover_translation",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_orbit_yaw",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_dive",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_betty",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_mission",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_rescue",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_phase0_regressions",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_phase0_evidence",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_mobile",
+   "pillow": false,
+   "mobile": true
+  },
+  {
+   "name": "test_mobile_drive",
+   "pillow": false,
+   "mobile": true
+  },
+  {
+   "name": "test_mobile_mission",
+   "pillow": false,
+   "mobile": true
+  },
+  {
+   "name": "test_visual_continuity",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_visual_feedback_cleanup",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_entry_consistency",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_mission_loop",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_flight_tactics",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_threat_damage",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_visual_materials",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_visual_detail",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_detail_parts",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_detail_fallback",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_fail_paths",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_training",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_challenge_variants",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_cross_platform",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_fixes",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_cinematic",
+   "pillow": true,
+   "mobile": false
+  },
+  {
+   "name": "test_audio",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_weather",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_music",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_dof",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_narrative",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_cutscene",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_input_passthrough",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_camera_owner",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_reset_round",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_audio_resume",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_music_bus",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_dof_resources",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_dof_fb",
+   "pillow": true,
+   "mobile": false
+  },
+  {
+   "name": "test_gate_harness",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_pl_acq",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_mode_transitions",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_mode_chip",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_phase14_bbox",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_phase14_display",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_phase14_lifecycle",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_phase14_feedback",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_phase14_scene_readability",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_weapons_range",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_ground_ring",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_arcade",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_arcade_settle",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_arcade_hi",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_arcade_privacy",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_samwar",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_damage",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_enemyair",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_narrative_strike",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_resources",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_campaign",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_damage_hints",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_jam_trigger",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_air_superiority",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_target_len_yaw",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_gameplay_b",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_town",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_canyon",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_canyon_fp",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_appmode",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_levels",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_training",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_finale",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_layouts",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_livery_fp",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_fp_aim",
+   "pillow": false,
+   "mobile": false
+  },
+  {
+   "name": "test_routes",
+   "pillow": false,
+   "mobile": false
+  }
+ ]
+}

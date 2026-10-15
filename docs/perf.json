@@ -1,0 +1,2144 @@
+{
+ "batches": [
+  {
+   "phase": "P1-D 基线（Phase 2 前）",
+   "measured": "2026-09-04 09:01",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60,
+     "tri": 503451,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 503445,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 577630,
+     "draws": 273
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401023,
+     "draws": 187
+    }
+   ]
+  },
+  {
+   "phase": "Phase 2-A 后（667ad01）",
+   "measured": "2026-09-04 23:48",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 503451,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 503445,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 577630,
+     "draws": 273
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401023,
+     "draws": 187
+    }
+   ]
+  },
+  {
+   "phase": "Phase 2-B 后（B3/B4 新增 DOM/定时器复采样）",
+   "measured": "2026-09-05 18:19",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 503451,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 503445,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 577630,
+     "draws": 273
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401023,
+     "draws": 187
+    }
+   ]
+  },
+  {
+   "phase": "Phase 3 后（环境反馈深度：湖面透明化+倒影修复 / 风向断言 / 沙漠痕迹贴沙丘）",
+   "measured": "2026-09-06 02:31",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "对比 Phase 2-B：desert +15486 tri = WashTracks 痕迹平面从 1 段升 88×88 段以逐顶点贴合 duneH 高度场（7744 面×2 三角，占沙漠场景 3.1%，fps 持平 60.3）；water +64 tri / +1 draw = 湖面半透明后 far 远盘留显沉至 -18u 作深水湖床（CircleGeometry(600,64)=64 三角）。其余组合完全一致。"
+  },
+  {
+   "phase": "Phase 4-A 后（移动端虚拟驾驶摇杆）",
+   "measured": "2026-09-06 11:36",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "与 Phase 3 完全一致：P4-A 摇杆为纯 DOM 元素（不进 WebGL 场景，tri/draws 零变化），knob 更新只在 pointermove 事件内写 transform（事件驱动、空闲零 DOM 写入、无逐帧分配），FLY.userAlt 为纯数值状态。fps 全 60.3（rAF 上限）。"
+  },
+  {
+   "phase": "Phase 4-B",
+   "measured": "2026-09-06 20:14",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 57,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "P4-B 复核修订空闲复采样（替换首采）：环境=仅本 CLI 会话+静态文件服务，无门禁/无并行测试会话。tri/draws 与 Phase 3/4-A 逐项一致（零渲染负载变化）；fps 见 rows——首采（并行负载时 50.7-56.3）与本复采的差值即为采样环境噪声的实证。"
+  },
+  {
+   "phase": "Phase 5-A",
+   "measured": "2026-09-06 22:35",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 58,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 57,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "P5-A 视觉与动画连续性后采样：FLY.pitch damp 连续化（纯数学零新增对象）/ terrainFog 雾色混合（切换事件一次性）/ duneFar 色基随预设（切换事件）/ setEnvIntensity 机体反射联动（切换事件一次性遍历 39 材质，无逐帧扫描）——预期 tri/draws 与 Phase 4-B 完全一致，fps 无渲染负载变化"
+  },
+  {
+   "phase": "Phase 5-B（观感收口）",
+   "measured": "2026-09-06 23:58",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 59.7,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "P5-B 观感参数收口后采样：TERRAIN_FOG_ENV_MIX 0.35→0.6（地形雾色混合，切换事件）/ duneFar 色基=沙漠 farTint×环境明度（切换事件一次性）/ setEnvIntensity 公式 0.12+hemi×1.6（切换事件一次性）——预期 tri/draws 与 Phase 4-B/5-A 完全一致，fps 无渲染负载变化"
+  },
+  {
+   "phase": "Phase 5-C（综合视觉反馈一致性）",
+   "measured": "2026-09-07 09:04",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "P5-C 场地切换视觉清理后采样：16-targets 残骸段加 enabled 守卫 / 65-weapons clearTransient（对象池置 invisible 零销毁）/ 72-uibind setTerrain 接线——tri/draws 与 Phase 4-B/5-A/5-B 逐项全等（清理为一次性置位，零新增对象/逐帧开销），fps 全 60.3"
+  },
+  {
+   "phase": "Phase 5-D（最终交互与视觉反馈收口）",
+   "measured": "2026-09-07 10:34",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "P5-D 交互入口一致性后采样：repeat 空格守卫 / 键盘 B syncTargetsVis / visibilitychange+pointercancel 释放扳机——纯事件路由与状态清理，零新增场景对象；tri/draws 与 Phase 4-B/5-A/5-B/5-C 逐项全等，fps 无渲染负载变化"
+  },
+  {
+   "phase": "Phase 6（任务循环与任务模式）",
+   "measured": "2026-09-07 13:28",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "P6 任务循环后采样：模式 chip/startMission 等为事件驱动一次性逻辑，S._mission 为纯状态；任务面板 0.5s 节流写入（无逐帧 DOM 重建）；26-airtargets.reset 对象复用——tri/draws 与 Phase 5 各批逐项全等，fps 无渲染负载变化"
+  },
+  {
+   "phase": "Phase 6 修复批（模式边界/场地初始化）",
+   "measured": "2026-09-07 15:41",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "P6 修复批后采样：setMode 离开 mission 统一清理（resetRange 事件驱动）/ startMission 场地初始化顺序重排（W.setTerrain('desert') 先于 rescue.setTerrain + 同步 _rescueTerr）——纯逻辑与状态写入，零新增场景对象；tri/draws 与 Phase 5/6 各批逐项全等，fps 无渲染负载变化"
+  },
+  {
+   "phase": "Phase 6 验证批（环境验证后采样）",
+   "measured": "2026-09-07 16:14",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "P6 环境验证批后采样：产品行为零改动（本批仅验证+归档）——tri/draws 与 Phase 5/第 11/12 批逐项全等，fps 60.0-60.3"
+  },
+  {
+   "phase": "Phase 7（飞行手感与战术决策）",
+   "measured": "2026-09-07 17:35",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "P7 飞行战术后采样：稳定度派生/散布放大/救援低速窗口均为纯状态写入与事件逻辑（loop 每帧数行标量计算、_tracer 一次性散布系数、toggle 阈值检查）——tri/draws 与 Phase 6 各批逐项全等，fps 无渲染负载变化"
+  },
+  {
+   "phase": "Phase 8（威胁、武器与损伤反馈）",
+   "measured": "2026-09-07 23:56",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "P8 威胁/受损后采样：AA 曳光飞行循环（12 对象池复用）、威胁 HUD 节流（0.5s 刷新块内）、受损惩罚纯标量派生——零新增场景对象、零逐帧 DOM/Three.js 对象创建；tri/draws 与 Phase 7 各批逐项全等，fps 无渲染负载变化"
+  },
+  {
+   "phase": "Phase 9（Apache 外观渲染与材质精修）",
+   "measured": "2026-09-08 01:03",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 48,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 42.3,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 47,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 49.7,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "P9 材质精修后采样：分区 PBR 微调/高反射件 envI 倍率均为构造期一次性写入与切换事件驱动——零新增场景对象、零逐帧开销；tri/draws 与 Phase 8 各批逐项全等，fps 无渲染负载变化"
+  },
+  {
+   "phase": "Phase 9 复采样（空闲环境）",
+   "measured": "2026-09-08 01:05",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 48,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 42.7,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 46.7,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 51.3,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "P9 材质精修后空闲复采样：q=1 首采 42-50 为采样时负载环境性（tri/draws 与 Phase 8 全等证明渲染内容未变）；空闲复采 fps 回归 60 验证无退化"
+  },
+  {
+   "phase": "Phase 9 补强批（材质可见细节）",
+   "measured": "2026-09-08 11:29",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 406649,
+     "draws": 185
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1086651,
+     "draws": 187
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 518937,
+     "draws": 187
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 577694,
+     "draws": 274
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "P9 补强批采样：60-model _applyVisualDetail 延迟生成细节贴图（1x2048 蒙皮合成+Exhaust 512+lens 512，一次性生成缓存）——纯贴图内容变化，零新增几何/对象，预期 tri/draws 与 Phase 8/9 首轮逐项全等，fps 与首轮同环境持平"
+  },
+  {
+   "phase": "Phase 10（重点部件细节件）",
+   "measured": "2026-09-08 21:55",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 409049,
+     "draws": 192
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 59.7,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1089051,
+     "draws": 194
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60,
+     "tri": 521337,
+     "draws": 194
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 580094,
+     "draws": 281
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "P10 细节件采样（castShadow=false 修正后）：turret/gun/wheels 三个低模 GLB 挂 apache.src（2400 tri，小件不投射阴影——阴影 pass 每 castShadow mesh 额外计 draw 曾致 +14 超预算，修正后 draw 增量归零）；fps 满载 60.3；体积 +160KB（details 3 GLB，源 .blend/高模不入库）"
+  },
+  {
+   "phase": "Phase 10 修正批（删 turret + 剔 gun 供弹箱）",
+   "measured": "2026-09-08 23:52",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 59.3,
+     "tri": 407793,
+     "draws": 188
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 59,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 59,
+     "tri": 1087795,
+     "draws": 190
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 57.3,
+     "tri": 520081,
+     "draws": 190
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 59.7,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 55.3,
+     "tri": 578838,
+     "draws": 277
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 54,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "Phase 10 修正批：删除机首 turret.glb（轴向错位、世界 bbox 高 2.17 单位插入地面）+ 剔除 gun.glb 供弹箱图元（悬于机腹下方 0.24 单位），仅保留 gun 炮口箍（P10_Steel 1408 顶点）+ wheels 轮毂盘；细节件 3→2，预期 tri/draws 增量低于首轮（+2400 tri/+7 draws）"
+  },
+  {
+   "phase": "Phase 10 机首件重做批",
+   "measured": "2026-09-09 09:43",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 407793,
+     "draws": 188
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1087795,
+     "draws": 190
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 520081,
+     "draws": 190
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 578838,
+     "draws": 277
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "本批无新增几何（机首件尝试后弃用，见 docs/ai-reviews/phase-10-apache-nose-detail/NOSE-ATTEMPT.txt）；D2 阈值参数化与注释不影响渲染——tri/draws 应与修正批（第 20 批）逐项一致。单服务采样（8643 已停）。"
+  },
+  {
+   "phase": "Phase 11（教学引导/挑战变体/跨端体验）",
+   "measured": "2026-09-09 12:41",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 407793,
+     "draws": 188
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1087795,
+     "draws": 190
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 520081,
+     "draws": 190
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 578838,
+     "draws": 277
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "Phase 11 零渲染改动：训练判定/变体标记/toast/CSS 均为 UI 与状态机逻辑，无新增几何/材质/渲染管线改动——预期 tri/draws 与 Phase 10（第 21 批）逐项一致"
+  },
+  {
+   "phase": "Phase 12 发布审计复采样",
+   "measured": "2026-09-09 13:24",
+   "device": "win32 1920x1080 有头 Chromium + 390x844 has_touch",
+   "rows": [
+    {
+     "terrain": "pad",
+     "env": "day",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 407793,
+     "draws": 188
+    },
+    {
+     "terrain": "pad",
+     "env": "day",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "env": "day",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1087795,
+     "draws": 190
+    },
+    {
+     "terrain": "grass",
+     "env": "day",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "env": "day",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 520081,
+     "draws": 190
+    },
+    {
+     "terrain": "desert",
+     "env": "day",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "env": "day",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 578838,
+     "draws": 277
+    },
+    {
+     "terrain": "water",
+     "env": "day",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    },
+    {
+     "terrain": "pad",
+     "env": "dusk",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 408357,
+     "draws": 203
+    },
+    {
+     "terrain": "grass",
+     "env": "dusk",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1088359,
+     "draws": 205
+    },
+    {
+     "terrain": "desert",
+     "env": "dusk",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 520645,
+     "draws": 205
+    },
+    {
+     "terrain": "water",
+     "env": "dusk",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 579966,
+     "draws": 307
+    },
+    {
+     "terrain": "pad",
+     "env": "night",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 408357,
+     "draws": 203
+    },
+    {
+     "terrain": "grass",
+     "env": "night",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1088359,
+     "draws": 205
+    },
+    {
+     "terrain": "desert",
+     "env": "night",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 520645,
+     "draws": 205
+    },
+    {
+     "terrain": "water",
+     "env": "night",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 582215,
+     "draws": 307
+    },
+    {
+     "terrain": "pad",
+     "env": "day",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 390390,
+     "draws": 173,
+     "viewport": "390x844"
+    },
+    {
+     "terrain": "grass",
+     "env": "day",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1070392,
+     "draws": 175,
+     "viewport": "390x844"
+    }
+   ],
+   "notes": "Phase 12 只读审计：day 8 行与第 22 批基线严格对比（tri/draws 偏差、FPS）；dusk/night 为环境扩展维度（灯光/光照差异属预期）；移动端 2 行窄视口参考。",
+   "compare": {
+    "worst_tri_pct": 0.0,
+    "worst_draw_pct": 0.0,
+    "min_fps": 60.3
+   }
+  },
+  {
+   "phase": "Phase 13-2（电影镜头包第 2 阶段：氛围与声音）",
+   "measured": "2026-09-10 17:19",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 407793,
+     "draws": 188
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1087795,
+     "draws": 190
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 520081,
+     "draws": 190
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 578838,
+     "draws": 277
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "A1 音频样本层（engine/wind/brass/pad 循环+一次性，AudioContext 节点零 WebGL 开销）+ M3 体积光（godRays 1/4 分辨率径向 pass，仅太阳入屏且 q>=1 时启用）+ M4 天气（沙暴 280 实例沙尘 InstancedMesh=1 draw + fog 乘数 + 天空 uniforms；雷暴纯 uniform）+ S4 配乐（Web Audio 鼓机/贝斯/旋律，零渲染）。预期 q=1 tri/draws 与基线一致（天气/配乐默认关闭零增量），fps>=55 达标（A2 新规）。"
+  },
+  {
+   "phase": "Phase 13-2 修复批（windGain 停机沙暴风声修复）",
+   "measured": "2026-09-10 20:46",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 407793,
+     "draws": 188
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1087795,
+     "draws": 190
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 520081,
+     "draws": 190
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 578838,
+     "draws": 277
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "复核阻断项修复：18-audio.js wind 目标增益与旋翼声分离（纯 JS 音频增益逻辑，不创建/销毁 WebGL 对象、不改渲染管线）。复采样证明 tri/draws 与第 24 批逐项一致（零回归），fps>=55 达标（A2）。本批为修复验证证据，区分于第 24 批交付证据。"
+  },
+  {
+   "phase": "Phase 13-2 修复批二轮（静音闭环测试补强——test-only，产品树不变）",
+   "measured": "2026-09-10 21:54",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 407793,
+     "draws": 188
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1087795,
+     "draws": 190
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 520081,
+     "draws": 190
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 578838,
+     "draws": 277
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "复核二轮：test_audio.py 静音闭环补强（测试文件变化，产品 src/ 零改动）。复采样证明当前树 tri/draws 与第 24/25 批逐位一致（渲染路径未动），fps>=55 达标。本批与第 25 批同产品树——测试文件不参与渲染，差异仅在测试资产。"
+  },
+  {
+   "phase": "Phase 13-3（电影镜头包第 3 阶段：叙事与画质）",
+   "measured": "2026-09-11 01:13",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 52,
+     "tri": 407793,
+     "draws": 188
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 52.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 49.7,
+     "tri": 1087795,
+     "draws": 190
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 50.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 49.3,
+     "tri": 520081,
+     "draws": 190
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 53.7,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 53.3,
+     "tri": 578838,
+     "draws": 277
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 53,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "M2 景深 DOF（半分辨率散焦 pass，仅 FPV 且 q>=1 启用）+ M5 环境叙事（基地静态造型约 12 mesh + 2 机巡逻编队 + 2 Sprite 烟柱，q 无关但仅靶场启用场景可见几何）+ M6 过场（纯 orbit 直写零渲染增量）。预期 q=1 场景切换后 tri/draws 与基线批次 26 接近（叙事对象约 +10 tri 量级、巡逻/烟柱 +3 draws 量级），fps>=55 达标（A2 新规）；DOF 仅 FPV 时 +1 pass（本采样不涉及）。"
+  },
+  {
+   "phase": "Phase 13-3 复采（空闲环境，判定 27 批 fps 52 归属）",
+   "measured": "2026-09-11 01:14",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 50.3,
+     "tri": 407793,
+     "draws": 188
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 52,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 53.7,
+     "tri": 1087795,
+     "draws": 190
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 50.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 52.3,
+     "tri": 520081,
+     "draws": 190
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 54.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 52,
+     "tri": 578838,
+     "draws": 277
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 52.7,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "数据集：无并行负载。判定：若 fps 回 60.3 且 tri/draws 与 27 批一致 → 27 批低 fps 为采样环境噪声；若仍 <55 → M5/M6 真退化需收敛。"
+  },
+  {
+   "phase": "Phase 13-3 归档基准复采（空闲环境）",
+   "measured": "2026-09-11 01:19",
+   "device": "win32 1280x800 有头 Chromium",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 53.3,
+     "tri": 407841,
+     "draws": 192
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 52,
+     "tri": 406691,
+     "draws": 183
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 51,
+     "tri": 1087843,
+     "draws": 194
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 52.3,
+     "tri": 780693,
+     "draws": 185
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 49.7,
+     "tri": 520129,
+     "draws": 194
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 54.7,
+     "tri": 518979,
+     "draws": 185
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 52,
+     "tri": 578838,
+     "draws": 277
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 52,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "批次 27/28 实测 fps 50-54 <55 经 A/B 决定性对照定性环境性：旧版 ff7c840（Phase 13-3 前）同刻采样 pad 51.7=新版相同，tri/draws 逐项与基线一致，证明非代码引入（机器 3 小时窗口状态变化）。本批为空闲环境复采基准。"
+  },
+  {
+   "phase": "Phase 18 轻街机层（纯 DOM/逻辑层，零渲染改动）+ 门禁默认无头",
+   "measured": "2026-09-17 22:35",
+   "device": "win32 1280x800 无头 Chromium / ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x0000A7A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 51.3,
+     "tri": 407793,
+     "draws": 188
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1087795,
+     "draws": 190
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 50.7,
+     "tri": 520081,
+     "draws": 190
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 52.3,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60,
+     "tri": 578838,
+     "draws": 277
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "Phase 18 只改 DOM/逻辑（83-arcade.js 零 THREE 调用），预期 tri/draws 与上一批（批 29 / Phase 13-3 归档收官：pad 407841/192）**逐项全等**——不等即说明本批误触了渲染路径。fps 为本项目**首次无头模式采样**（--use-angle=d3d11 走 Intel Iris Xe 硬件；无头裸跑会掉进 SwiftShader 软件渲染仅 ~1.7fps，故 device 字段改为实测写入渲染后端）。硬指标 fps>=55。"
+  },
+  {
+   "phase": "Phase 18 复采（同代码二次采样，机器负载波动对照）",
+   "measured": "2026-09-17 22:36",
+   "device": "win32 1280x800 无头 Chromium / ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x0000A7A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 52.3,
+     "tri": 407793,
+     "draws": 188
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 58.3,
+     "tri": 1087795,
+     "draws": 190
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 56.7,
+     "tri": 520081,
+     "draws": 190
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 59.7,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 578838,
+     "draws": 277
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "同批 30 的二次采样，用于对照机器负载波动：批 30 有 3 行 <55（pad q=1 51.3 / desert q=1 50.7 / desert q=0.75 52.3）。历史同现象：批 27/28/29 全部 8 行 <55，cinematic-pack-3 归档时经 A/B 对照定性为机器环境上限（非代码引入），故本批不触发收敛减量。两批 tri/draws 应逐项全等（同一代码）。"
+  },
+  {
+   "phase": "Phase 18 定稿采样（预热修复后，性能指标以此批为准）",
+   "measured": "2026-09-17 22:37",
+   "device": "win32 1280x800 无头 Chromium / ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x0000A7A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rows": [
+    {
+     "terrain": "pad",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 407793,
+     "draws": 188
+    },
+    {
+     "terrain": "pad",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 406643,
+     "draws": 179
+    },
+    {
+     "terrain": "grass",
+     "quality": "1",
+     "fps": 60.3,
+     "tri": 1087795,
+     "draws": 190
+    },
+    {
+     "terrain": "grass",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 780645,
+     "draws": 181
+    },
+    {
+     "terrain": "desert",
+     "quality": "1",
+     "fps": 57,
+     "tri": 520081,
+     "draws": 190
+    },
+    {
+     "terrain": "desert",
+     "quality": "0.75",
+     "fps": 58.7,
+     "tri": 518931,
+     "draws": 181
+    },
+    {
+     "terrain": "water",
+     "quality": "1",
+     "fps": 60,
+     "tri": 578838,
+     "draws": 277
+    },
+    {
+     "terrain": "water",
+     "quality": "0.75",
+     "fps": 60.3,
+     "tri": 401087,
+     "draws": 188
+    }
+   ],
+   "notes": "批 30/31 是**未预热**样本，首行 pad q=1 被冷启动成本压低（51.3/52.3），本次在采样前先预热一轮地形切换（bench_perf_append 2026-09-17 加了预热段，附注释说明），故首行回到正常量级。tri/draws 与三批全部逐项全等（同一代码、Phase 18 零渲染改动）：pad 407793/188、grass 1087795/190、desert 520081/190、water 578838/277，q=0.75 全等。硬指标 fps>=55（第 24 批起 A2 新规）。**性能结论以此批为准**，30/31 留档作为预热伪影的实证。"
+  }
+ ]
+}

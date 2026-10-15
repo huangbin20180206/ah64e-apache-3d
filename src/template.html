@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>AH-64E 阿帕奇 · 交互式 3D</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2307090c'/%3E%3Ccircle cx='16' cy='16' r='6.5' fill='none' stroke='%235fd0a8' stroke-width='2'/%3E%3Cpath d='M16 2v7M16 23v7M2 16h7M23 16h7' stroke='%235fd0a8' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#07090c; --fg:#e8edf2; --dim:#8b97a5; --line:rgba(255,255,255,.10);
+  --panel:rgba(12,16,21,.80); --accent:#5fd0a8; --accent2:#f0b45a; --warn:#e0684f;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",Roboto,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-family:var(--sans)}
+#gl{position:fixed;inset:0;display:block;width:100%;height:100%}
+
+/* ---------- 载入遮罩 ---------- */
+#loading{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:16px;background:#07090c;
+  transition:opacity .5s ease}
+#loading.done{opacity:0;pointer-events:none}
+#load-title{font-size:13px;letter-spacing:.30em;color:var(--dim);text-transform:uppercase}
+#load-bar{width:min(320px,62vw);height:2px;background:rgba(255,255,255,.10);overflow:hidden}
+#load-fill{height:100%;width:0%;background:var(--accent);transition:width .25s ease}
+#load-txt{font-family:var(--mono);font-size:11px;color:var(--dim);min-height:14px;
+  max-width:82vw;text-align:center;white-space:pre-wrap;word-break:break-word}
+
+/* ---------- 顶部 HUD ---------- */
+#top{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;
+  gap:14px;padding:10px 14px;pointer-events:none;
+  background:linear-gradient(180deg,rgba(4,6,9,.72),rgba(4,6,9,0))}
+#brand{font-size:12px;letter-spacing:.18em;font-weight:600;padding-left:9px;
+  border-left:2px solid var(--accent)}
+#brand small{display:block;font-size:9px;letter-spacing:.26em;color:var(--dim);font-weight:400;margin-top:2px}
+#hud{display:flex;gap:12px;font-family:var(--mono);font-size:10px;color:var(--dim);flex-wrap:wrap}
+#hud b{color:var(--fg);font-weight:500}
+#top-right{margin-left:auto;display:flex;gap:6px;pointer-events:auto}
+.iconbtn{width:30px;height:30px;border:1px solid var(--line);background:rgba(10,14,18,.62);
+  color:var(--fg);border-radius:6px;cursor:pointer;font-size:13px;line-height:1;
+  display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+.iconbtn:hover{border-color:var(--accent);color:var(--accent)}
+.iconbtn.on{border-color:var(--accent);color:var(--accent)}
+
+/* ---------- 右侧控制面板（军工航电 HUD 风格） ---------- */
+#panel{position:fixed;top:52px;right:12px;bottom:12px;width:246px;z-index:25;
+  overflow-y:auto;overflow-x:hidden;padding:14px 12px 12px;
+  border:1px solid rgba(95,208,168,.26);border-top:2px solid var(--accent);
+  border-radius:0;
+  clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px));
+  background:
+    repeating-linear-gradient(0deg,transparent 0 2px,rgba(95,208,168,.034) 2px 3px),
+    linear-gradient(180deg,rgba(11,16,14,.90),var(--panel));
+  backdrop-filter:blur(14px);
+  box-shadow:inset 0 18px 22px -20px rgba(95,208,168,.16),inset 0 -14px 18px -16px rgba(240,180,90,.08);
+  scrollbar-width:thin;transition:transform .3s ease,opacity .3s ease}
+#panel.hide{transform:translateX(calc(100% + 18px));opacity:0;pointer-events:none}
+#panel::-webkit-scrollbar{width:5px}
+#panel::-webkit-scrollbar-thumb{background:rgba(95,208,168,.28);border-radius:3px}
+.sec{margin-bottom:14px}
+.sec:last-child{margin-bottom:2px}
+.sec>h3{margin:0 0 8px;font-size:9px;letter-spacing:.24em;color:var(--accent);
+  text-transform:uppercase;font-weight:600;font-family:var(--mono);
+  display:flex;align-items:center;gap:6px}
+.sec>h3::before{content:'';width:6px;height:10px;background:var(--accent);
+  clip-path:polygon(0 0,100% 0,100% 55%,50% 100%,0 55%)}   /* 弹头形指示条 */
+.sec>h3::after{content:'';flex:1;height:1px;
+  background:linear-gradient(90deg,rgba(95,208,168,.38),transparent)}
+.btn{width:100%;padding:8px 10px;border:1px solid rgba(240,180,90,.42);border-radius:2px;
+  background:linear-gradient(180deg,rgba(240,180,90,.10),rgba(240,180,90,.03));
+  color:var(--accent2);font-size:12px;cursor:pointer;
+  font-family:var(--sans);text-align:center;transition:.15s;
+  letter-spacing:.14em;font-weight:600}
+.btn:hover{border-color:var(--accent2);background:rgba(240,180,90,.16);
+  box-shadow:0 0 14px rgba(240,180,90,.25)}
+.btn.primary{border-color:var(--accent2);color:var(--accent2);font-weight:700;letter-spacing:.06em;
+  box-shadow:inset 0 0 14px rgba(240,180,90,.10)}
+.btn.primary.on{background:var(--warn);border-color:var(--warn);color:#fff;
+  box-shadow:0 0 16px rgba(224,104,79,.45)}
+.row{display:flex;gap:5px;flex-wrap:wrap}
+.row>.chip{flex:1 1 auto}
+.chip{padding:6px 8px;border:1px solid rgba(255,255,255,.13);border-radius:2px;
+  background:rgba(255,255,255,.03);color:#9aa7b3;font-size:10.5px;cursor:pointer;
+  text-align:center;white-space:nowrap;transition:.15s;font-family:var(--sans);
+  position:relative;letter-spacing:.04em}
+.chip:hover{color:var(--fg);border-color:rgba(240,180,90,.55);
+  background:rgba(240,180,90,.07)}
+.chip.on{background:rgba(95,208,168,.13);border-color:var(--accent);color:var(--accent);
+  box-shadow:inset 0 0 12px rgba(95,208,168,.12),0 0 8px rgba(95,208,168,.18);
+  text-shadow:0 0 8px rgba(95,208,168,.55)}
+.chip.on::after{content:'';position:absolute;top:2px;right:2px;width:5px;height:5px;
+  background:var(--accent);clip-path:polygon(0 0,100% 0,100% 100%)}  /* 右上三角点亮标 */
+/* 键盘可达：.chip 是 div 伪按钮，没有原生焦点环；:focus-visible 只在
+   键盘导航时出现，鼠标点击不会留下框（避免影响原有观感）。 */
+.chip:focus-visible,.btn:focus-visible,.iconbtn:focus-visible,
+select:focus-visible,input:focus-visible,button:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}
+label.ck{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--fg);
+  padding:4px 0;cursor:pointer;user-select:none;
+  border-bottom:1px dashed rgba(255,255,255,.055)}
+label.ck input{appearance:none;width:15px;height:15px;flex:0 0 15px;
+  border:1px solid rgba(255,255,255,.22);border-radius:2px;
+  background:rgba(0,0,0,.32);cursor:pointer;position:relative}
+label.ck input:checked{background:rgba(95,208,168,.18);border-color:var(--accent);
+  box-shadow:0 0 7px rgba(95,208,168,.35)}
+label.ck input:checked::after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;
+  border:solid var(--accent);border-width:0 2px 2px 0;transform:rotate(45deg);
+  filter:drop-shadow(0 0 3px rgba(95,208,168,.8))}
+.sl{display:block;margin:7px 0 3px}
+.sl>span{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);margin-bottom:4px}
+.sl>span b{color:var(--fg);font-family:var(--mono);font-weight:500}
+input[type=range]{appearance:none;width:100%;height:3px;background:rgba(255,255,255,.14);
+  border-radius:2px;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:11px;height:11px;border-radius:1px;
+  background:var(--accent);border:none;cursor:pointer;
+  box-shadow:0 0 8px rgba(95,208,168,.6)}
+input[type=range]::-moz-range-thumb{width:11px;height:11px;border-radius:1px;
+  background:var(--accent);border:none;cursor:pointer;
+  box-shadow:0 0 8px rgba(95,208,168,.6)}
+select{width:100%;padding:6px 8px;border:1px solid rgba(95,208,168,.30);border-radius:2px;
+  background:rgba(8,12,15,.95);color:var(--fg);font-size:11.5px;font-family:var(--mono);cursor:pointer}
+
+/* 转速表 */
+#rotor-wrap{margin-top:8px}
+#rotor-bar{height:5px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden;
+  border:1px solid rgba(255,255,255,.10)}
+#rotor-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));
+  box-shadow:0 0 8px rgba(240,180,90,.5)}
+.rotor-info{display:flex;justify-content:space-between;font-family:var(--mono);
+  font-size:10px;color:var(--dim);margin-top:4px}
+.rotor-info b{color:var(--fg);font-weight:500}
+
+/* ---------- 左下 规格 ---------- */
+#specs{position:fixed;left:12px;bottom:12px;z-index:20;padding:10px 12px;
+  border:1px solid rgba(95,208,168,.22);border-radius:2px;
+  background:var(--panel);border-left:2px solid var(--accent);
+  backdrop-filter:blur(12px);font-family:var(--mono);font-size:10px;color:var(--dim);
+  line-height:1.65;max-width:200px;transition:opacity .3s}
+#specs b{color:var(--fg);font-weight:500}
+#specs.hide{opacity:0;pointer-events:none}
+
+/* ---------- 任务面板（P2-2 军工风） ---------- */
+#mission{position:fixed;left:12px;top:52px;z-index:22;width:228px;padding:10px 12px;
+  border:1px solid rgba(95,208,168,.26);border-top:2px solid var(--accent);
+  background:linear-gradient(180deg,rgba(11,16,14,.90),var(--panel));
+  clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,10px 100%,0 calc(100% - 10px));
+  font-family:var(--mono);font-size:11px;color:var(--fg);line-height:1.7;
+  opacity:0;pointer-events:none;transition:opacity .4s}
+#mission.show{opacity:1;pointer-events:none}   /* P4-B：任务面板是纯只读展示，不拦截画布触控 */
+/* Phase 11 C1：简报阶段允许交互（变体 chip 选择）；active/结算阶段恢复纯只读 */
+#mission.briefing{pointer-events:auto}
+/* 变体选择行：flex-wrap 保证窄屏换行不溢出（X3） */
+#mission-variants{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px}
+#mission-variants .chip{flex:1 1 auto;font-size:10px;padding:5px 6px}
+#mission-campaign{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px}
+#mission-campaign .chip{flex:1 1 auto;font-size:10px;padding:5px 6px}
+#mission-campaign .chip.locked{opacity:.38;cursor:not-allowed}
+/* P18：难度行（与变体行同款 chips；仅简报阶段渲染——结算/失败不出现） */
+#mission-difficulties{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px}
+#mission-difficulties .chip{flex:1 1 auto;font-size:10px;padding:5px 6px}
+#mission-difficulties .chip::before{content:'难度 · ';color:var(--dim)}
+#mission-title{font-size:10px;letter-spacing:.24em;color:var(--accent);
+  text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+#mission-title::before{content:'';width:6px;height:9px;background:var(--accent);
+  clip-path:polygon(0 0,100% 0,100% 55%,50% 100%,0 55%)}
+#mission-body .mrow{display:flex;justify-content:space-between;color:var(--dim)}
+#mission-body .mrow b{color:var(--fg);font-weight:500}
+#mission-body .mhint{color:var(--accent);font-size:10.5px;margin-top:4px}
+
+/* ---------- 部件标签 ---------- */
+#labels{position:fixed;inset:0;z-index:15;pointer-events:none;overflow:hidden}
+/* 引线+文字（用户反馈）：文字框抬到锚点上方，细线连接锚点与文字框底边 */
+.lab{position:absolute;transform:translate(-50%,-100%);white-space:nowrap;
+  font-size:10px;font-family:var(--mono);color:var(--fg);padding:2px 6px;
+  border:1px solid rgba(95,208,168,.42);border-radius:3px;background:rgba(6,10,14,.78);
+  letter-spacing:.04em;cursor:pointer;pointer-events:auto;
+  transition:background .15s,border-color .15s}
+.labline{position:absolute;height:1px;background:rgba(95,208,168,.35);
+  transform-origin:left center;pointer-events:none}
+.lab:hover{background:rgba(6,10,14,.94);border-color:var(--accent)}
+.lab::before{content:'';position:absolute;left:50%;bottom:-4px;width:3px;height:3px;
+  margin-left:-1.5px;border-radius:50%;background:var(--accent)}
+/* P2-B3：部件解说牌——点击标签展开，展台解说口吻；点击牌面收起 */
+#label-info{position:fixed;right:16px;top:62px;z-index:16;display:none;max-width:300px;
+  padding:13px 16px;border-radius:12px;background:rgba(10,14,19,.88);color:#dbe6ee;
+  font-size:12.5px;line-height:1.7;border:1px solid rgba(95,208,168,.3);
+  backdrop-filter:blur(8px);pointer-events:auto;cursor:pointer;
+  box-shadow:0 10px 30px rgba(0,0,0,.5)}
+#label-info b{display:block;font-size:14px;color:#fff;margin-bottom:6px;letter-spacing:.06em}
+#label-info p{margin:0}
+
+/* ---------- 第一人称 HUD ---------- */
+#fp-hud{position:fixed;inset:0;z-index:18;pointer-events:none;display:none;
+  font-family:var(--mono)}
+#fp-reticle{position:absolute;left:50%;top:50%;width:44px;height:44px;
+  transform:translate(-50%,-50%)}
+#fp-reticle::before{content:'';position:absolute;left:50%;top:50%;width:4px;height:4px;
+  margin:-2px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px rgba(95,208,168,.9)}
+#fp-reticle i{position:absolute;background:rgba(95,208,168,.85);box-shadow:0 0 4px rgba(95,208,168,.6)}
+#fp-reticle i:nth-child(1){left:0;top:50%;width:11px;height:2px;margin-top:-1px}
+#fp-reticle i:nth-child(2){right:0;top:50%;width:11px;height:2px;margin-top:-1px}
+#fp-reticle i:nth-child(3){top:0;left:50%;width:2px;height:11px;margin-left:-1px}
+#fp-reticle i:nth-child(4){bottom:0;left:50%;width:2px;height:11px;margin-left:-1px}
+#fp-info{position:absolute;left:50%;bottom:64px;transform:translateX(-50%);
+  display:flex;gap:18px;padding:7px 16px;border:1px solid var(--line);border-radius:8px;
+  background:rgba(8,11,15,.72);backdrop-filter:blur(8px);font-size:11px;color:var(--dim)}
+#fp-info b{color:var(--fg);font-weight:500}
+/* 批 E：峡谷地形读数（离地/崖顶余量/前方净空），仅峡谷任务 FPV 显示 */
+#fp-gpws{position:absolute;left:50%;bottom:104px;transform:translateX(-50%);display:none;
+  padding:4px 12px;border:1px solid var(--line);border-radius:6px;background:rgba(8,11,15,.6);
+  font-size:11px;color:var(--fg);letter-spacing:.04em;white-space:nowrap}
+#fp-gpws.show{display:block}
+#fp-gpws.exposed{color:#ffcf8a}
+#fp-gpws.caution{border-color:#e8b04a;color:#ffe2a8}
+#fp-gpws.warn{border-color:#ff5a4a;color:#ffd0c8;background:rgba(60,10,8,.72);animation:gpwsBlink .5s steps(2) infinite}
+@keyframes gpwsBlink{50%{opacity:.45}}
+/* 完整键位提示（用户反馈：无按键提示——进入 FPV 即显示全部武器/驾驶键位） */
+#fp-tip{position:absolute;top:52px;left:50%;transform:translateX(-50%);
+  font-size:10px;color:var(--dim);letter-spacing:.08em;text-align:center;line-height:1.7;
+  white-space:nowrap;max-width:96vw;overflow:hidden;text-overflow:ellipsis}
+#fp-lock{position:fixed;z-index:19;width:46px;height:46px;margin:-23px;
+  border:2px solid var(--accent2);border-radius:4px;pointer-events:none;
+  box-shadow:0 0 8px rgba(240,180,90,.5);display:none;
+  animation:lockPop .28s cubic-bezier(.2,1.4,.4,1)}
+@keyframes lockPop{0%{transform:scale(1.9);opacity:0}100%{transform:scale(1);opacity:1}}
+#fp-lock-d{position:absolute;left:50%;top:calc(100% + 4px);transform:translateX(-50%);
+  font-family:var(--mono);font-size:10px;color:var(--accent2);white-space:nowrap}
+/* 建议武器（按锁定目标类型，随距离数字下方常驻显示） */
+#fp-lock-w{position:absolute;left:50%;top:calc(100% + 20px);transform:translateX(-50%);
+  font-family:var(--mono);font-size:10px;color:var(--accent);white-space:nowrap}
+#fp-arr{position:fixed;z-index:19;color:var(--accent2);font-size:20px;
+  pointer-events:none;display:none;text-shadow:0 0 6px rgba(240,180,90,.8)}
+/* P16 验收修复：屏外目标标签（目标名+武器建议，贴箭头下方；箭头模式显示） */
+#fp-arr-label{position:fixed;z-index:19;display:none;transform:translateX(-50%);
+  font-family:var(--mono);font-size:10px;color:var(--accent2);white-space:nowrap;
+  pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+#fp-capture{position:absolute;left:50%;top:82px;transform:translateX(-50%);display:none;
+  align-items:center;gap:8px;padding:6px 9px;border:1px solid rgba(240,180,90,.55);
+  border-radius:6px;background:rgba(22,17,10,.88);color:#f2d9a6;font-size:10px;
+  pointer-events:auto;white-space:nowrap}
+#fp-recapture{padding:5px 9px;border:1px solid var(--accent2);border-radius:4px;
+  background:transparent;color:var(--accent2);font:inherit;cursor:pointer}
+#fp-recapture:hover{background:rgba(240,180,90,.14)}
+#fp-status{color:var(--dim)}
+#fp-touch{display:none;position:absolute;left:14px;bottom:82px;grid-template-columns:repeat(3,42px);
+  grid-template-rows:repeat(3,42px);gap:5px;pointer-events:auto;touch-action:none}
+#fp-touch button,#fp-touch-rq button{width:42px;height:42px;border:1px solid rgba(95,208,168,.6);
+  border-radius:6px;background:rgba(8,14,11,.72);color:var(--accent);font:11px var(--sans);
+  touch-action:none;user-select:none}
+#fp-touch button:active,#fp-touch-rq button:active{background:rgba(95,208,168,.22)}
+#fp-touch-w{grid-column:2;grid-row:1}#fp-touch-a{grid-column:1;grid-row:2}
+#fp-touch-s{grid-column:2;grid-row:2}#fp-touch-d{grid-column:3;grid-row:2}
+#fp-touch-rq{display:none;position:absolute;right:14px;bottom:82px;gap:5px;
+  pointer-events:auto;touch-action:none}
+@media (pointer:coarse){
+  #fp-touch{display:grid} #fp-touch-rq{display:flex}
+  .chip{padding:9px 14px;font-size:11px}          /* 触控最小目标 28px+ */
+  #views .chip{font-size:10.5px;padding:7px 10px}
+}
+
+/* ---------- P4-A 移动端虚拟驾驶摇杆（环绕模式，76-mobile.js） ---------- */
+#mstick{display:none;position:fixed;inset:0;z-index:21;pointer-events:none}
+#mstick-l,#mstick-r{position:absolute;bottom:104px;width:112px;height:112px;
+  border-radius:50%;border:1px solid rgba(95,208,168,.45);background:rgba(8,14,11,.42);
+  pointer-events:auto;touch-action:none;backdrop-filter:blur(3px)}
+#mstick-l{left:14px}
+#mstick-r{right:14px}
+#mstick-lk,#mstick-rk{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px;
+  border-radius:50%;border:1px solid rgba(95,208,168,.85);background:rgba(13,24,19,.8);
+  box-shadow:0 0 10px rgba(95,208,168,.3);transition:transform .06s ease;pointer-events:none}
+#mstick-l.on,#mstick-r.on{border-color:var(--accent);
+  box-shadow:0 0 14px rgba(95,208,168,.4),inset 0 0 10px rgba(95,208,168,.12)}
+#mstick-l:focus-visible,#mstick-r:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+/* 显示条件置于 base 之后，同特异性下后写者胜——粗指针（触屏）才显示 */
+@media (pointer:coarse){
+  #mstick{display:block}
+}
+/* 面板打开时摇杆让位（面板占右半屏；躲藏防误触也防拖动被遮挡）；
+   FPV 激活时由 #fp-touch 方向键接管（body.fp-mode 由 76-mobile 的
+   MutationObserver 同步，76-mobile.js state().fpMode 可遥测） */
+#panel:not(.hide) ~ #mstick{display:none!important}
+body.fp-mode #mstick{display:none!important}
+
+/* ---------- P14-B 模式/输入状态徽标 ---------- */
+#mode-chip{position:fixed;right:14px;top:92px;z-index:21;padding:4px 10px;
+  border:1px solid rgba(90,170,255,.35);border-radius:15px;
+  background:rgba(8,14,20,.82);color:#9fc4e8;font-size:10.5px;
+  letter-spacing:.05em;pointer-events:none;white-space:nowrap}
+#mode-chip.warn{border-color:rgba(255,180,90,.5);color:#ffd9a8}
+
+/* ---------- 上下文提示条 ---------- */
+#guide{position:fixed;left:12px;bottom:150px;z-index:20;padding:7px 12px;
+  border:1px solid rgba(95,208,168,.35);border-radius:7px;
+  background:rgba(8,14,11,.82);color:var(--accent);font-size:11.5px;
+  opacity:0;transition:opacity .3s;pointer-events:none;letter-spacing:.03em}
+
+/* ---------- 击杀信息流 / 命中标记 ---------- */
+#killfeed{position:fixed;right:14px;top:110px;z-index:22;display:flex;
+  flex-direction:column;gap:5px;align-items:flex-end;pointer-events:none}
+.kf{padding:5px 12px 5px 10px;border:1px solid rgba(95,208,168,.5);border-radius:6px;
+  background:rgba(8,14,11,.85);color:var(--accent);font-size:11.5px;
+  border-left:3px solid var(--accent2);
+  transform:translateX(24px);opacity:0;transition:all .3s ease}
+.kf.show{transform:none;opacity:1}
+.kf.out{opacity:0;transform:translateX(24px)}
+/* 玩法批 B3：连锁殉爆条目（橙色）+ 多杀横幅 */
+.kf.kf-chain{color:#ffb054;border-color:rgba(255,176,84,.55);border-left-color:#ff7a2e}
+#streak{position:fixed;left:50%;top:16%;z-index:23;pointer-events:none;
+  transform:translate(-50%,-8px) scale(.9);opacity:0;transition:opacity .25s,transform .25s;
+  font-size:30px;font-weight:800;letter-spacing:.18em;color:#ffcf6b;
+  text-shadow:0 0 14px rgba(255,140,40,.75),0 2px 0 rgba(0,0,0,.6)}
+#streak.show{opacity:1;transform:translate(-50%,0) scale(1)}
+@media (prefers-reduced-motion:reduce){#streak{transition:opacity .2s}}
+/* 玩法批 D：峡谷雷达暴露度条 */
+#canyon-hud{position:fixed;left:50%;top:9%;transform:translateX(-50%);z-index:22;pointer-events:none;
+  display:none;align-items:center;gap:8px;font-size:12px;letter-spacing:.08em;color:#cfe3d6;
+  background:rgba(10,16,14,.55);border:1px solid rgba(120,200,170,.35);padding:4px 10px;border-radius:3px}
+#canyon-hud.show{display:flex}
+#canyon-hud i{display:block;width:120px;height:6px;background:rgba(255,255,255,.12);border-radius:3px;overflow:hidden}
+#canyon-hud b{display:block;height:100%;width:0;background:#e8b04a;transition:width .15s}
+#canyon-hud em{font-style:normal;opacity:.8}
+#canyon-hud.lock{border-color:#ff5a4a;color:#ffd0c8}
+#canyon-hud.lock b{background:#ff5a4a}
+#fp-reticle.hit{animation:fpHit .18s ease-out}
+#fp-reticle.hit::after{content:'';position:absolute;inset:-7px;border:2px solid #fff;
+  border-radius:50%;opacity:.9;box-shadow:0 0 10px rgba(255,255,255,.8)}
+@keyframes fpHit{0%{transform:translate(-50%,-50%) scale(1.35)}100%{transform:translate(-50%,-50%) scale(1)}}
+
+/* ---------- 视角条 ---------- */
+#views{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:20;
+  display:flex;gap:4px;padding:6px;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel);backdrop-filter:blur(12px);max-width:min(660px,calc(100vw - 240px));
+  overflow-x:auto;scrollbar-width:none}
+#views::-webkit-scrollbar{display:none}
+#views .chip{font-size:10px;padding:5px 8px}
+
+/* ---------- 提示 ---------- */
+#hint{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:50;
+  max-width:min(430px,88vw);padding:18px 20px;border:1px solid var(--line);
+  border-radius:11px;background:rgba(8,11,15,.94);backdrop-filter:blur(18px);
+  font-size:12px;line-height:1.85;display:none}
+#hint.show{display:block}
+#hint h4{margin:0 0 10px;font-size:11px;letter-spacing:.2em;color:var(--accent);
+  text-transform:uppercase}
+#hint table{width:100%;border-collapse:collapse;font-size:11.5px}
+#hint td{padding:3px 0;color:var(--dim)}
+#hint td:first-child{width:88px;font-family:var(--mono);color:var(--fg)}
+#hint .close{margin-top:12px;width:100%}
+
+/* ---------- Phase 18：成就面板（与 #hint 同款抽屉；内容经 72-uibind 动态渲染） ---------- */
+#arcade{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:50;
+  max-width:min(430px,88vw);padding:18px 20px;border:1px solid var(--line);
+  border-radius:11px;background:rgba(8,11,15,.94);backdrop-filter:blur(18px);
+  font-size:12px;line-height:1.85;display:none}
+#arcade.show{display:block}
+#arcade h4{margin:0 0 10px;font-size:11px;letter-spacing:.2em;color:var(--accent);
+  text-transform:uppercase}
+#arcade .hi-row{margin-bottom:8px;font-size:11px;color:var(--dim)}
+#arcade .hi-row b{color:var(--fg);font-weight:500}
+#arcade .ach-list{max-height:40vh;overflow-y:auto}
+#arcade .ach{display:flex;justify-content:space-between;gap:10px;padding:5px 2px;
+  border-bottom:1px dashed rgba(95,208,168,.14);color:var(--dim)}
+#arcade .ach.on{color:var(--fg)}
+#arcade .ach .ach-d{font-size:10.5px;color:var(--dim)}
+#arcade .ach .ach-s{font-family:var(--mono);font-size:10px;color:var(--accent)}
+#arcade .ach:not(.on) .ach-s{color:var(--dim);opacity:.5}
+#arcade .close{margin-top:12px;width:100%}
+/* 窄屏：面板限高可滚（P11 同款 70vh 规则） */
+@media (max-width:640px){#arcade{max-height:70vh;overflow-y:auto}}
+
+/* ---------- 轻提示 ---------- */
+#toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:55;
+  padding:7px 15px;border:1px solid rgba(240,180,90,.45);border-radius:7px;
+  background:rgba(22,17,10,.88);color:#f2d9a6;font-size:12px;opacity:0;
+  pointer-events:none;transition:opacity .25s;font-family:var(--sans)}
+#toast.show{opacity:1}
+
+@media (max-width:820px){
+  #panel{width:212px;top:48px}
+  #specs{display:none}
+  #views{max-width:calc(100vw - 24px);bottom:8px}
+  #hud{font-size:9px;gap:8px}
+  /* P4-B：窄屏下控制面板(右抽屉)打开时任务面板让位——与 #mstick 同模式，
+     防右侧被抽屉裁切遮挡（桌面宽屏两者共存不适用） */
+  #panel:not(.hide) ~ #mission{display:none!important}
+  /* Phase 11 X3：结算面板窄屏字号 ≥13px，内容不溢出 */
+  #mission.result{font-size:13px}
+  /* Phase 11 X2：hint 对话框窄屏可滚动（内容多于 70vh 时滚动条接管） */
+  #hint{max-height:70vh;overflow-y:auto}
+}
+/* Phase 11 X1：触屏设备 toast 字号 ≥14px（模式切换/训练提示可读） */
+@media (pointer:coarse){
+  #toast{font-size:14px}
+}
+/* Phase 11 X5：prefers-reduced-motion 全覆盖——训练/简报/结算/提示无过渡动画
+   （transitions 归零直接显示；振动/自动旋转关闭逻辑在 72-uibind 既有实现不变） */
+@media (prefers-reduced-motion: reduce){
+  #mission,#toast,#hint,#guide{transition:none!important}
+}
+
+/* ============================================================
+   P1（2026-10-13）：主菜单 + 展示/游戏 模式隔离 + 视觉语言收敛
+   body 类：app-menu / app-show / app-play / app-all（legacy 全功能，测试默认）
+   ============================================================ */
+:root{--mil:#9fd4b8;--mil-dim:#6f8a7d;--hair:rgba(159,212,184,.18)}
+/* —— 视觉语言：去掉霓虹辉光、降低饱和，细线框 + 等宽读数 —— */
+.app-show .chip.on,.app-play .chip.on,.app-menu .chip.on{box-shadow:none;text-shadow:none;
+  background:rgba(159,212,184,.10);border-color:rgba(159,212,184,.62);color:#d6efe2}
+.app-show .chip,.app-play .chip{border-color:rgba(255,255,255,.10);background:rgba(255,255,255,.02)}
+.app-show #panel,.app-play #panel{background:linear-gradient(180deg,rgba(9,12,12,.92),rgba(9,12,12,.84));
+  border:1px solid var(--hair);border-top:1px solid rgba(159,212,184,.45);box-shadow:none;
+  clip-path:none;border-radius:3px;width:268px}
+.app-show .sec>h3,.app-play .sec>h3{color:var(--mil-dim);letter-spacing:.2em}
+.app-show .sec>h3::before,.app-play .sec>h3::before{width:3px;height:9px;clip-path:none;background:var(--mil)}
+.app-show .btn.primary,.app-play .btn.primary{box-shadow:none}
+.app-show #top,.app-play #top{background:linear-gradient(180deg,rgba(3,5,6,.78),rgba(3,5,6,0))}
+.app-show #brand,.app-play #brand{border-left-color:var(--mil)}
+
+/* —— 模式可见性 —— */
+#ptabs,#play-head{display:none}
+.app-show #ptabs{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin:-14px -12px 12px;
+  position:sticky;top:-14px;z-index:2;background:rgba(7,10,10,.97);border-bottom:1px solid var(--hair)}
+.ptab{padding:10px 0 9px;text-align:center;font-size:11.5px;color:#8a9a92;cursor:pointer;
+  letter-spacing:.12em;border-bottom:2px solid transparent;user-select:none}
+.ptab:hover{color:#d6efe2}
+.ptab.on{color:#e6f4ec;border-bottom-color:var(--mil);background:rgba(159,212,184,.05)}
+.ptab:focus-visible{outline:2px solid var(--mil);outline-offset:-2px}
+.app-show #panel .sec{display:none}
+.app-show #panel .sec.tab-on{display:block}
+.app-play #play-head{display:block;margin:0 0 12px;padding-bottom:9px;border-bottom:1px solid var(--hair)}
+.ph-k{font-family:var(--mono);font-size:9px;letter-spacing:.3em;color:var(--mil-dim)}
+.ph-t{font-size:15px;letter-spacing:.2em;margin-top:3px;color:#e6f4ec}
+.app-play #panel .sec:not([data-tab~="play"]){display:none}
+.app-play #mode-row [data-mode="show"]{display:none}
+.app-play #mode-row{grid-template-columns:repeat(2,1fr)}
+.app-show .g-only,.app-menu .g-only{display:none!important}
+.app-show #mission,.app-menu #mission{display:none!important}
+.app-show #canyon-hud,.app-menu #canyon-hud{display:none!important}
+.app-play .s-only,.app-menu .s-only{display:none!important}
+.app-show .dev-only,.app-play .dev-only,.app-menu .dev-only{display:none}
+.app-all #btn-home{display:none}
+.know-tip{font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5}
+#know-list{display:flex;flex-direction:column;gap:4px}
+body.photo-mode > *:not(canvas):not(#photo-exit):not(.route-bar):not(#tour-cap){visibility:hidden!important}
+.chip.pc::before{content:'';display:block;height:22px;margin:-2px -4px 5px;border-radius:2px;background:var(--th);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.qhint{margin-top:5px;font-size:11px;color:var(--dim,#8a948f);line-height:1.5}
+.rcard{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:7px 9px;margin:0 0 5px;
+  border:1px solid rgba(255,255,255,.08);border-radius:6px;background:rgba(255,255,255,.025);cursor:pointer}
+.rcard b{font-size:12.5px;color:var(--fg)}.rcard .rdur{font:11px var(--mono);color:#7fdca0}
+.rcard small{grid-column:1/3;font-size:10.5px;color:#8b98a3}
+.rcard:hover,.rcard.on{border-color:rgba(120,255,170,.45);background:rgba(120,255,170,.06)}
+.kcard{display:flex;align-items:center;gap:8px;padding:8px 9px;border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.02);cursor:pointer;font-size:12px;color:#c9d6cf;border-radius:2px}
+.kcard i{font-style:normal;font-family:var(--mono);font-size:9.5px;color:var(--mil-dim);width:18px}
+.kcard:hover{border-color:rgba(159,212,184,.45);color:#eef7f2}
+#mission .mact{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:8px;border-top:1px solid var(--hair,rgba(255,255,255,.12))}
+#mission .mact .chip{flex:1 1 auto;text-align:center;pointer-events:auto;cursor:pointer}
+/* P4a：知识库 + MFD 风格 */
+.kh{font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;color:var(--mil-dim);margin:12px 0 6px;
+  padding-bottom:4px;border-bottom:1px solid var(--hair)}
+#know-parts{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.kpart{display:flex;align-items:center;gap:6px;padding:6px 7px;border:1px solid rgba(255,255,255,.06);
+  cursor:pointer;font-size:11px;color:#aebcb5;border-radius:2px;min-width:0}
+.kpart span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpart i{font-style:normal;font-family:var(--mono);font-size:9px;color:var(--mil-dim)}
+.kpart:hover,.kpart.on{border-color:var(--mil);color:#eef7f2}
+#label-info.kc{max-width:340px;border-radius:2px;border-color:rgba(159,212,184,.45);background:rgba(6,10,9,.92);
+  padding:12px 14px 10px;cursor:default}
+#label-info.kc::before,#label-info.kc::after{content:"";position:absolute;width:10px;height:10px;border:2px solid var(--mil)}
+#label-info.kc::before{left:-1px;top:-1px;border-right:0;border-bottom:0}
+#label-info.kc::after{right:-1px;bottom:-1px;border-left:0;border-top:0}
+#label-info.kc .kc-h{display:flex;flex-direction:column;gap:2px;margin-bottom:4px}
+#label-info.kc .kc-h i{font-style:normal;font-family:var(--mono);font-size:9px;letter-spacing:.28em;color:var(--mil-dim)}
+#label-info.kc b{margin:0;color:#eaf6ef}
+#label-info.kc em{display:block;font-style:normal;color:#e8b04a;font-size:11.5px;margin-bottom:8px}
+#label-info.kc dl{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:0 0 8px;padding:7px 0;
+  border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);font-size:11.5px}
+#label-info.kc dt{color:var(--mil-dim);white-space:nowrap}
+#label-info.kc dd{margin:0;color:#dfeee6;font-family:var(--mono),sans-serif}
+#label-info.kc p{font-size:12px;line-height:1.65;color:#c3d1ca}
+#label-info.kc small{display:block;margin-top:7px;font-size:9.5px;color:#5f7469;font-family:var(--mono);word-break:break-all}
+.app-show #panel{border-radius:2px}
+.app-show #panel::before{content:"";position:absolute;left:0;top:0;width:12px;height:12px;border-left:2px solid var(--mil);
+  border-top:2px solid var(--mil);pointer-events:none}
+.app-show .ptab{font-family:var(--mono),sans-serif;letter-spacing:.12em}
+@media (max-width:820px){#label-info.kc{max-height:46vh;overflow:auto}}
+.kcard.on{border-color:var(--mil);background:rgba(159,212,184,.08);color:#eef7f2}
+
+/* —— 主菜单 —— */
+#launcher{position:fixed;inset:0;z-index:50;display:none;font-family:var(--sans)}
+.app-menu #launcher{display:block}
+.app-menu #top>#hud,.app-menu #mode-chip,.app-menu #panel,.app-menu #views,.app-menu #guide,
+.app-menu #mstick,.app-menu #specs,.app-menu #top-right{display:none!important}
+.app-menu #brand{opacity:0}
+#ln-shade{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(90deg,rgba(3,5,6,.86) 0%,rgba(3,5,6,.55) 38%,rgba(3,5,6,0) 62%),
+             linear-gradient(0deg,rgba(3,5,6,.75),rgba(3,5,6,0) 40%)}
+#ln-brand{position:absolute;left:clamp(24px,6vw,96px);top:clamp(48px,14vh,150px)}
+.ln-k{font-family:var(--mono);font-size:11px;letter-spacing:.42em;color:var(--mil-dim)}
+.ln-t{font-size:clamp(46px,7vw,92px);font-weight:700;letter-spacing:.16em;color:#eef3ef;line-height:1.1;margin-top:10px}
+.ln-s{font-size:14px;letter-spacing:.3em;color:#9aa7a0;margin-top:8px}
+#ln-cards{position:absolute;left:clamp(24px,6vw,96px);bottom:clamp(64px,13vh,140px);display:flex;gap:16px}
+.ln-card{width:clamp(220px,22vw,300px);text-align:left;padding:18px 18px 16px;display:flex;flex-direction:column;gap:6px;
+  background:rgba(8,11,11,.78);border:1px solid rgba(159,212,184,.22);border-top:2px solid rgba(159,212,184,.55);
+  color:#dfe8e3;cursor:pointer;font-family:var(--sans);border-radius:2px;backdrop-filter:blur(10px);
+  transition:border-color .2s,background .2s,transform .2s}
+.ln-card:hover,.ln-card:focus-visible{border-color:var(--mil);background:rgba(14,20,18,.9);transform:translateY(-3px);outline:none}
+.ln-idx{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--mil-dim)}
+.ln-name{font-size:26px;font-weight:700;letter-spacing:.24em}
+.ln-en{font-family:var(--mono);font-size:10px;letter-spacing:.36em;color:#8a9a92;margin-top:-4px}
+.ln-desc{font-size:12px;color:#a9b5ae;line-height:1.6;min-height:38px;margin-top:4px}
+.ln-go{font-size:12px;letter-spacing:.2em;color:var(--mil);margin-top:6px}
+#ln-foot{position:absolute;left:clamp(24px,6vw,96px);bottom:clamp(22px,5vh,48px);font-size:11px;color:#7d8a83;letter-spacing:.1em}
+@media (max-width:700px){
+  #ln-cards{flex-direction:column;right:20px;left:20px;bottom:56px;gap:10px}
+  .ln-card{width:auto;padding:14px}
+  .ln-desc{min-height:0}
+  #ln-brand{top:40px;left:20px}
+  #ln-foot{left:20px;right:20px}
+}
+@media (max-width:820px){.app-show #panel,.app-play #panel{width:236px}}
+@media (prefers-reduced-motion: reduce){.ln-card{transition:none}}
+/* 展示模式：解说牌让到面板左侧（面板收起时贴右） */
+.app-show #panel:not(.hide) ~ #label-info{right:296px;top:64px}
+@media (max-width:820px){.app-show #panel:not(.hide) ~ #label-info{right:12px;top:auto;bottom:70px;left:12px;max-width:none}}
+.app-show #panel,.app-play #panel{bottom:auto;max-height:calc(100vh - 64px)}
+.app-play #mission{border:1px solid var(--hair);border-top:1px solid rgba(159,212,184,.45);clip-path:none;border-radius:3px;
+  background:linear-gradient(180deg,rgba(9,12,12,.92),rgba(9,12,12,.84));width:250px}
+.app-play #mission-title{color:var(--mil-dim)}
+.app-play #mission-title::before{width:3px;clip-path:none;background:var(--mil)}
+
+/* ============================================================
+   P2（2026-10-13）：战役地图 + 关卡简报/结算
+   ============================================================ */
+#play-actions{display:none}
+.lm-open #panel,.lm-open #hud-top{visibility:hidden}
+.app-play #play-actions{display:flex}
+.app-play #btn-mission-start,.app-play #mission-campaign,.app-play #mission-variants{display:none!important}
+#levelmap{position:fixed;inset:0;z-index:48;display:none;padding:clamp(56px,8vh,90px) clamp(16px,4vw,64px) 24px;
+  background:radial-gradient(ellipse at 70% 40%,rgba(6,9,9,.55),rgba(3,5,6,.92));overflow-y:auto;font-family:var(--sans)}
+.app-play #levelmap.show{display:block}
+.lm-head{display:flex;align-items:flex-end;gap:28px;max-width:1180px;margin:0 auto 22px;flex-wrap:wrap}
+.lm-k{font-family:var(--mono);font-size:10px;letter-spacing:.4em;color:var(--mil-dim)}
+.lm-t{font-size:30px;font-weight:700;letter-spacing:.2em;color:#eef3ef;margin-top:4px}
+.lm-tot{font-family:var(--mono);font-size:13px;color:#c9d6cf}
+.lm-tot b{font-size:22px;color:#f0c46a}
+.lm-tot span{display:block;font-size:11px;color:#8a9a92;margin-top:2px;font-family:var(--sans)}
+.lm-diff{display:flex;gap:4px;margin-left:auto}
+.lm-dchip{padding:7px 12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:#9aa7a0;
+  font-size:12px;cursor:pointer;border-radius:2px;font-family:var(--sans)}
+.lm-dchip.on{border-color:var(--mil);color:#e6f4ec;background:rgba(159,212,184,.10)}
+.lm-close{width:34px;height:34px;border:1px solid rgba(255,255,255,.14);background:rgba(8,11,11,.8);color:#cfd8d3;
+  font-size:18px;cursor:pointer;border-radius:2px}
+.lm-cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;max-width:1180px;margin:0 auto}
+.lm-chh{font-size:14px;letter-spacing:.18em;color:#e6f4ec;padding-bottom:8px;margin-bottom:10px;border-bottom:1px solid var(--hair)}
+.lm-chh i{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--mil-dim);margin-right:8px}
+.lm-chh span{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.3em;color:#6f7d76;margin-top:3px}
+.lm-lv{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto;gap:3px 10px;width:100%;text-align:left;
+  padding:12px 12px 11px;margin-bottom:8px;background:rgba(8,11,11,.82);border:1px solid rgba(159,212,184,.16);
+  border-left:2px solid rgba(159,212,184,.5);color:#dfe8e3;cursor:pointer;border-radius:2px;font-family:var(--sans);
+  transition:border-color .15s,background .15s}
+.lm-lv:hover,.lm-lv:focus-visible{border-color:var(--mil);background:rgba(14,20,18,.92);outline:none}
+.lm-lv.cur{box-shadow:inset 0 0 0 1px rgba(240,196,106,.5)}
+.lm-lv.locked,.lm-lv.wip{opacity:.5;border-left-color:rgba(255,255,255,.18);cursor:not-allowed}
+.lv-id{font-family:var(--mono);font-size:12px;color:var(--mil-dim);grid-row:1/3;align-self:center}
+.lv-n{font-size:15px;letter-spacing:.1em}
+.lm-lv em{font-style:normal;font-size:12px;justify-self:end}
+.b-star{color:#f0c46a;letter-spacing:.1em}
+.b-lock,.b-wip{color:#8a9a92;font-size:10.5px!important;border:1px solid rgba(255,255,255,.14);padding:1px 6px}
+.lv-m{grid-column:2/4;font-size:11px;color:#8a9a92}
+.lm-foot{max-width:1180px;margin:16px auto 0;font-size:11.5px;color:#7d8a83}
+@media (max-width:900px){.lm-cols{grid-template-columns:repeat(2,minmax(0,1fr))}.lm-diff{margin-left:0}}
+@media (max-width:520px){.lm-cols{grid-template-columns:1fr}}
+#mission-body .mintro{color:#c9d6cf;font-family:var(--sans);font-size:11.5px;line-height:1.6;margin:2px 0 8px}
+#mission-body .mobj{margin:4px 0 8px;font-family:var(--sans)}
+#mission-body .mobj em{display:block;font-style:normal;font-size:9.5px;letter-spacing:.2em;color:var(--mil-dim,#6f8a7d);margin-bottom:2px}
+#mission-body .mobj i{display:block;font-style:normal;font-size:11.5px;color:#c9d6cf}
+#mission-body .mobj i.ok{color:#9fd4b8}
+#mission-body .mstars{font-size:26px;letter-spacing:.18em;color:#f0c46a;margin:2px 0 6px}
+</style>
+</head>
+<body>
+<canvas id="gl" aria-label="AH-64E 阿帕奇武装直升机三维交互视图。视觉内容，请使用右侧控制面板操作。" role="img"></canvas>
+
+<div id="loading" role="progressbar" aria-live="polite" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="载入进度">
+  <div id="load-title">AH-64E Apache</div>
+  <div id="load-bar"><div id="load-fill"></div></div>
+  <div id="load-txt">初始化…</div>
+</div>
+
+<!-- P1（2026-10-13）：主菜单——展示 / 游戏 两个入口（70-appmode 管理；自动化测试默认跳过） -->
+<div id="launcher" role="dialog" aria-modal="true" aria-label="主菜单">
+  <div id="ln-shade"></div>
+  <div id="ln-brand">
+    <div class="ln-k">AH-64E APACHE GUARDIAN</div>
+    <div class="ln-t">阿帕奇</div>
+    <div class="ln-s">攻击直升机 · 三维交互平台</div>
+  </div>
+  <div id="ln-cards">
+    <button class="ln-card" id="ln-show" data-go="show">
+      <span class="ln-idx">01</span>
+      <span class="ln-name">展示</span>
+      <span class="ln-en">SHOWCASE</span>
+      <span class="ln-desc">机体与结构 · 飞行 · 多环境场景 · 武器与机械知识 · 练习靶场</span>
+      <span class="ln-go">进入 →</span>
+    </button>
+    <button class="ln-card" id="ln-play" data-go="play">
+      <span class="ln-idx">02</span>
+      <span class="ln-name">游戏</span>
+      <span class="ln-en">MISSIONS</span>
+      <span class="ln-desc" id="ln-play-desc">战役关卡 · 难度选择 · 评级与解锁</span>
+      <span class="ln-go">出击 →</span>
+    </button>
+  </div>
+  <div id="ln-foot">按 1 进入展示 · 按 2 进入游戏 · 任何时候点右上角 ⌂ 回到这里</div>
+</div>
+
+<div id="top">
+  <div id="brand">AH-64E APACHE<small>USMC LOW-VIS · LONGBOW</small></div>
+  <div id="hud" role="status" aria-live="off" aria-label="遥测读数">
+    <span>RPM <b id="hud-rpm">0</b></span>
+    <span>高度 <b id="hud-alt">0</b> m</span>
+    <span class="g-only">威胁 <b id="hud-threat">无</b></span>
+    <!-- Phase 19：RWR 告警与干扰弹余量（0.5s 节流 + dataset 缓存只写变化） -->
+    <span class="g-only">RWR <b id="hud-rwr">安全</b></span>
+    <span class="g-only">干扰弹 <b id="hud-flare">6</b></span>
+    <!-- Phase 19：机务损伤告警（四系统最高级缩写；hudFail 窗口内显示 ---） -->
+    <span class="g-only">机务 <b id="hud-mx">OK</b></span>
+    <!-- Phase 20：燃油遥测（任务局显示；补给窗口内显示进度） -->
+    <span id="hud-fuel-wrap" style="display:none">燃油 <b id="hud-fuel">100</b>%</span>
+    <!-- P18：轻街机层遥测（分数/连击；0.5s 节流写，仅任务局有值） -->
+    <span class="g-only">分数 <b id="hud-score">0</b></span>
+    <span class="g-only" id="hud-combo-wrap" style="display:none">连击 ×<b id="hud-combo">0</b></span>
+    <span class="dev-only">三角面 <b id="hud-tri">–</b></span>
+    <span class="dev-only">网格 <b id="hud-mesh">–</b></span>
+    <span class="dev-only">绘制 <b id="hud-draw">–</b></span>
+    <span>FPS <b id="hud-fps">–</b></span>
+  </div>
+  <!-- P14-B：模式/输入状态徽标（只读派生，状态翻转才写；aria-live=off 防读屏噪声） -->
+  <div id="mode-chip" role="status" aria-label="当前模式与输入状态" aria-atomic="true"></div>
+  <div id="top-right">
+    <!-- P1：返回主菜单（展示/游戏两侧共用；legacy 全功能模式隐藏） -->
+    <button class="iconbtn" id="btn-home" title="主菜单" aria-label="返回主菜单">⌂</button>
+    <button class="iconbtn" id="btn-help" tabindex="6" title="帮助 (H)" aria-label="帮助与键位说明 (H)" aria-expanded="false">?</button>
+    <!-- P18：成就面板按钮（A 键，H 键位不动；动态渲染 #arcade 抽屉） -->
+    <button class="iconbtn g-only" id="btn-arcade" tabindex="7" title="成就 (A)" aria-label="成就面板 (A)" aria-expanded="false">★</button>
+    <button class="iconbtn" id="btn-shot" tabindex="8" title="截图 (P)" aria-label="保存截图 (P)">▣</button>
+    <button class="iconbtn on" id="btn-panel" tabindex="9" title="面板" aria-label="显示或隐藏控制面板" aria-expanded="true">☰</button>
+  </div>
+</div>
+
+<div id="panel" role="region" aria-label="控制面板">
+  <!-- P1（2026-10-13）：展示模式分页标签（app-show 才显示；legacy/all 模式全部分节平铺） -->
+  <div id="ptabs" role="tablist" aria-label="展示分页">
+    <div class="ptab on" data-tab="fly" role="tab" tabindex="0">飞行</div>
+    <div class="ptab" data-tab="body" role="tab" tabindex="0">机体</div>
+    <div class="ptab" data-tab="env" role="tab" tabindex="0">环境</div>
+    <div class="ptab" data-tab="arm" role="tab" tabindex="0">武器</div>
+    <div class="ptab" data-tab="know" role="tab" tabindex="0">知识</div>
+  </div>
+  <div id="play-head">
+    <div class="ph-k">MISSION CONTROL</div>
+    <div class="ph-t">作战任务</div>
+  </div>
+
+  <div class="sec" data-tab="play">
+    <h3>模式</h3>
+    <div class="grid3" id="mode-row">
+      <div class="chip on" data-mode="show" tabindex="3">展示</div>
+      <div class="chip" data-mode="train" tabindex="4">训练</div>
+      <div class="chip" data-mode="mission" tabindex="5">任务</div>
+    </div>
+    <div class="row" style="margin-top:7px" id="mission-actions">
+      <div class="chip" id="btn-mission-start" title="开始统一任务（靶场摧毁+绞车救援）">开始任务</div>
+      <div class="chip" id="btn-mission-retry" title="清空重试当前任务" style="display:none">重试</div>
+    </div>
+    <!-- P2：游戏模式按钮区（战役地图 / 下一关；app-play 才显示） -->
+    <div class="row" style="margin-top:7px" id="play-actions">
+      <div class="chip" id="btn-levelmap" title="打开战役地图选关">战役地图</div>
+      <div class="chip" id="btn-next-level" title="进入下一关" style="display:none">下一关 →</div>
+    </div>
+  </div>
+
+  <div class="sec" data-tab="fly play">
+    <h3>动力</h3>
+    <button class="btn primary" id="btn-start" tabindex="1">启动旋翼</button>
+    <div class="row" style="margin-top:7px">
+      <div class="chip" id="btn-fly" tabindex="2">起飞 (T)</div>
+      <div class="chip" id="btn-fp" title="第一人称驾驶（悬停时可用）">第一人称 (C)</div>
+    </div>
+    <div id="rotor-wrap">
+      <div id="rotor-bar"><div id="rotor-fill"></div></div>
+      <div class="rotor-info"><span><b id="rotor-pct">0</b>%</span><span><b id="rpm">0</b> RPM</span></div>
+    </div>
+    <div class="rotor-info"><span>飞行状态 <b id="fly-state">地面</b></span></div>
+    <label class="ck"><input type="checkbox" id="chk-disc" checked>桨盘残影</label>
+    <label class="ck"><input type="checkbox" id="chk-vib" checked>机体振动</label>
+    <label class="ck"><input type="checkbox" id="chk-scan" checked>长弓雷达扫描</label>
+  </div>
+
+  <div class="sec" data-tab="fly">
+    <h3>航线展示</h3>
+    <div class="know-tip">自动驾驶 + 电影机位，每条 40–60 秒。任意键或点击画面接管驾驶，Esc 回到航线菜单。</div>
+    <div id="route-list"></div>
+  </div>
+
+  <div class="sec" data-tab="fly">
+    <h3>驾驶</h3>
+    <label class="sl"><span>FPV 灵敏度 <b id="v-fpsens">1.0</b></span>
+      <input type="range" id="fpsens" min="0.5" max="2" step="0.1" value="1"></label>
+  </div>
+
+  <div class="sec" data-tab="body">
+    <h3>涂装</h3>
+    <div class="row" id="scheme-row">
+      <div class="chip on" data-scheme="lowvis">低可视灰</div>
+      <div class="chip" data-scheme="army">美军绿</div>
+    </div>
+  </div>
+
+  <div class="sec" data-tab="body">
+    <h3>结构</h3>
+    <label class="sl"><span>结构分解 <b id="v-exp2">0.00</b></span>
+      <input type="range" id="explode" min="0" max="1" step="0.005" value="0"></label>
+    <label class="ck"><input type="checkbox" id="chk-labels">部件标签</label>
+    <label class="ck"><input type="checkbox" id="chk-wire">线框</label>
+    <label class="ck"><input type="checkbox" id="chk-auto">自动旋转</label>
+  </div>
+
+  <div class="sec" data-tab="env">
+    <h3>一键场景</h3>
+    <div class="grid3" id="combo-row">
+      <div class="chip pc" data-combo="dawn-pad" data-c-ter="pad" data-c-env="dawn" data-c-wx="none" style="--th:linear-gradient(180deg,#3a5a8c,#e8b9a0 70%,#5d5a52)" role="button" tabindex="0">晨雾停机坪</div>
+      <div class="chip pc" data-combo="day-grass" data-c-ter="grass" data-c-env="day" data-c-wx="none" style="--th:linear-gradient(180deg,#2a5a9c,#a9c4dc 55%,#4d6b30 56%)" role="button" tabindex="0">正午草原</div>
+      <div class="chip pc" data-combo="aft-lake" data-c-ter="water" data-c-env="afternoon" data-c-wx="none" style="--th:linear-gradient(180deg,#2f63a0,#d6d2bf 55%,#3f6c84 56%)" role="button" tabindex="0">午后湖畔</div>
+      <div class="chip pc" data-combo="dusk-desert" data-c-ter="desert" data-c-env="dusk" data-c-wx="none" style="--th:linear-gradient(180deg,#1a2748,#e08a4c 55%,#b0703c 56%)" role="button" tabindex="0">黄昏沙丘</div>
+      <div class="chip pc" data-combo="sand-raid" data-c-ter="desert" data-c-env="day" data-c-wx="sand" style="--th:linear-gradient(180deg,#b8905e,#d9b07a 55%,#a8743f 56%)" role="button" tabindex="0">沙暴突击</div>
+      <div class="chip pc" data-combo="night-storm" data-c-ter="grass" data-c-env="night" data-c-wx="storm" style="--th:linear-gradient(180deg,#02050c,#1c2a44 55%,#0d1410 56%)" role="button" tabindex="0">夜雷暴</div>
+    </div>
+    <h3 style="margin-top:10px">环境</h3>
+    <div class="grid2" id="env-row">
+      <div class="chip pc" data-env="dawn" style="--th:linear-gradient(180deg,#3a5a8c,#e8b9a0 70%,#5d5a52)">清晨</div>
+      <div class="chip on pc" data-env="day" style="--th:linear-gradient(180deg,#2a5a9c,#a9c4dc 70%,#5b6150)">正午</div>
+      <div class="chip pc" data-env="afternoon" style="--th:linear-gradient(180deg,#2f63a0,#d6d2bf 70%,#6a6a52)">午后</div>
+      <div class="chip pc" data-env="dusk" style="--th:linear-gradient(180deg,#1a2748,#e08a4c 68%,#3a2a20)">黄昏</div>
+      <div class="chip pc" data-env="night" style="--th:linear-gradient(180deg,#02050c,#12243a 70%,#0a0d0c)">夜间</div>
+      <div class="chip pc" data-env="studio" style="--th:radial-gradient(circle at 50% 40%,#6a6f76,#22252a)">棚拍</div>
+    </div>
+    <h3 style="margin-top:10px">起降场地</h3>
+    <div class="grid2" id="terrain-row">
+      <div class="chip on pc" data-terrain="pad" style="--th:repeating-linear-gradient(90deg,#6b7173 0 10px,#5f6567 10px 11px),#666">停机坪</div>
+      <div class="chip pc" data-terrain="grass" style="--th:radial-gradient(circle at 30% 60%,#5f7a3a,#3d5228)">草地</div>
+      <div class="chip pc" data-terrain="water" style="--th:linear-gradient(180deg,#5a7f98,#24465a)">湖面</div>
+      <div class="chip pc" data-terrain="desert" style="--th:linear-gradient(170deg,#d7a76a,#a8743f 60%,#c99558)">沙漠</div>
+    </div>
+    <h3 style="margin-top:10px">天气</h3>
+    <div class="grid3" id="weather-row">
+      <div class="chip on" data-weather="none">无</div>
+      <div class="chip" data-weather="sand">沙暴</div>
+      <div class="chip" data-weather="storm">夜雷暴</div>
+    </div>
+    <h3 style="margin-top:10px">音效</h3>
+    <div class="grid2" id="sfx-row">
+      <div class="chip on" data-sfx="on">开</div>
+      <div class="chip" data-sfx="off">关</div>
+    </div>
+    <label class="sl"><span>曝光 <b id="v-exp">1.00</b></span>
+      <input type="range" id="exposure" min="0.4" max="2.2" step="0.01" value="1"></label>
+    <label class="sl"><span>泛光 <b id="v-bloom">0.55</b></span>
+      <input type="range" id="bloom" min="0" max="2" step="0.01" value="0.55"></label>
+  </div>
+
+  <div class="sec" data-tab="arm play">
+    <h3>挂载与武备</h3>
+    <label class="ck"><input type="checkbox" id="chk-hellfire" checked>AGM-114 地狱火 ×8</label>
+    <label class="ck"><input type="checkbox" id="chk-rocket" checked>M261 火箭巢 ×2</label>
+    <label class="ck"><input type="checkbox" id="chk-gun" checked>M230 30mm 链炮</label>
+    <label class="ck"><input type="checkbox" id="chk-radar" checked>AN/APG-78 桅顶雷达</label>
+    <div class="row" style="margin-top:7px">
+      <div class="chip" id="btn-hf" title="发射一枚地狱火">地狱火 (F)</div>
+      <div class="chip" id="btn-rk" title="按住连发火箭">火箭 (按住 X)</div>
+      <div class="chip" id="btn-gun" title="按住连发">机炮 (按住 G)</div>
+    </div>
+    <div class="rotor-info" style="margin-top:5px">
+      <span>链炮 <b id="v-gun">1200</b></span>
+      <span>火箭 <b id="v-rk">38</b></span>
+      <span>地狱火 <b id="v-hf">8</b></span>
+    </div>
+    <div class="chip" style="width:100%;margin-top:6px" id="btn-v" title="装填全部弹药">装填弹药 (V)</div>
+  </div>
+
+  <div class="sec" data-tab="arm">
+    <h3>练习靶场</h3>
+    <label class="ck"><input type="checkbox" id="chk-targets" checked>显示攻击靶标 ×10</label>
+    <div class="rotor-info">
+      <span>存活 <b id="v-targets">10</b></span>
+      <span>击毁 <b id="v-kills">0</b></span>
+    </div>
+    <div class="chip" style="width:100%;margin-top:6px" id="btn-reset-targets" title="重建全部靶标">重置靶场 (B)</div>
+    <div class="chip" style="width:100%;margin-top:6px" id="btn-rescue" title="放/收绞车救援幸存者 (K)">绞车救援 (K)</div>
+  </div>
+
+  <div class="sec" data-tab="know">
+    <h3>武器与机械</h3>
+    <div class="know-tip">选一张卡，镜头会飞到对应部件，并给出参数和原理。</div>
+    <div class="kh">系统知识 · 10</div>
+    <div id="know-list"></div>
+    <div class="kh">部件速查 · 14</div>
+    <div id="know-parts"></div>
+  </div>
+
+  <div class="sec" data-tab="env">
+    <h3>画质</h3>
+    <div class="row"><div class="chip" id="photo-btn" role="button" tabindex="0" title="隐藏界面 + 景深对焦机体，适合截图；Esc 退出">摄影模式 · 景深</div></div>
+    <label class="ck"><input type="checkbox" id="chk-shadow" checked>阴影</label>
+    <div class="grid2" id="qual-row" style="margin-top:6px">
+      <div class="chip on" data-q="auto" role="button" tabindex="0" title="电脑跑得动就自动调高画质，卡了就自动调低">自动（推荐）</div>
+      <div class="chip" data-q="0.75" role="button" tabindex="0" title="画面稍粗，但最流畅，适合老电脑或笔记本">低画质</div>
+      <div class="chip" data-q="1" role="button" tabindex="0" title="清晰度和流畅度兼顾，大多数电脑选这个">正常画质</div>
+      <div class="chip" data-q="1.5" role="button" tabindex="0" title="最清楚、影子最细致，需要较好的显卡">高画质</div>
+    </div>
+    <div class="qhint" id="qual-hint">自动：跑得动就调高，卡了就调低</div>
+    <!-- 旧控件保留为隐藏后端（测试与 applyQuality 仍走它们） -->
+    <div style="display:none">
+      <select id="sel-quality">
+        <option value="0.75">低</option>
+        <option value="1" selected>正常</option>
+        <option value="1.5">高</option>
+        <option value="2">极致</option>
+      </select>
+      <label class="ck"><input type="checkbox" id="chk-qauto" checked>自动</label>
+    </div>
+  </div>
+</div>
+
+<div id="specs" class="s-only">
+  旋翼直径 <b>14.63 m</b><br>
+  机身长 <b>17.73 m</b><br>
+  最大速度 <b>293 km/h</b><br>
+  额定转速 <b>289 RPM</b><br>
+  发动机 <b>2× T700-GE-701D</b>
+</div>
+
+<div id="labels" aria-hidden="true"></div>
+<div id="label-info" role="status" aria-live="polite" title="点击收起解说"></div>
+<div id="mission" role="region" aria-label="任务面板">
+  <div id="mission-title">作战简报</div>
+  <!-- Phase 20-D：战役关卡链（前关达 B 解锁下一关；选中关卡进入对应变体×难度） -->
+  <div id="mission-campaign" role="radiogroup" aria-label="战役关卡"></div>
+  <div id="mission-variants" role="radiogroup" aria-label="任务变体"></div>
+  <div id="mission-difficulties" role="radiogroup" aria-label="难度"></div>
+  <div id="mission-body"></div>
+</div>
+<!-- P2：战役地图（70-play 动态渲染） -->
+<div id="levelmap" role="dialog" aria-modal="true" aria-label="战役地图"></div>
+<div id="guide" role="status" aria-live="polite"></div>
+<div id="killfeed" role="log" aria-live="polite" aria-label="击毁记录"></div>
+<div id="streak" aria-hidden="true"></div>
+<div id="canyon-hud" aria-hidden="true"><span>雷达暴露</span><i><b></b></i><em></em></div>
+<div id="fp-hud">
+  <div id="fp-reticle" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <div id="fp-tip">W/S 前后 · A/D 转向 · R/Q 升降 · Z/X 侧飞 · 鼠标 瞄准 · 左键机炮 · 右键火箭 · F 地狱火 · V 装填 · J 干扰弹 · C 退出</div>
+  <div id="fp-lock" aria-hidden="true"><span id="fp-lock-d"></span><span id="fp-lock-w"></span></div>
+  <div id="fp-arr" aria-hidden="true">➤</div>
+  <div id="fp-arr-label" aria-hidden="true"></div>
+  <div id="fp-capture" role="status" aria-live="polite"><span id="fp-status">指针未锁定</span><button id="fp-recapture">重新捕获</button></div>
+  <div id="fp-touch" role="group" aria-label="第一人称移动方向键">
+    <button id="fp-touch-w" aria-label="前进">前</button><button id="fp-touch-a" aria-label="左转">左</button>
+    <button id="fp-touch-s" aria-label="后退">后</button><button id="fp-touch-d" aria-label="右转">右</button>
+  </div>
+  <div id="fp-touch-rq" role="group" aria-label="第一人称升降"><button id="fp-touch-r" aria-label="上升">上升</button><button id="fp-touch-q" aria-label="下降">下降</button></div>
+  <div id="fp-gpws" role="status" aria-live="off" aria-label="峡谷地形读数"></div>
+  <div id="fp-info" role="status" aria-live="off" aria-label="第一人称遥测">
+    <span>速度 <b id="fp-spd">0</b> km/h</span>
+    <span>高度 <b id="fp-alt">0</b> m</span>
+    <span>航向 <b id="fp-hdg">000</b>°</span>
+    <span>稳定 <b id="fp-stab">100</b>%</span>
+    <span>机炮 <b id="fp-am">1200</b></span>
+    <span>火箭 <b id="fp-ar">38</b></span>
+    <span>地狱火 <b id="fp-ah">8</b></span>
+  </div>
+</div>
+<!-- P4-A 移动端虚拟驾驶摇杆：左=悬停平移（与方向键同效），右=升降(FLY.userAlt)/偏航(A/D 蹬舵同效）。
+     仅触屏（pointer:coarse）显示；面板打开或第一人称激活时由 CSS 隐藏 -->
+<div id="mstick">
+  <div id="mstick-l" role="group" tabindex="0"
+       aria-label="悬停平移摇杆：上前进、下后退、左左移、右右移（键盘方向键同效）">
+    <div id="mstick-lk" aria-hidden="true"></div>
+  </div>
+  <div id="mstick-r" role="group" tabindex="0"
+       aria-label="高度与转向摇杆：上下升降（聚焦时键盘上下方向键同效）、左右转向（键盘 A D 同效）">
+    <div id="mstick-rk" aria-hidden="true"></div>
+  </div>
+</div>
+<div id="views"></div>
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<div id="hint" role="dialog" aria-modal="false" aria-label="操作说明">
+  <h4>操作说明</h4>
+  <table>
+    <tr><td>拖拽</td><td>环绕旋转</td></tr>
+    <tr><td>Shift+拖拽</td><td>平移视点</td></tr>
+    <tr><td>滚轮 / 双指</td><td>缩放</td></tr>
+    <tr><td>空格</td><td>启动 / 关停旋翼</td></tr>
+    <tr><td>T</td><td>起飞 / 降落</td></tr>
+    <tr><td>C</td><td>第一人称驾驶（悬停时）</td></tr>
+    <tr><td>FP·鼠标</td><td>瞄准（十字线=机头）</td></tr>
+    <tr><td>FP·W/S</td><td>前进 / 后退</td></tr>
+    <tr><td>FP·A/D</td><td>左转 / 右转</td></tr>
+    <tr><td>FP·R/Q</td><td>上升 / 下降</td></tr>
+    <tr><td>FP·左/右键</td><td>机炮 / 火箭</td></tr>
+    <tr><td>1 – 9 0 - =</td><td>切换 12 个机位</td></tr>
+    <tr><td>G(按住)</td><td>M230 机炮连发</td></tr>
+    <tr><td>X(按住)</td><td>Hydra-70 火箭连发</td></tr>
+    <tr><td>F</td><td>发射地狱火</td></tr>
+    <tr><td>V</td><td>装填弹药</td></tr>
+    <tr><td>J</td><td>投放干扰弹（规避来袭导弹）</td></tr>
+    <tr><td>U</td><td>引擎降功率（超温时降温，功率上限 -15%）</td></tr>
+    <tr><td>N</td><td>重新上膛（武器卡壳时，3 秒）</td></tr>
+    <tr><td>I</td><td>航电重启（读数失效时，2 秒全黑）</td></tr>
+    <tr><td>K</td><td>救援绞车（悬停时放下 / 收起）</td></tr>
+    <tr><td>B</td><td>重置靶场</td></tr>
+    <tr><td>R</td><td>自动旋转</td></tr>
+    <tr><td>L</td><td>部件标签</td></tr>
+    <tr><td>W</td><td>线框</td></tr>
+    <tr><td>E</td><td>切换涂装</td></tr>
+    <tr><td>P</td><td>保存截图</td></tr>
+    <tr><td>H</td><td>本说明</td></tr>
+    <tr><td>训练模式</td><td>面板「模式」切到训练——分步学习：启动/起飞/观察/武器/救援（Esc 跳过）</td></tr>
+    <tr><td>任务变体</td><td>任务简报面板选「标准 / 限时救援 / 受限弹药」（← → 方向键切换）</td></tr>
+    <tr><td>难度</td><td>任务简报面板选「新手 / 标准 / 老兵」——影响敌方火力/时限/得分，本局生效</td></tr>
+    <tr><td>A</td><td>成就面板（各难度最高分 + 8 项成就）</td></tr>
+    <tr><td>移动端·左摇杆</td><td>悬停平移（上/下/左/右）</td></tr>
+    <tr><td>移动端·右摇杆</td><td>左右转向 · 上下升降</td></tr>
+  </table>
+  <button class="btn close" id="hint-close">关闭</button>
+</div>
+
+<!-- P18：成就面板抽屉（内容经 72-uibind 动态渲染；与 #hint 同款样式） -->
+<div id="arcade" role="dialog" aria-modal="false" aria-label="成就">
+  <h4>成就</h4>
+  <div id="arcade-hi" class="hi-row"></div>
+  <div id="arcade-ach" class="ach-list"></div>
+  <button class="btn close" id="arcade-close">关闭</button>
+</div>
+
+<script>
+// 早期错误捕获：把异常显示在载入层，避免白屏无从下手
+window.__showErr = function (msg) {
+  var t = document.getElementById('load-txt');
+  if (t) { t.textContent = '出错：' + msg; t.style.color = '#e0684f'; }
+  var l = document.getElementById('loading');
+  if (l) l.classList.remove('done');
+  document.title = '错误 · AH-64E';
+};
+window.addEventListener('error', function (e) {
+  window.__showErr((e.message || 'unknown') + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : ''));
+});
+window.addEventListener('unhandledrejection', function (e) {
+  window.__showErr('Promise: ' + ((e.reason && e.reason.message) || e.reason));
+});
+(function () {
+  try {
+    var c = document.createElement('canvas');
+    if (!(c.getContext('webgl2') || c.getContext('webgl'))) {
+      window.__showErr('当前浏览器不支持 WebGL');
+    }
+  } catch (err) { window.__showErr('WebGL 检测失败：' + err.message); }
+})();
+// file:// 直接打开时浏览器禁止 fetch 本地相对资源（GLB 请求必然失败，页面会
+// 停在载入界面）——立即给出清晰的本地服务指引，不得静默卡死（P15-B）。
+if (location.protocol === 'file:') {
+  window.__showErr('file:// 模式无法加载本地资源——请运行 start-demo.bat 或本地 HTTP 服务（http://localhost:8642）打开');
+}
+</script>
+
+<script type="module">
+/*__THREE__*/
+/*__LOADER__*/
+/*__APP__*/
+</script>
+</body>
+</html>

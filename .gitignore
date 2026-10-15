@@ -1,0 +1,47 @@
+# 构建产物（node build.mjs 随时重建）
+dist/
+
+# 本地工具配置
+.codely-cli/
+.codely/
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+# Python 缓存与临时输出（区别于 docs/ai-reviews/ 下有意保留的验收证据）
+__pycache__/
+*.pyc
+*.pyo
+
+# 一次性探针脚本（_ 前缀 = 可弃诊断/门禁临时文件，一律忽略）。
+# 2026-09 维护补全：原来只覆盖 tools/tests/ 下，tools/ 根级探针
+# （如 gate 测试写入的 tools/_gate_dirty_probe.py）会污染 git status；
+# 已入库的维护工具（tools/_verify_p10_coords.py）不受本规则影响。
+tools/_*.py
+tools/tests/_probe_*.py
+tools/tests/_shot_*.py
+
+# 测试运行态产物（每次回归都会覆写的临时输出；正式证据归档在 docs/ai-reviews/）
+tools/tests/last_result.json
+tools/tests/fail_shot.png
+
+# 3D 原始产物（FBX/未压缩原始件不入库；归一化 GLB 明确保留）
+assets/targets/*_raw.fbx
+assets/targets/*_raw.glb
+
+tools/tests/shot_*.jpg
+
+# 架构方阶段执行指令文档（docs/phase-*.md 用户放置，保留本地参考价值）
+# 处理定调（2026-09-06 架构复核）：有意不入库——Phase 2 D-5 曾把误提交的
+# prompt 文档从仓库移除，本条规则让 git status 对它们归零，文件本体不删
+docs/phase-*-prompt.md
+
+# WorkBuddy 项目数据（记忆/自动化/缓存，不进源码库）
+.workbuddy/
+
+# 2026-10-12 仓库瘦身：根目录调试截图（79 张）与 docs/ai-reviews/ 验收存档（46MB）已移出仓库，
+# 历史版本见 git tag archive/pre-cleanup-2026-10-12。以后同类产物只留本地，不再入库：
+/*.jpg
+/*.png
+docs/ai-reviews/

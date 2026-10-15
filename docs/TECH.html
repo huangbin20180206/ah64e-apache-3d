@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AH-64E 阿帕奇 · 参赛技术文档</title>
+<style>
+:root{--bg:#0a0e12;--fg:#dfe7ec;--dim:#8fa0ab;--accent:#5fd0a8;--line:rgba(255,255,255,.10)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);
+  font:15px/1.85 "Microsoft YaHei",system-ui,sans-serif;padding:0 18px 90px}
+main{max-width:860px;margin:0 auto}
+h1{font-size:30px;margin:52px 0 4px;letter-spacing:1px}
+h1 small{display:block;font-size:13px;color:var(--dim);letter-spacing:.28em;margin-top:6px}
+h2{margin:48px 0 10px;font-size:20px;color:var(--accent);border-left:3px solid var(--accent);padding-left:12px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin:12px 0}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--dim);font-weight:600;font-size:12.5px;letter-spacing:.06em}
+td.r,th.r{text-align:right;font-family:Consolas,monospace}
+.story{background:rgba(95,208,168,.06);border:1px solid var(--line);border-radius:10px;
+  padding:16px 18px;margin:14px 0}
+.story h3{margin:0 0 6px;font-size:15px}
+.story p{margin:6px 0;color:var(--dim);font-size:14px}
+.story p b{color:var(--fg)}
+.badge{display:inline-block;padding:2px 10px;border:1px solid var(--accent);border-radius:20px;
+  color:var(--accent);font-size:12px;margin:2px 6px 2px 0}
+.note{color:var(--dim);font-size:13px}
+a{color:var(--accent)}
+</style>
+</head>
+<body><main>
+<h1>AH-64E「阿帕奇」交互式 3D 展示页<small>全国 AI 编程大赛 · 参赛技术文档</small></h1>
+<p class="note">单文件交付（零依赖、零 CDN、离线可运行）：three.js 与全部应用代码构建进一个
+ <code>dist/index.html</code>（1131 KB）+ 主模型 GLB 流式加载。所有视觉——涂装、地形、
+ 水面、粒子、灯效、音效——全部为<b>程序化实时生成</b>，无一帧预渲染。</p>
+<div>
+  <span class="badge">物理驱动特效</span><span class="badge">一键智能导览</span>
+  <span class="badge">九项浏览器自动化回归</span><span class="badge">画质自适应</span>
+  <span class="badge">无障碍 A11y</span><span class="badge">移动端触控</span>
+</div>
+
+<h2>一、真实感场景系统（性能与物理）</h2>
+<table>
+<tr><th>场地</th><th>物理表现</th><th class="r">三角形/帧</th><th class="r">绘制调用</th><th class="r">实测帧率</th></tr>
+<tr><td>停机坪</td><td>接地阴影 · 反光</td><td class="r">40.7 万</td><td class="r">184</td><td class="r">60 fps</td></tr>
+<tr><td>草原</td><td><b>6.8 万株草叶实例</b>（5 段悬臂梁弯曲、下洗倒伏、草浪、压痕留存）</td><td class="r">108.7 万</td><td class="r">186</td><td class="r">60 fps</td></tr>
+<tr><td>沙漠</td><td>沙丘（Bagnold 横向形态、坡角卡摩擦角）· <b>brownout 沙暴</b>（能见度物理标定）</td><td class="r">43.5 万</td><td class="r">186</td><td class="r">60 fps</td></tr>
+<tr><td>湖面</td><td>镜面倒影 · 碎金光路 · 下洗吹平/白沫/溅射/涟漪</td><td class="r">57.8 万</td><td class="r">272</td><td class="r">60 fps</td></tr>
+</table>
+<p class="note">测试环境：1280×800 有头 Chromium（vsync 封顶 60fps）。性能档自动降档：粒子量/分辨率/
+辉光层级/阴影尺寸联动缩放；连续掉帧自动退档，用户手选后彻底让位。</p>
+
+<h2>二、工程故事（评审看点）</h2>
+<div class="story"><h3>1. 用数学探针定位"用户说不清"的视觉 bug</h3>
+<p>用户吐槽草原"内芯比外圈稀"。人眼审图两轮无果后，我们改用<b>顶点数据分箱统计</b>：
+按半径把 6.8 万株草的分布拆成密度直方图，实测 [47.7, 61.3, 77.9]——外圈密度反超内圈 60%。
+根因是分布公式 <code>r = √u·R·(1−k·u)</code> 的线性收缩让 dr/du 越靠外越小。修复为纯 √u
+均匀分布 + 拒绝采样羽化边缘，复测 [50.7, 56.2, 56.5, 56.7]。<b>可复现随机种子</b>保证每次刷新贴图
+完全一致，所有数字都能在自动化回归里复现。</p></div>
+<div class="story"><h3>2. brownout 沙暴：先查文献，再做标定</h3>
+<p>"伸手不见五指"不是美术词。依据陆军航空文献（下洗涡卷扬 + 地效再循环 + 桨尖涡扬沙）
+建立悬浮尘墙模型；雾密度按透射率公式标定：机体 15u 保留 57% 轮廓可辨、25u 遮蔽 77%、
+35u 遮蔽 94%。上升沿 1.5 秒（地效再循环建立过程），脱离快退。测试断言的是
+<b>雾密度物理量</b>（0.0034→0.0373）而非截图观感。</p></div>
+<div class="story"><h3>3. 测出来的"玩具枪"，改出来的实战音效</h3>
+<p>初版武器音效用锯齿波扫频——评审第一反应就是"游戏激光"。全部推倒重做为
+<b>纯噪声 + 滤波合成</b>：机炮方波 110→45Hz 加噪声爆点、地狱火弹射砰加低通尾焰、
+爆炸分级（机炮/火箭/地狱火三档）。没有任何采样文件，全部由 Web Audio 实时合成。</p></div>
+
+<h2>三、工程化与可靠性</h2>
+<table>
+<tr><th>机制</th><th>说明</th></tr>
+<tr><td>构建管线</td><td>纯 Node 内置模块「ESM 剥壳 + 按序拼接」；构建前置 id 契约检查（拼错 DOM id 直接构建失败）、模块语法防火墙（app 出现 import/export 即报错）</td></tr>
+<tr><td>自动化回归</td><td><b>九项 Playwright 有头浏览器回归</b>：FPV 驾驶/夜灯/空中目标/水面涟漪/边界场景/草地/沙漠/动目标/导览；护具含看门狗硬超时、孤儿内核清理、结果落盘</td></tr>
+<tr><td>无障碍</td><td>伪按钮补齐 role/tabindex/键盘触发，互斥组 aria-pressed 镜像，机位条 radiogroup，live region 提示</td></tr>
+<tr><td>移动端</td><td>双指捏合缩放、触控目标 ≥28px、FPV 触屏方向键、窄屏布局适配</td></tr>
+<tr><td>演示模式</td><td>「一键导览」60 秒自动巡航全项目（夜景灯光→沙漠沙暴→湖面着舰→爆炸视图），中文字幕，Esc/点按即接管</td></tr>
+</table>
+
+<h2>四、功能全景</h2>
+<p class="note">第一人称座舱（指针锁定驾驶+HUD+武器）· 三种武器曳光/制导弹道 · 地面靶场（含动目标巡逻）
++ 空中目标（无人机/热气球/靶机）· 分武器毁伤特效与击杀信息流 · 夜间航行灯/信标/频闪/搜索灯/编队灯条/仪表绿光 ·
+涂装切换（史实低可视 USMC）· 爆炸视图 · 线框模式 · 12 个预设机位 · 环境预设（正午/黄昏/夜间/棚拍）。</p>
+</main></body></html>

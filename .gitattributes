@@ -1,0 +1,23 @@
+# 统一换行符策略 + 二进制保护（Phase 0-0.6）
+* text=auto eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.py text eol=lf
+*.ps1 text eol=crlf
+*.md text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.glb binary
+*.fbx binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webm binary
+*.mp4 binary
+*.ico binary
+# 注：曾短暂加过 vendor/* -text 与 src/three.module.min.js -text 例外（b18bf0e），
+# 实测其会冻结本机陈旧 CRLF 工作区副本（vendor/GLTFLoader.js 4663 个 CR），导致
+# 新鲜 clone 构建的 dist 与归档字节不符（1,188,155 vs 1,192,752）——已撤销；
+# 跨机器复现由 build.mjs 读入侧 CR 归一化保证（与 git 属性解耦）
