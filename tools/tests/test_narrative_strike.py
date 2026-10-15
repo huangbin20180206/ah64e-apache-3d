@@ -30,8 +30,8 @@ def run(pg):
     print('N1 PASS: 三设施 alive + hp=hp0 + radarAlive')
 
     # ---- N2: 命中未毁——防空车 hp3 打 1 发 → hp 降、仍存活、无 killEvent ----
-    # 防空车世界坐标 (12, 0, 36)；standard 抗打击 res=1.0，机炮威力 1 → 扣 1
-    hit_sam = "__dbg.narrative.hitTest({ x: 12, y: 0.8, z: 36 }, 1)"
+    # 防空车世界坐标 (12, 0, 69)；standard 抗打击 res=1.0，机炮威力 1 → 扣 1
+    hit_sam = "__dbg.narrative.hitTest({ x: 12, y: 0.8, z: 69 }, 1)"
     ok = pg.evaluate("(() => !!%s)()" % hit_sam)
     assert ok, ('N2: 应命中防空车（radius 2.0 覆盖）',)
     n2 = pg.evaluate("__dbg.narrative.state()")
@@ -41,11 +41,11 @@ def run(pg):
     print('N2 PASS: 防空车 hp 3→2、存活、无 killEvent')
 
     # ---- N5+N3+N6: SEAD 闭环 + 雷达摧毁计分 + sead 成就（任务局） ----
-    # 起任务局 → 玩家悬停反击区（距基地 42u）→ samwar 建锁交战（radar 存活）→
+    # 起任务局 → 玩家悬停反击区（z=33，距基地 BASE_C 42u）→ samwar 建锁交战（radar 存活）→
     # 摧毁雷达 → siteN 门断 → samwar 回落 idle；同时 70-app 消费 killEvent 计分 + sead。
     pg.evaluate("(() => { __dbg.S.mode = 'mission'; __dbg.startMission('standard'); })()")
     pg.wait_for_function("() => __dbg.narrative.state().enabled && __dbg.narrative.state().radarAlive", timeout=5000)
-    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=0;
+    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=33;
       F.yaw=0; F.pitch=0; F.roll=0; F.comp=0; F.fp=false; __dbg.S._alt=0; __dbg.S.running=true; })()""")
     pg.evaluate("(() => { const m=__dbg.S._mission; m.phase='active'; if(m.t0==null) m.t0=__dbg.S.time; __dbg.beginMission(); })()")
     # 雷达存活时 samwar 应进入交战（track/lock/launch）——SEAD 前置：防空活跃
@@ -56,10 +56,10 @@ def run(pg):
 
     s0 = pg.evaluate("(() => ({ score: __dbg.arcade.state().score, sead: __dbg.arcade.state().unlocked.includes('sead') }))()")
     assert s0['sead'] is False, ('N3: 摧毁前 sead 未解锁', s0)
-    # 摧毁雷达：雷达世界坐标 (-16, 0, 46)，hp2，机炮 2 发（standard res=1）
+    # 摧毁雷达：雷达世界坐标 (-16, 0, 79)，hp2，机炮 2 发（standard res=1）
     pg.evaluate("""(() => {
-      __dbg.narrative.hitTest({ x: -16, y: 0.8, z: 46 }, 1);
-      __dbg.narrative.hitTest({ x: -16, y: 0.8, z: 46 }, 1);
+      __dbg.narrative.hitTest({ x: -16, y: 0.8, z: 79 }, 1);
+      __dbg.narrative.hitTest({ x: -16, y: 0.8, z: 79 }, 1);
     })()""")
     # killEvent 由 70-app loop 消费 → onKill('radar')；等计分入账 + radarAlive 翻转
     pg.wait_for_function("() => __dbg.narrative.state().radarAlive === false", timeout=5000)
@@ -91,10 +91,10 @@ def run(pg):
     print('N9 PASS: 雷达毁后 RWR HUD 显“压制”')
 
     # ---- N4: 弹药库殉爆——hp1 一发毁 + 二次爆炸标记（_ammoBoom） ----
-    # 弹药库世界坐标 (-11, 0, 40)，hp1，机炮 1 发即毁。原子读 _ammoBoom：与
+    # 弹药库世界坐标 (-11, 0, 73)，hp1，机炮 1 发即毁。原子读 _ammoBoom：与
     # hitTest 同一 evaluate（_destroy 同步置标记），零帧间隔避免 0.5s 殉爆倒计时跑完
     n4 = pg.evaluate("""(() => {
-      __dbg.narrative.hitTest({ x: -11, y: 0.8, z: 40 }, 1);
+      __dbg.narrative.hitTest({ x: -11, y: 0.8, z: 73 }, 1);
       return { ammoDead: !__dbg.narrative.state().strikes.find(s => s.key==='ammo').alive,
                boom: __dbg.narrative._ammoBoom != null };
     })()""")
@@ -121,7 +121,7 @@ def run(pg):
     pg.evaluate("(() => { __dbg.S.mode='mission'; __dbg.startMission('standard'); __dbg.S._mission.difficulty='veteran'; })()")
     pg.wait_for_function("() => __dbg.narrative.state().enabled", timeout=5000)
     hpb = pg.evaluate("__dbg.narrative.state().strikes.find(s => s.key==='sam').hp")
-    pg.evaluate("__dbg.narrative.hitTest({ x: 12, y: 0.8, z: 36 }, 1)")
+    pg.evaluate("__dbg.narrative.hitTest({ x: 12, y: 0.8, z: 69 }, 1)")
     hpa = pg.evaluate("__dbg.narrative.state().strikes.find(s => s.key==='sam').hp")
     ded = hpb - hpa
     print('N8 veteran 扣减:', round(ded, 4), '(期望≈%.4f)' % (1 / 1.4))
@@ -140,9 +140,9 @@ def run(pg):
     # （实测：读间隙偶发 ~7s 时 burn 已自然衰减为 0，wreck 仍在——非产品缺陷）
     w9 = pg.evaluate("""(() => {
       const N = __dbg.narrative;
-      for (let i = 0; i < 2; i++) N.hitTest({ x: -16, y: 0.8, z: 46 }, 1);
-      for (let i = 0; i < 3; i++) N.hitTest({ x: 12, y: 0.8, z: 36 }, 1);
-      N.hitTest({ x: -11, y: 0.8, z: 40 }, 1);
+      for (let i = 0; i < 2; i++) N.hitTest({ x: -16, y: 0.8, z: 79 }, 1);
+      for (let i = 0; i < 3; i++) N.hitTest({ x: 12, y: 0.8, z: 69 }, 1);
+      N.hitTest({ x: -11, y: 0.8, z: 73 }, 1);
       return { st: N.state().wrecks, kids: N.group.children.length };
     })()""")
     print('N10 摧毁后残骸遥测:', w9['st'], 'group kids:', kids0, '->', w9['kids'])
@@ -194,7 +194,7 @@ def run(pg):
     # ---- N11b (Phase 21.1)：真实入口回归——resetRange（走 72-uibind 全链）也清残骸 ----
     # 前置只需"残骸存在"（burn 生效性已由 N9 原子读覆盖）；同样单 evaluate 原子读
     b = pg.evaluate("""(() => {
-      __dbg.narrative.hitTest({ x: -11, y: 0.8, z: 40 }, 1);
+      __dbg.narrative.hitTest({ x: -11, y: 0.8, z: 73 }, 1);
       return __dbg.narrative.state().wrecks.find(w => w.key === 'ammo');
     })()""")
     assert b['wreck'], ('N11b: 二次摧毁弹药库应再生成残骸', b)
@@ -215,7 +215,7 @@ def run(pg):
     # 渲染时序、其它系统的瞬态几何（弹药库殉爆 0.5s 二次爆的分批破片入账等）完全
     # 解耦。探针实证：跨帧几何计数差值断言会被二次爆炸噪声淹没，不可用。
     w12a = pg.evaluate("""(() => {
-      __dbg.narrative.hitTest({ x: -11, y: 0.8, z: 40 }, 1);
+      __dbg.narrative.hitTest({ x: -11, y: 0.8, z: 73 }, 1);
       const n = __dbg.narrative;
       let wave = null;
       n.group.traverse(o => { if (o.name.indexOf('narrative-wave-') === 0) wave = o; });
@@ -255,7 +255,7 @@ def run(pg):
     w13 = pg.evaluate("""(() => {
       const rig = window.__rigFx;
       const before = rig && rig.puffs ? rig.puffs.filter(p => p.m.visible).length : -1;
-      __dbg.narrative.hitTest({ x: 12, y: 0.8, z: 36 }, 1);
+      __dbg.narrative.hitTest({ x: 12, y: 0.8, z: 69 }, 1);
       const n = __dbg.narrative;
       const fx = n.state().fx.find(f => f.key === 'sam');
       const hp = n.state().strikes.find(s => s.key === 'sam').hp;
@@ -284,7 +284,7 @@ def run(pg):
     # ① 白天（本测试此前未切环境，S.env 引导默认 'day'）：摧毁弹药库 → 残骸在烧
     # 但辉光不得挂载。用 radarR 推进证 update 确实跑过多帧（排除"没来得及挂"假阴性）
     d14 = pg.evaluate("""(() => {
-      __dbg.narrative.hitTest({ x: -11, y: 0.8, z: 40 }, 1);
+      __dbg.narrative.hitTest({ x: -11, y: 0.8, z: 73 }, 1);
       const n = __dbg.narrative;
       return { env: __dbg.S.env, burn: n.state().wrecks.find(w => w.key === 'ammo').burn };
     })()""")
@@ -374,8 +374,8 @@ def run(pg):
     print('N15 夜亮昼淡 OK: night=%.3f day=%.3f' % (opN, opD))
     # ④ 摧毁雷达（hp2 两发）→ 波束随组哑火（有效可见性 false——隐藏非删除）；
     #    雷达信标同帧随组熄灭（信标熄灭语义在 N16 结构断言中完整覆盖，此处顺带读回）
-    pg.evaluate("""(() => { __dbg.narrative.hitTest({ x: -16, y: 0.8, z: 46 }, 1);
-      __dbg.narrative.hitTest({ x: -16, y: 0.8, z: 46 }, 1); })()""")
+    pg.evaluate("""(() => { __dbg.narrative.hitTest({ x: -16, y: 0.8, z: 79 }, 1);
+      __dbg.narrative.hitTest({ x: -16, y: 0.8, z: 79 }, 1); })()""")
     pg.wait_for_function("() => __dbg.narrative.state().radarBeam.on === false", timeout=5000)
     d15 = pg.evaluate("""(() => {
       const n = __dbg.narrative;
@@ -417,7 +417,7 @@ def run(pg):
     pg.wait_for_function("(b) => Math.abs(__dbg.narrative.group.getObjectByName('narrative-beacon-radar').material.opacity - b) > 0.05", arg=o16, timeout=6000)
     print('N16 信标呼吸 OK')
     # ③ 摧毁防空车（hp3 三发）→ sam 信标随组熄（on=false + 祖先链有效可见性 false）
-    pg.evaluate("(() => { for (let i = 0; i < 3; i++) __dbg.narrative.hitTest({ x: 12, y: 0.8, z: 36 }, 1); })()")
+    pg.evaluate("(() => { for (let i = 0; i < 3; i++) __dbg.narrative.hitTest({ x: 12, y: 0.8, z: 69 }, 1); })()")
     pg.wait_for_function("() => __dbg.narrative.state().beacons.find(b => b.key === 'sam').on === false", timeout=5000)
     d16 = pg.evaluate("""(() => {
       const n = __dbg.narrative;
@@ -471,7 +471,7 @@ def run(pg):
     # ② 打防空车 1 发（hp3→2，d=1/3）：hurt 置位、d 精确、软烟点亮在 d=1/3 包络、
     #    发射架按公式下垂；雷达/弹药堆不受波及（遥测原子读）
     h17 = pg.evaluate("""(() => {
-      __dbg.narrative.hitTest({ x: 12, y: 0.8, z: 36 }, 1);
+      __dbg.narrative.hitTest({ x: 12, y: 0.8, z: 69 }, 1);
       return __dbg.narrative.state().damaged;
     })()""")
     dm17 = {x['key']: x for x in h17}
@@ -495,8 +495,8 @@ def run(pg):
     # ③ 再打 1 发（hp2→1，d=2/3）：受创程度抬升（d 单调升 + 包络右移 + 下垂加深）；
     #    再打雷达 1 发（hp2→1，d=0.5）：盘侧倾精确 0.09 + 雷达软烟亮
     h17b = pg.evaluate("""(() => {
-      __dbg.narrative.hitTest({ x: 12, y: 0.8, z: 36 }, 1);
-      __dbg.narrative.hitTest({ x: -16, y: 0.8, z: 46 }, 1);
+      __dbg.narrative.hitTest({ x: 12, y: 0.8, z: 69 }, 1);
+      __dbg.narrative.hitTest({ x: -16, y: 0.8, z: 79 }, 1);
       return __dbg.narrative.state().damaged;
     })()""")
     dm17b = {x['key']: x for x in h17b}
@@ -535,7 +535,7 @@ def run(pg):
     # ⑤ 摧毁走残骸链共存：满血防空车 3 发摧毁 → hurt=false/d=0（残骸语义接管）、
     #    软烟熄灭、wreck=true（21.1）+ waves==1（21.2）链原样
     d17 = pg.evaluate("""(() => {
-      for (let i = 0; i < 3; i++) __dbg.narrative.hitTest({ x: 12, y: 0.8, z: 36 }, 1);
+      for (let i = 0; i < 3; i++) __dbg.narrative.hitTest({ x: 12, y: 0.8, z: 69 }, 1);
       const n = __dbg.narrative;
       return { dm: n.state().damaged.find(s => s.key === 'sam'),
                wreck: n.state().wrecks.find(w => w.key === 'sam'),
