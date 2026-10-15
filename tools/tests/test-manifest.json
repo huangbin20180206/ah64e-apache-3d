@@ -436,11 +436,6 @@
    "mobile": false
   },
   {
-   "name": "test_training",
-   "pillow": false,
-   "mobile": false
-  },
-  {
    "name": "test_finale",
    "pillow": false,
    "mobile": false
