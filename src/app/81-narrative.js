@@ -1,17 +1,17 @@
 // ============================================================
 // 81-narrative.js — 环境叙事（Phase 13-M5）
 // ============================================================
-// 基地（baseCenter=(0,0,42)）周围的环境动态：让玩家在自由飞行/任务中看到
+// 基地（baseCenter=05-config BASE_C）周围的环境动态：让玩家在自由飞行/任务中看到
 // "有军事活动"的基地而非静态布景——
-//   1) 旋转雷达天线：基地内侧慢速旋转（~3.3°/s，约 108s/圈）
-//   2) 防空导弹车：发射架起竖姿态（静止）——阴影透到地面增强存在感
+//   1) 旋转雷达天线：方舱车+桁架桅杆+抛物柱面天线，慢速旋转（~3.3°/s，约 108s/圈）
+//   2) 防空导弹车：8×8 轮式发射车，4 联装发射筒起竖姿态（静止）
 //   3) 探照灯：夜间扫掠光锥（ConeGeometry 半透明 + 灯头亮点，低频摆动）
-//   4) 弹药堆：成捆箱体（3 箱堆叠）
-//   5) 巡逻编队：2 架小型机影沿基地上空环形轨道（r=18u，h=12u）低速
+//   4) 弹药堆：三垛托盘弹药箱（中垛盖篷布）
+//   5) 巡逻编队：2 架察打无人机沿基地上空环形轨道（r=18u，h=12u）低速
 //      巡航（~0.16 rad/s，2 机相位差 π——"有人看着这片天"）
 //   6) 远交火烟柱：基地外 60-80u 处 2 处间歇烟柱（Sprite 缓慢升腾+呼吸）
 // 所有对象随靶场显隐（syncEnabled）——湖面隐藏靶场时基地叙事一并隐藏。
-// 性能：程序化一次性几何（约 20 mesh 规模），每帧仅转雷达/编队/灯摆/烟柱
+// 性能：程序化一次性几何（2026-10-15 起各设施顶点色合批，约 16 mesh 规模），每帧仅转雷达/编队/灯摆/烟柱
 // opacity（零创建销毁）；draws 增量 ≤ 8、fps ≥ 55（A2 新规）。
 // ============================================================
 
@@ -23,22 +23,64 @@ class NarrativeFX {
     this.group = new THREE.Group();
     scene.add(this.group);
 
-    const BC = { x: 0, z: 42 };                    // 基地中心（与 16-targets build 同源）
+    const BC = { x: BASE_C.x, z: BASE_C.z };        // 基地中心（05-config BASE_C，与 16-targets build 同源）
     // —— 材质（共享实例，避免每件新建）——
-    const grey = new THREE.MeshStandardMaterial({ color: 0x4a4f46, roughness: 0.75 });
     const dgrey = new THREE.MeshStandardMaterial({ color: 0x33382f, roughness: 0.85 });
-    const crateMat = new THREE.MeshStandardMaterial({ color: 0x5c5034, roughness: 0.9 });
     const lampMat = new THREE.MeshBasicMaterial({ color: 0xfff3d0 });
 
-    // 1) 旋转雷达：柱 + 顶部雷达盘（天线沿 +X 展向的扁盘，绕柱 Y 旋转）
+    // 1) 旋转雷达（2026-10-15 真实化，参照"平面"系列车载警戒雷达）：
+    //    方舱车（6m×2.5m≈2.6u×1.1u，四轮+支腿）+ 舱顶桁架桅杆 + 顶部旋转天线
+    //    （抛物柱面反射板 ≈7m 宽=3.2u + 馈源臂）。全高 ≈4.2u≈9.5m。
+    //    名称保持：mast=静态整车（顶点色合批 1 mesh），dish=旋转天线（1 mesh）。
     const radar = new THREE.Group();
     radar.name = 'narrative-radar';
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1.6, 8), grey);
+    const radarMat = vcMat(0.78, 0.18);
+    const OL = 0x56604a, OD = 0x3d4436, DK = 0x1d201b, MT = 0x6b7262;
+    const rk = vcKit();
+    rk.box(0.92, 0.12, 2.3, DK, 0, 0.36, 0);                    // 底盘大梁
+    rk.box(1.10, 1.02, 2.50, OL, 0, 0.94, 0);                   // 方舱
+    rk.box(1.14, 0.05, 2.54, OD, 0, 1.47, 0);                   // 舱顶檐
+    rk.box(0.02, 0.62, 0.48, OD, 0.56, 0.86, 0.55);             // 侧门
+    rk.box(0.02, 0.16, 0.36, 0x2a3a3c, 0.56, 1.18, -0.55);      // 观察窗
+    rk.box(0.30, 0.18, 0.40, OD, 0.30, 1.58, -0.85);            // 舱顶空调/设备箱
+    rk.box(0.07, 0.07, 0.95, DK, 0, 0.34, 1.62);                // 牵引杆
+    for (const sx of [-0.52, 0.52]) for (const sz of [-0.82, 0.82]) {
+      rk.cyl(0.24, 0.24, 0.17, 12, DK, sx, 0.24, sz, 0, 0, Math.PI / 2);   // 车轮
+      rk.cyl(0.10, 0.10, 0.18, 8, OD, sx * 1.01, 0.24, sz, 0, 0, Math.PI / 2);
+    }
+    for (const sx of [-0.62, 0.62]) for (const sz of [-1.18, 1.18]) {
+      rk.box(0.06, 0.40, 0.06, DK, sx, 0.20, sz);               // 调平支腿
+      rk.box(0.18, 0.03, 0.18, DK, sx, 0.015, sz);              // 支腿垫板
+    }
+    // 舱顶桁架桅杆（4 根立柱收分 + 斜撑）+ 转台
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      rk.box(0.05, 1.90, 0.05, MT, sx * 0.17, 2.43, sz * 0.17, sz * 0.05, 0, -sx * 0.05);
+    }
+    for (let k = 0; k < 3; k++) {
+      const y = 1.75 + k * 0.6, w = 0.40 - k * 0.04;
+      rk.box(w, 0.035, 0.035, MT, 0, y, 0.17 - k * 0.02);
+      rk.box(w, 0.035, 0.035, MT, 0, y, -0.17 + k * 0.02);
+      rk.box(0.035, 0.035, w, MT, 0.17 - k * 0.02, y, 0);
+      rk.box(0.035, 0.035, w, MT, -0.17 + k * 0.02, y, 0);
+    }
+    rk.cyl(0.20, 0.24, 0.16, 12, OD, 0, 3.42, 0);               // 转台
+    const mast = new THREE.Mesh(rk.build(), radarMat);
     mast.name = 'narrative-radar-mast';
-    mast.position.y = 0.8;
-    const dish = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.5), dgrey);
+    // 旋转天线：7 片拼成的抛物柱面反射板（凹面朝 +Z）+ 背桁 + 馈源臂/馈源
+    const dk = vcKit();
+    for (let i = -3; i <= 3; i++) {
+      const a = i * 0.13;
+      dk.box(0.47, 0.70, 0.035, MT, Math.sin(a) * 1.8, 0.42, -Math.cos(a) * 1.8 + 1.8, 0, -a, 0);
+    }
+    dk.box(2.6, 0.06, 0.06, MT, 0, 0.42, -0.08);                // 背桁横梁
+    dk.box(0.07, 0.62, 0.07, DK, 0, 0.42, -0.10);
+    dk.box(0.16, 0.30, 0.16, OD, 0, 0.12, 0);                   // 转轴座
+    dk.box(0.04, 0.04, 1.05, DK, 0.42, 0.42, 0.50, 0, -0.38, 0);    // 馈源撑臂 ×2
+    dk.box(0.04, 0.04, 1.05, DK, -0.42, 0.42, 0.50, 0, 0.38, 0);
+    dk.box(0.30, 0.12, 0.12, OD, 0, 0.42, 0.98);                // 馈源
+    const dish = new THREE.Mesh(dk.build(), radarMat);
     dish.name = 'narrative-radar-dish';
-    dish.position.y = 1.75;
+    dish.position.y = 3.50;
     // Phase 25：雷达扫描波束——薄扇形挂 radarDish 子节点，随盘同转（复用既有
     // radarDish 旋转，不新开动画时钟）；雷达摧毁 = 组隐藏 + 停转 → 波束自动
     // "哑火"，天然表达 SEAD 致盲（视觉闭环）。加性半透/depthWrite:false，
@@ -48,7 +90,8 @@ class NarrativeFX {
       new THREE.MeshBasicMaterial({ color: 0x6fd8ff, transparent: true, opacity: 0.1,
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
     beam.name = 'narrative-beam';
-    beam.rotation.x = -Math.PI / 2 - 0.3;           // 平铺 + 远端下探 ~0.84u（扫地面）
+    beam.rotation.x = -Math.PI / 2 - 0.3;           // 平铺 + 远端下探（扫地面）
+    beam.position.y = 0.42;
     beam.renderOrder = 3;
     dish.add(beam);
     this._beam = beam;
@@ -58,20 +101,58 @@ class NarrativeFX {
     this.radarDish = dish;                          // 只转盘不转柱
     this._radarGroup = radar;                       // Phase 21：打击层引用（摧毁隐藏 + 停转）
 
-    // 2) 防空导弹车：车身 + 4 根起竖发射架（倾斜圆柱）
+    // 2) 防空导弹车（2026-10-15 真实化，参照 8×8 轮式远程防空发射车）：
+    //    车长 10.5m≈4.6u、宽 3m≈1.3u；车头驾驶室在 +Z，4 联装发射筒（≈7m=3.0u，
+    //    直径 ≈0.75m）铰接在车尾，起竖后筒口朝车头前倾 ~20°。
+    //    名称保持：sam-body=整车（顶点色合批 1 mesh），sam-tube-0..3=四根发射筒。
     const sam = new THREE.Group();
     sam.name = 'narrative-sam';
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.55, 3.2), grey);
+    const samMat = vcMat(0.76, 0.2);
+    const SO = 0x5a6248, SD = 0x3b4233, SK = 0x1c1f1a, GL = 0x22343a;
+    const sk = vcKit();
+    sk.box(1.05, 0.24, 4.40, SK, 0, 0.62, 0);                   // 大梁
+    for (const z of [1.55, 0.92, -0.62, -1.25]) for (const sx of [-0.56, 0.56]) {
+      sk.cyl(0.29, 0.29, 0.22, 14, SK, sx, 0.29, z, 0, 0, Math.PI / 2);   // 8 个大轮
+      sk.cyl(0.12, 0.12, 0.23, 8, SD, sx * 1.01, 0.29, z, 0, 0, Math.PI / 2);
+    }
+    for (const z of [1.24, -0.94]) sk.box(1.32, 0.05, 1.05, SD, 0, 0.62, z);   // 挡泥板
+    sk.box(1.30, 0.70, 0.95, SO, 0, 1.08, 1.72);                // 驾驶室
+    sk.box(1.20, 0.26, 0.04, GL, 0, 1.24, 2.20, -0.18, 0, 0);   // 风挡
+    for (const sx of [-0.66, 0.66]) sk.box(0.03, 0.22, 0.45, GL, sx, 1.22, 1.78);   // 侧窗
+    sk.box(1.24, 0.06, 0.85, SD, 0, 1.45, 1.70);                // 驾驶室顶
+    sk.box(1.20, 0.55, 0.85, SO, 0, 1.00, 0.80);                // 动力/电源舱
+    sk.box(0.10, 0.10, 0.80, SK, 0.52, 1.30, 0.80);             // 排气管
+    sk.box(1.28, 0.12, 2.65, SD, 0, 0.82, -0.85);               // 后部发射平台
+    for (const sx of [-0.70, 0.70]) for (const z of [1.10, -2.05]) {
+      sk.box(0.08, 0.68, 0.08, SK, sx, 0.40, z);                // 调平千斤顶
+      sk.box(0.22, 0.03, 0.22, SK, sx, 0.015, z);
+    }
+    sk.box(1.10, 0.18, 0.22, SD, 0, 1.0, -2.05);                // 尾部铰接座
+    sk.box(0.10, 1.45, 0.10, SD, 0.0, 1.55, -1.10, 0.42, 0, 0); // 起竖液压撑杆
+    const body = new THREE.Mesh(sk.build(), samMat);
     body.name = 'narrative-sam-body';
-    body.position.y = 0.55;
     sam.add(body);
+    // 发射筒：轴心在筒底（铰点，车尾），装在绕 Y 翻转 180° 的起竖架里——
+    // rotation.x 基线 -0.35（Phase 28 损伤公式以此为基线）在这里表现为
+    // "筒口朝车头方向前倾 ~20°"（半起竖姿态；探针实测筒顶在铰点与驾驶室之间）
+    const erector = new THREE.Group();
+    erector.position.set(0, 1.02, -2.0);
+    erector.rotation.y = Math.PI;
+    sam.add(erector);
+    const tubeGeo = (() => {
+      const tk = vcKit();
+      tk.cyl(0.165, 0.165, 3.0, 14, 0x5f6650, 0, 1.5, 0);
+      for (const y of [0.25, 1.5, 2.75]) tk.cyl(0.18, 0.18, 0.10, 14, 0x454c3c, 0, y, 0);   // 加强箍
+      tk.cyl(0.17, 0.17, 0.04, 14, 0x2b2f28, 0, 3.0, 0);        // 筒口盖
+      return tk.build();
+    })();
     this._samTubes = [];                           // Phase 28：发射架引用（重创下垂微倾）
     for (let i = 0; i < 4; i++) {
-      const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 2.1, 8), dgrey);
+      const tube = new THREE.Mesh(tubeGeo, samMat);
       tube.name = 'narrative-sam-tube-' + i;
-      tube.position.set((i % 2) * 0.4 - 0.2, 1.7, i < 2 ? 0 : -1.55);
-      tube.rotation.x = -0.35;                      // 起竖微倾
-      sam.add(tube);
+      tube.position.set((i - 1.5) * 0.36, 0, 0);
+      tube.rotation.x = -0.35;                      // 起竖微倾（Phase 28 基线）
+      erector.add(tube);
       this._samTubes.push(tube);
     }
     sam.position.set(BC.x + 12, 0, BC.z - 6);
@@ -79,14 +160,32 @@ class NarrativeFX {
     this.group.add(sam);
     this._samGroup = sam;                           // Phase 21：打击层引用
 
-    // 3) 弹药堆：3 箱堆叠（大小错落）
+    // 3) 弹药堆（2026-10-15 真实化）：三垛托盘弹药箱（单箱 ≈1.0m×0.6m×0.7m），
+    //    垛高 2/3/1 层，中垛盖篷布。名称保持 ammo-crate-0..2（每垛 1 mesh）。
     const ammo = new THREE.Group();
     ammo.name = 'narrative-ammo';
+    const ammoMat = vcMat(0.88, 0.05);
+    const layers = [2, 3, 1];
     for (let i = 0; i < 3; i++) {
-      const c = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 1.2), crateMat);
+      const ak = vcKit();
+      ak.box(1.02, 0.07, 0.82, 0x6b5536, 0, 0.035, 0);         // 木托盘
+      for (const sx of [-0.4, 0, 0.4]) ak.box(0.07, 0.06, 0.82, 0x4f3e27, sx, 0.035, 0);
+      for (let l = 0; l < layers[i]; l++) for (const cx of [-0.25, 0.25]) for (const cz of [-0.2, 0.2]) {
+        const y = 0.07 + 0.15 + l * 0.30;
+        const col = ((l + (cx > 0) + (cz > 0)) % 2) ? 0x55603f : 0x4d5739;
+        ak.box(0.46, 0.28, 0.36, col, cx, y, cz);              // 弹药箱
+        ak.box(0.47, 0.04, 0.37, 0x3a412c, cx, y + 0.06, cz);  // 箱体加强带
+        ak.box(0.10, 0.03, 0.02, 0xc9b25a, cx, y + 0.02, cz + 0.185);   // 黄色标识条
+      }
+      if (i === 1) {
+        const top = 0.07 + layers[i] * 0.30;
+        ak.box(1.06, 0.04, 0.86, 0x4a4e36, 0, top + 0.02, 0);  // 篷布
+        for (const sx of [-0.54, 0.54]) ak.box(0.02, top - 0.1, 0.86, 0x4a4e36, sx, top / 2 + 0.05, 0);
+      }
+      const c = new THREE.Mesh(ak.build(), ammoMat);
       c.name = 'narrative-ammo-crate-' + i;
-      c.position.set(i * 0.95 - 0.9, 0.3 + (i === 2 ? 0.55 : 0), (i % 2) * 0.3);
-      c.rotation.y = i * 0.4;
+      c.position.set(i * 1.15 - 1.15, 0, (i % 2) * 0.35);
+      c.rotation.y = i * 0.12;
       ammo.add(c);
     }
     ammo.position.set(BC.x - 11, 0, BC.z - 2);
@@ -128,17 +227,33 @@ class NarrativeFX {
     this.lamp = lamp;                               // update 中按环境摆动灯组
     this._lampSwing = 0;
 
-        // 5) 巡逻编队：2 架小机影（机身 + 三角翼），基地上空环形轨道
-    const patrolMat = new THREE.MeshStandardMaterial({ color: 0x2e332b, roughness: 0.8 });
+    // 5) 巡逻编队（2026-10-15 真实化）：2 架中空长航时察打无人机——
+    //    机长 6.5m≈2.9u、翼展 12m≈5.3u，倒 V 尾双尾撑、推进式螺旋桨、机头下光电球。
+    //    名称保持 patrol-i-fus（整机顶点色合批 1 mesh）。机头局部 +Z。
+    const patrolMat = vcMat(0.6, 0.25);
+    const pk = vcKit();
+    const PG = 0x8b9190, PD = 0x5d6363, PB = 0x2a2e2f;
+    pk.cyl(0.19, 0.15, 2.1, 12, PG, 0, 0, 0.05, Math.PI / 2, 0, 0);  // 机身
+    pk.cyl(0.0, 0.19, 0.55, 12, PG, 0, 0, 1.38, Math.PI / 2, 0, 0);  // 机头整流
+    pk.sph(0.11, PB, 0, -0.17, 1.05);                           // 光电球
+    pk.box(0.16, 0.10, 0.70, PD, 0, 0.18, 0.15);                // 背部卫通鼓包
+    pk.box(2.65, 0.05, 0.42, PG, 1.33, 0.06, 0.05, 0, 0, 0.04); // 右翼（微上反）
+    pk.box(2.65, 0.05, 0.42, PG, -1.33, 0.06, 0.05, 0, 0, -0.04);
+    for (const sx of [-0.62, 0.62]) {
+      pk.cyl(0.045, 0.04, 1.75, 6, PD, sx, 0.05, -0.85, Math.PI / 2, 0, 0);   // 尾撑
+      pk.box(0.04, 0.50, 0.30, PG, sx * 0.80, -0.14, -1.68, 0, 0, sx > 0 ? 0.65 : -0.65);  // 倒 V 尾
+      pk.box(0.10, 0.04, 0.08, PB, sx * 1.6, 0.06, 0.05);       // 翼下挂点
+    }
+    pk.box(0.85, 0.05, 0.03, PB, 0, 0, -0.98);                  // 推进桨（静态）
+    pk.box(0.05, 0.85, 0.03, PB, 0, 0, -0.98);
+    const patrolGeo = pk.build();
     this.patrol = [];
     for (let i = 0; i < 2; i++) {
       const p = new THREE.Group();
       p.name = 'narrative-patrol-' + i;
-      const fus = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 1.1), patrolMat);
+      const fus = new THREE.Mesh(patrolGeo, patrolMat);
       fus.name = 'narrative-patrol-' + i + '-fus';
-      const wing = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.06, 0.5), patrolMat);
-      wing.position.z = 0.1;
-      p.add(fus, wing);
+      p.add(fus);
       this.group.add(p);
       this.patrol.push({ g: p, phase: i * Math.PI, altv: (i % 2) * 0.5 });
     }
@@ -176,9 +291,9 @@ class NarrativeFX {
     // 70-app 断防空 env）。
     this.strikes = [
       { key: 'radar', group: this._radarGroup, hp: 2, hp0: 2, alive: true,
-        label: '敌雷达站',   pos: { x: BC.x - 16, z: BC.z + 4 }, radius: 1.6 },
+        label: '敌雷达站',   pos: { x: BC.x - 16, z: BC.z + 4 }, radius: 1.9 },
       { key: 'sam',   group: this._samGroup,   hp: 3, hp0: 3, alive: true,
-        label: '防空发射车', pos: { x: BC.x + 12, z: BC.z - 6 }, radius: 2.0 },
+        label: '防空发射车', pos: { x: BC.x + 12, z: BC.z - 6 }, radius: 2.4 },
       { key: 'ammo',  group: this._ammoGroup,  hp: 1, hp0: 1, alive: true,
         label: '弹药库',     pos: { x: BC.x - 11, z: BC.z - 2 }, radius: 1.4 },
     ];
@@ -198,7 +313,7 @@ class NarrativeFX {
         map: this._glowTexGet(), color: 0xff5040, transparent: true, opacity: 0.8,
         blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
       sp.name = 'narrative-beacon-' + s.key;
-      sp.position.set(0, s.key === 'radar' ? 2.06 : 1.02, s.key === 'radar' ? 0 : 0.7);
+      sp.position.set(0, s.key === 'radar' ? 4.05 : 1.62, s.key === 'radar' ? 0 : 1.72);   // 2026-10-15：雷达桅顶 / 防空车驾驶室顶
       sp.scale.set(0.34, 0.34, 1);
       sp.renderOrder = 4;
       s.group.add(sp);
@@ -218,7 +333,7 @@ class NarrativeFX {
         map: this._glowTexGet(), color: 0x55514b, transparent: true, opacity: 0,
         depthWrite: false }));
       sp.name = 'narrative-dmgsmoke-' + s.key;
-      sp.position.set(0, s.key === 'radar' ? 1.0 : 0.9, s.key === 'radar' ? 0 : -0.6);
+      sp.position.set(0, s.key === 'radar' ? 1.6 : 1.1, s.key === 'radar' ? 0 : -0.6);
       sp.scale.set(1.2, 1.2, 1);
       sp.renderOrder = 4;
       sp.visible = false;
@@ -508,7 +623,7 @@ class NarrativeFX {
       b.sp.material.opacity = 0.55 + 0.45 * Math.sin(time * 2.4 + b.ph);
     }
     // 巡逻编队：绕基地环形轨道（r=18, h=12），2 机相位差 π
-    const bc = { x: 0, z: 42 };
+    const bc = BASE_C;
     for (let i = 0; i < this.patrol.length; i++) {
       const p = this.patrol[i];
       const a = time * 0.16 + p.phase;
