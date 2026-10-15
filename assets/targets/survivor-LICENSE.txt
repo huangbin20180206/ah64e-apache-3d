@@ -1,0 +1,4 @@
+survivor.glb — 幸存者士兵模型
+来源：Grab3D "Soldier"（rigged 版） https://grab3d.com/models/characters/soldier/
+许可：CC0 1.0（公共领域，可商用，无需署名）
+处理：删除原 walk/run 动画；减面约 28 万 → 1.7 万三角面；贴图缩到 512；meshopt 压缩（tools: @gltf-transform 4.5.1）。
