@@ -19,9 +19,9 @@
 // 由 70-app 构造注入）。
 // ============================================================
 
-// 城镇中心（基地 BC=(0,42) 再往北 21u；r>48 处 duneFarH 恒为 0——全平地。
-// 位于基地 HESCO 北墙（z=54，正中留门）之外
-const TOWN_CENTER = { x: 0, z: 63 };
+// 城镇中心（基地 BC=05-config BASE_C 再往北 21u；r>48 处 duneFarH 恒为 0——全平地。
+// 位于基地 HESCO 北墙（BC+12，正中留门）之外
+const TOWN_CENTER = { x: BASE_C.x, z: BASE_C.z + 21 };
 // 建筑：[cx, cz, w(沿 x), d(沿 z), h, hp, 名称]（TOWN_CENTER 相对坐标）。
 // 主街 |x|<1.6 纵贯、横街 |z|<1.4 横贯；南排挡住横街，北排挡住北巷。
 const TOWN_BUILDINGS = [
@@ -134,7 +134,7 @@ class TownDistrict {
       new THREE.MeshStandardMaterial({ color: 0x8c7d63, roughness: 1, metalness: 0,
         polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
     yard.rotation.x = -PI / 2;
-    yard.position.set(C.x, 0.006, C.z + 2);    // z 54.5~75.5：南缘停在基地北墙(z=54)外
+    yard.position.set(C.x, 0.006, C.z + 2);    // BC+12.5~BC+33.5：南缘停在基地北墙(BC+12)外
     yard.receiveShadow = true;
     g.add(yard);
     const roadGeos = [];
