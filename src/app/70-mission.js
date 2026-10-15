@@ -77,14 +77,14 @@ function _airSupAnchor() {
   const m = S._mission;
   if (m && m._airAnchor) return m._airAnchor;
   if (targets && targets.baseCenter) return targets.baseCenter;
-  return { x: 0, z: 42 };
+  return { x: BASE_C.x, z: BASE_C.z };
 }
 // Phase 24：SEAD 变体目标达成判定——雷达与防空发射车均已摧毁（读 81 的 state()
 // 公开遥测，不反向引用 81 内部；无叙事层时不阻塞完成）。函数声明会提升，供上方
 // loop 完成判定调用。
 // P3 终关：阶段推进（只进不退）。1 致盲 → 2 清场（进入时敌机升空）→ 3 救援（进入时
 // 被俘飞行员出现在基地西侧）→ 4 完成。阶段 1-2 期间救援目标隐藏且不可作业（rescue.ok=false）。
-const FINALE_POW = { x: -14, z: 50 };
+const FINALE_POW = { x: -14, z: BASE_C.z + 8 };   // 基地西北侧（BASE_C 相对，旧绝对值 (-14,50)=BC+8）
 function _placeRescue(x, z) {
   if (!rescue) return;
   rescue._home = { x, z };
