@@ -42,7 +42,9 @@
    "rsign",
    "smin",
    "smoothstep",
-   "tex"
+   "tex",
+   "vcKit",
+   "vcMat"
   ],
   "depends": {}
  },
@@ -58,6 +60,8 @@
  "05-config.js": {
   "provides": [
    "AC",
+   "BASE_C",
+   "FLY_BOUND",
    "GROUND_PITCH",
    "GROUND_PITCH_COMP",
    "GROUND_Y",
@@ -213,6 +217,9 @@
    ],
    "31-scenery.js": [
     "buildScenery"
+   ],
+   "05-config.js": [
+    "BASE_C"
    ]
   }
  },
@@ -224,7 +231,9 @@
    "00-utils.js": [
     "PI",
     "disposeObject3D",
-    "mergeGeos"
+    "mergeGeos",
+    "vcKit",
+    "vcMat"
    ],
    "16-targetmodels.js": [
     "targetMat"
@@ -259,6 +268,9 @@
     "loadTargetModels",
     "mergeTargetStatics",
     "targetMat"
+   ],
+   "05-config.js": [
+    "BASE_C"
    ]
   }
  },
@@ -630,6 +642,9 @@
    ],
    "45-flight.js": [
     "FLY"
+   ],
+   "05-config.js": [
+    "FLY_BOUND"
    ]
   }
  },
@@ -997,6 +1012,7 @@
     "toast"
    ],
    "05-config.js": [
+    "FLY_BOUND",
     "RPM_NOMINAL",
     "SPIN_DOWN_SEC",
     "SPIN_UP_SEC",
@@ -1110,6 +1126,7 @@
     "toast"
    ],
    "05-config.js": [
+    "BASE_C",
     "GUN",
     "ROCKET"
    ],
@@ -1563,10 +1580,15 @@
   "depends": {
    "00-utils.js": [
     "TAU",
-    "rnd"
+    "rnd",
+    "vcKit",
+    "vcMat"
    ],
    "01-host.js": [
     "HOST"
+   ],
+   "05-config.js": [
+    "BASE_C"
    ]
   }
  },
@@ -1589,6 +1611,9 @@
    ],
    "70-camera.js": [
     "setView"
+   ],
+   "05-config.js": [
+    "BASE_C"
    ]
   }
  },
@@ -1682,7 +1707,9 @@
     "DEG",
     "PI",
     "mergeGeos",
-    "rnd"
+    "rnd",
+    "vcKit",
+    "vcMat"
    ],
    "01-host.js": [
     "HOST"
