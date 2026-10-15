@@ -1,7 +1,8 @@
 // ============================================================
 // 48-rescue.js — 绞车救援任务（P2-3）
 // 幸存者随场地生成（沙漠/草原各一处，水上/棚拍无），信标闪烁+信号烟
-// P4g：幸存者为飞行服机组成员模型（挥手求救 / 吊带上举），与 AH-64E 同比例（1u≈2.27m）。
+// P4g：幸存者 = 真人士兵 GLB（CC0，assets/targets/survivor.glb，骨骼摆姿挥手求救 / 吊带上举）；
+// GLB 未到或加载失败时用程序化兜底身体。与 AH-64E 同比例（1u≈2.27m，身高 1.85m）。
 // 辅助寻找。玩法闭环：悬停对位 → K 放绞车 → 吊钩落地自动挂接 →
 // 收绞车救起 → 低空返回停机坪 → 救援完成。
 // 吊钩跟随机腹，随悬停移动自然摆动；K 可中途收回（幸存者原地放下）。
@@ -41,7 +42,8 @@ class Rescue {
     kb.box(0.2, 0.06, 0.05, VISOR, 0, 1.71, 0.115);                     // 护目镜
     const mat = vcMat(0.85, 0.05);
     const fig = new THREE.Group();
-    fig.add(new THREE.Mesh(mergeGeos(kb.list), mat));
+    this._proc = new THREE.Mesh(mergeGeos(kb.list), mat);
+    fig.add(this._proc);
     // 手臂：枢轴在肩部，零件沿 -Y 下垂
     const arm = (sx) => {
       const ka = vcKit();
@@ -58,7 +60,7 @@ class Rescue {
     this.armL = arm(-1); this.armR = arm(1);
     // 救援吊带（腋下环 + 向上连到吊钩的短带），挂接后才显示
     const ks = vcKit();
-    ks.add(new THREE.TorusGeometry(0.24, 0.03, 6, 16), PATCH, 0, 1.4, 0, Math.PI / 2, 0, 0);
+    ks.add(new THREE.TorusGeometry(0.27, 0.03, 6, 16), PATCH, 0, 1.4, 0, Math.PI / 2, 0, 0);
     ks.box(0.04, 0.5, 0.03, PATCH, 0, 1.65, 0.2);
     ks.box(0.04, 0.5, 0.03, PATCH, 0, 1.65, -0.2);
     this.strap = new THREE.Mesh(mergeGeos(ks.list), mat);
@@ -66,8 +68,13 @@ class Rescue {
     fig.add(this.strap);
     fig.scale.setScalar(1 / 2.27 * 0.99);
     this.HANG = 1.92 / 2.27;                  // 吊钩到脚底的距离（u）
+    this._fig = fig;
     this.g = new THREE.Group();
     this.g.add(fig);
+    // 真人模型（CC0 士兵，grab3d.com/models/characters/soldier，减面+压缩后 assets/targets/survivor.glb）。
+    // 加载成功即替换上面的程序化兜底身体；失败则保持兜底（与 26-airtargets 靶机同一模式）。
+    this._sk = null;
+    new THREE.GLTFLoader().load('assets/targets/survivor.glb', (gltf) => this._useGlb(gltf), undefined, () => {});
     this.g.visible = false;
     scene.add(this.g);
 
@@ -100,6 +107,127 @@ class Rescue {
       new THREE.MeshBasicMaterial({ color: 0x2a2a26 }));
     this.hook.visible = false;
     scene.add(this.hook);
+  }
+
+  // 接入真人模型：按身高 1.85m 缩放、面朝 +Z，预先算好"挥手 A/B""吊起上举"三套手臂骨骼姿态
+  _useGlb(gltf) {
+    const m = gltf.scene, B = {};
+    m.traverse(o => { if (o.isBone) B[o.name] = o; });
+    const ARM = ['LeftArm', 'LeftForeArm', 'RightArm', 'RightForeArm'];
+    if (['Head', 'headfront', 'LeftHand', 'RightHand'].concat(ARM).some(n => !B[n])) return;
+    const V = () => new THREE.Vector3(), Q = () => new THREE.Quaternion();
+    const wrap = new THREE.Group();
+    wrap.add(m);
+    m.updateMatrixWorld(true);
+    const wp = n => V().setFromMatrixPosition(B[n].matrixWorld);
+    const f = wp('headfront').sub(wp('Head'));
+    wrap.rotation.y = -Math.atan2(f.x, f.z);           // 模型正面转到 +Z（与程序化身体一致）
+    wrap.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(wrap);
+    const sc = 1.85 / Math.max(0.1, box.max.y - box.min.y);
+    wrap.scale.setScalar(sc);
+    wrap.position.y = -box.min.y * sc;
+    this._fig.add(wrap);
+    this._fig.updateMatrixWorld(true);
+    const wInv = wrap.matrixWorld.clone().invert();
+    const loc = n => wp(n).applyMatrix4(wInv);
+    const R = Math.sign(loc('RightArm').x) || -1, L = -R;     // 角色右手在本地 X 的哪一侧
+    const rest = ARM.map(n => B[n].quaternion.clone());
+    const wq = Q(), pq = Q(), bq = Q(), dq = Q();
+    const aim = (bn, cn, d) => {
+      const bone = B[bn];
+      wrap.getWorldQuaternion(wq);
+      const cur = wp(cn).sub(wp(bn)).normalize();
+      const tgt = V().set(d[0], d[1], d[2]).normalize().applyQuaternion(wq);
+      dq.setFromUnitVectors(cur, tgt);
+      bone.getWorldQuaternion(bq);
+      bone.parent.getWorldQuaternion(pq);
+      bone.quaternion.copy(pq.invert().multiply(dq.multiply(bq)));
+      bone.updateMatrixWorld(true);
+    };
+    const pose = (dirs) => {
+      ARM.forEach((n, i) => B[n].quaternion.copy(rest[i]));
+      wrap.updateMatrixWorld(true);
+      aim('LeftArm', 'LeftForeArm', dirs[0]); aim('LeftForeArm', 'LeftHand', dirs[1]);
+      aim('RightArm', 'RightForeArm', dirs[2]); aim('RightForeArm', 'RightHand', dirs[3]);
+      return ARM.map(n => B[n].quaternion.clone());
+    };
+    const lDown = [[L * 0.22, -0.97, 0.06], [L * 0.08, -1, 0.18]];
+    const P = {
+      waveA: pose([...lDown, [R * 0.45, 0.89, 0.12], [R * 0.05, 1, 0.12]]),
+      waveB: pose([...lDown, [R * 0.45, 0.89, 0.12], [R * 0.8, 0.6, 0.12]]),
+      hoist: pose([[L * 0.25, 0.97, 0.05], [L * 0.06, 1, 0.04], [R * 0.25, 0.97, 0.05], [R * 0.06, 1, 0.04]]),
+    };
+    // CPU 蒙皮：把骨骼网格换成普通网格，由 _skin() 按骨骼姿态改写顶点（软件渲染下骨骼着色器会失败，
+    // 实测丢失整个画面；一个人约 1.8 万顶点，限频 15 次/秒，开销很小）
+    let sm = null;
+    m.traverse(o => { if (o.isSkinnedMesh && !sm) sm = o; });
+    if (!sm) return;
+    const sg = sm.geometry, pa = sg.attributes.position, na = sg.attributes.normal,
+      ja = sg.attributes.skinIndex, wa = sg.attributes.skinWeight, n = pa.count;
+    const P0 = new Float32Array(n * 3), N0 = new Float32Array(n * 3), J0 = new Uint16Array(n * 4), W0 = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) {
+      P0[i * 3] = pa.getX(i); P0[i * 3 + 1] = pa.getY(i); P0[i * 3 + 2] = pa.getZ(i);
+      N0[i * 3] = na.getX(i); N0[i * 3 + 1] = na.getY(i); N0[i * 3 + 2] = na.getZ(i);
+      J0[i * 4] = ja.getX(i); J0[i * 4 + 1] = ja.getY(i); J0[i * 4 + 2] = ja.getZ(i); J0[i * 4 + 3] = ja.getW(i);
+      W0[i * 4] = wa.getX(i); W0[i * 4 + 1] = wa.getY(i); W0[i * 4 + 2] = wa.getZ(i); W0[i * 4 + 3] = wa.getW(i);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(P0.slice(), 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(N0.slice(), 3));
+    if (sg.attributes.uv) geo.setAttribute('uv', sg.attributes.uv);
+    if (sg.index) geo.setIndex(sg.index);
+    const st = new THREE.Mesh(geo, sm.material);
+    st.position.copy(sm.position); st.quaternion.copy(sm.quaternion); st.scale.copy(sm.scale);
+    st.frustumCulled = false; st.castShadow = true;
+    sm.parent.add(st);
+    sm.parent.remove(sm);
+    this._sk = { bones: ARM.map(n => B[n]), P, sm, st, P0, N0, J0, W0, last: -1, M: new THREE.Matrix4(), BM: [] };
+    this._proc.visible = this.armL.visible = this.armR.visible = false;
+    this._setPose(P.waveA, true);
+  }
+
+  // 设定手臂骨骼姿态并（限频）重算顶点
+  _setPose(qs, force) {
+    const k = this._sk;
+    k.bones.forEach((b, i) => b.quaternion.copy(qs[i]));
+    const now = performance.now();
+    if (!force && now - k.last < 66) return;
+    k.last = now;
+    this._skin();
+  }
+
+  _skin() {
+    const k = this._sk, sk = k.sm.skeleton;
+    k.st.updateMatrixWorld(true);
+    for (const b of sk.bones) b.updateMatrixWorld(true);
+    // 每根骨骼的合成矩阵：网格逆 × 骨骼世界 × 骨骼逆绑定 × 绑定矩阵（与 three 着色器公式一致）
+    const inv = k.M.copy(k.st.matrixWorld).invert();
+    for (let b = 0; b < sk.bones.length; b++) {
+      const m = k.BM[b] || (k.BM[b] = new THREE.Matrix4());
+      m.multiplyMatrices(inv, sk.bones[b].matrixWorld).multiply(sk.boneInverses[b]).multiply(k.sm.bindMatrix);
+    }
+    const P0 = k.P0, N0 = k.N0, J0 = k.J0, W0 = k.W0, pos = k.st.geometry.attributes.position, nor = k.st.geometry.attributes.normal;
+    const PA = pos.array, NA = nor.array, n = pos.count;
+    for (let i = 0; i < n; i++) {
+      const x = P0[i * 3], y = P0[i * 3 + 1], z = P0[i * 3 + 2], nx = N0[i * 3], ny = N0[i * 3 + 1], nz = N0[i * 3 + 2];
+      let ox = 0, oy = 0, oz = 0, qx = 0, qy = 0, qz = 0;
+      for (let j = 0; j < 4; j++) {
+        const w = W0[i * 4 + j];
+        if (w === 0) continue;
+        const e = k.BM[J0[i * 4 + j]].elements;
+        ox += w * (e[0] * x + e[4] * y + e[8] * z + e[12]);
+        oy += w * (e[1] * x + e[5] * y + e[9] * z + e[13]);
+        oz += w * (e[2] * x + e[6] * y + e[10] * z + e[14]);
+        qx += w * (e[0] * nx + e[4] * ny + e[8] * nz);
+        qy += w * (e[1] * nx + e[5] * ny + e[9] * nz);
+        qz += w * (e[2] * nx + e[6] * ny + e[10] * nz);
+      }
+      const l = Math.hypot(qx, qy, qz) || 1;
+      PA[i * 3] = ox; PA[i * 3 + 1] = oy; PA[i * 3 + 2] = oz;
+      NA[i * 3] = qx / l; NA[i * 3 + 1] = qy / l; NA[i * 3 + 2] = qz / l;
+    }
+    pos.needsUpdate = nor.needsUpdate = true;
   }
 
   // 场地切换（Phase 0-0.3 跨地形状态规则）：
@@ -265,13 +393,16 @@ class Rescue {
     // 姿态：地面上面朝直升机挥手求救；挂上吊带后双臂上举抓带、吊带显示
     if (this.g.visible) {
       this.strap.visible = this.attached;
+      const sk = this._sk;
       if (this.attached) {
-        this.armL.rotation.set(0, 0, -2.75); this.armR.rotation.set(0, 0, 2.75);
+        if (sk) this._setPose(sk.P.hoist);
+        else { this.armL.rotation.set(0, 0, -2.75); this.armR.rotation.set(0, 0, 2.75); }
         this.g.rotation.y += dt * 0.6;       // 吊在绳上缓慢自转
       } else {
         this.g.rotation.y = Math.atan2(heliPos.x - this.g.position.x, heliPos.z - this.g.position.z);
-        this.armL.rotation.set(0, 0, -0.12);
-        this.armR.rotation.set(0, 0, 2.55 + 0.4 * Math.sin(this._sway * 5));
+        const t = 0.5 + 0.5 * Math.sin(this._sway * 5);
+        if (sk) { sk.bones.forEach((b, i) => b.quaternion.slerpQuaternions(sk.P.waveA[i], sk.P.waveB[i], t)); this._setPose(sk.bones.map(b => b.quaternion)); }
+        else { this.armL.rotation.set(0, 0, -0.12); this.armR.rotation.set(0, 0, 2.55 + 0.4 * Math.sin(this._sway * 5)); }
       }
     }
     // 信号烟上升 + 信标闪烁（幸存者在场且未救起时）
