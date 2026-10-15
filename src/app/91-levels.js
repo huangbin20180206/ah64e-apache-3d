@@ -107,15 +107,15 @@ const LEVELS = [
     scene: { env: 'day', weather: 'none' }, timeout: 360,
     intro: '雷达站在给整片阵地的防空火力做引导，雷达活着时地面火力明显更密。先打瞎雷达和防空发射车，再清剿护卫坦克和补给车队。',
     // P3c：护卫坦克各守雷达/防空车 + 一辆中线折返；补给卡车 2 辆绕阵地环线、2 辆停在防空车旁；
-    // 油桶围着弹药库（殉爆连锁）。radarFlak：雷达存活时 AA 频率 ×1.45，致盲后 ×0.6
+    // 油桶围着弹药库（殉爆连锁）。2026-10-15 基地 z 42→75（05-config BASE_C），本关坐标同步 +33。radarFlak：雷达存活时 AA 频率 ×1.45，致盲后 ×0.6
     layout: { radarFlak: true, brief: '雷达站 · 防空车 · 弹药库 + 护卫坦克 3 · 补给卡车 4 · 油桶 3', goal: '摧毁雷达站与防空发射车，并清剿全部 10 个地面目标',
       hint: '雷达活着时地面火力更密，先从侧面打雷达；油桶围着弹药库，一发火箭能连锁殉爆', units: [
-      { type: 'tank', x: 14, z: 32 }, { type: 'tank', x: -19, z: 43 },
-      { type: 'tank', x: 0, z: 36, mov: { kind: 'line', a: Math.PI / 2, half: 8, v: 1.4 } },
-      { type: 'truck', x: -12, z: 36, mov: { kind: 'path', loop: [[4, 30], [20, 30], [20, 44], [-8, 50], [-12, 36]], vmax: 2.0 } },
-      { type: 'truck', x: 20, z: 44, mov: { kind: 'path', loop: [[-8, 50], [-12, 36], [4, 30], [20, 30], [20, 44]], vmax: 2.0 } },
-      { type: 'truck', x: 16, z: 37 }, { type: 'truck', x: 8, z: 40 },
-      { type: 'barrel', x: -8, z: 41 }, { type: 'barrel', x: -13, z: 37 }, { type: 'barrel', x: -9, z: 36 },
+      { type: 'tank', x: 14, z: 65 }, { type: 'tank', x: -19, z: 76 },
+      { type: 'tank', x: 0, z: 69, mov: { kind: 'line', a: Math.PI / 2, half: 8, v: 1.4 } },
+      { type: 'truck', x: -12, z: 69, mov: { kind: 'path', loop: [[4, 63], [20, 63], [20, 77], [-8, 83], [-12, 69]], vmax: 2.0 } },
+      { type: 'truck', x: 20, z: 77, mov: { kind: 'path', loop: [[-8, 83], [-12, 69], [4, 63], [20, 63], [20, 77]], vmax: 2.0 } },
+      { type: 'truck', x: 16, z: 70 }, { type: 'truck', x: 8, z: 73 },
+      { type: 'barrel', x: -8, z: 74 }, { type: 'barrel', x: -13, z: 70 }, { type: 'barrel', x: -9, z: 69 },
     ] },
     objectives: [{ type: 'sead', label: '摧毁雷达站与防空发射车' },
                  { type: 'destroy_all', label: '清剿全部地面目标' }],
