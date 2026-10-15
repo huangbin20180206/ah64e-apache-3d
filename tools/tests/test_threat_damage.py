@@ -25,8 +25,8 @@ def run(pg):
     # ---- D1: 威胁等级 0→反击活跃→受击高（出现/升级/解除） ----
     # 地面停放（startMission 后 alt=0）→ 无反击 → 威胁 0
     assert pg.evaluate("__dbg.targets._threat") == 0, 'D1: 地面停放威胁应为 0'
-    # 悬停 z=0 alt=14（距 baseCenter(0,42) bd=42 在反击区 8~55u）→ 反击活跃 → 威胁 ≥1
-    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=0;
+    # 悬停 z=33 alt=14（距 baseCenter(0,75) bd=42 在反击区 8~55u）→ 反击活跃 → 威胁 ≥1
+    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=33;
       F.yaw=0; F.pitch=0; F.roll=0; F.comp=0; __dbg.S._alt=0; __dbg.S.running=true; })()""")
     pg.wait_for_function("() => __dbg.targets._threat >= 1", timeout=15000)   # B4：aaActive 每帧派生——条件等待
     t1 = pg.evaluate("__dbg.targets._threat")
