@@ -8,11 +8,9 @@ def run(pg):
     import pw_harness as H
     import sys as _sys
     try:
-        _sys.stdout.reconfigure(line_buffering=True)   # DIAG：日志时序=执行时序
+        _sys.stdout.reconfigure(line_buffering=True)   # CI 日志时序=执行时序（块缓冲会把失败点伪装成别处）
     except Exception:
         pass
-    # DIAG：捕获页面未捕获异常（onclick 处理器抛错会进这里）
-    pg.evaluate("window.__diagErr = []; addEventListener('error', e => { window.__diagErr.push(String(e.message)); });")
     # ① 引导完成：载入遮罩收起（finish() 末尾 setTimeout 260ms 才加 done 类——
     #    与 wait_for_function(__dbg) 之间存在 260ms 竞态，须显式等待该类）
     #    + __dbg 就绪（boot 是有界工作，与帧率无关）
@@ -23,7 +21,7 @@ def run(pg):
     pg.evaluate("__dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.FLY.x=0; __dbg.FLY.z=0; "
                 "__dbg.FLY.yaw=0; __dbg.FLY.pitch=0; __dbg.FLY.comp=0; __dbg.S._alt=0; __dbg.S.running=true")
     pg.keyboard.press('KeyC')
-    pg.wait_for_function("() => __dbg.fp.active === true", timeout=5000)   # B3：enter 同步置位，条件等待免固定窗
+    pg.wait_for_function("() => __dbg.fp.active === true", timeout=5000, polling=100)   # B3：enter 同步置位，条件等待免固定窗
     y0 = pg.evaluate("+__dbg.fp.vYaw.toFixed(5)")
     p0 = pg.evaluate("+__dbg.fp.vPitch.toFixed(5)")
     pg.evaluate("__dbg.fp.mouse(10, 0)")
@@ -50,23 +48,9 @@ def run(pg):
     # A1: 切场地后 _qCool 置正数（冷却豁免）
     pg.evaluate("__dbg.S._qCool = 0")
     pg.evaluate("document.querySelector('#terrain-row [data-terrain=\"water\"]').click()")
-    try:
-        pg.wait_for_function("() => __dbg.S._qCool > 0", timeout=5000)   # B3：setTerrain 同步置冷却——条件等待免固定窗
-    except Exception as _e:
-        # DIAG：失败现场全量转储
-        _st = pg.evaluate("""(() => ({
-          qcool: __dbg.S._qCool,
-          terr: __dbg.W.terrainKey,
-          mode: __dbg.S.mode,
-          fpActive: !!__dbg.fp.active,
-          running: !!__dbg.S.running,
-          onclick: typeof (document.querySelector('#terrain-row [data-terrain="water"]') || {}).onclick,
-          n: document.querySelectorAll('#terrain-row [data-terrain="water"]').length,
-          chips: [...document.querySelectorAll('#terrain-row .chip')].map(c => c.dataset.terrain + ':' + (c.classList.contains('on') ? 'on' : 'off')),
-          diagErr: window.__diagErr
-        }))()""")
-        print('DIAG A1-FAIL: %r' % (_st,), flush=True)
-        raise
+    # polling=100：条件由 click handler 同步置位——间隔轮询不依赖 rAF 帧
+    # （CI SwiftShader 软渲染下 5s 墙钟可能零帧，rAF 轮询会假超时）
+    pg.wait_for_function("() => __dbg.S._qCool > 0", timeout=5000, polling=100)
     qcool_after = pg.evaluate("__dbg.S._qCool")
     assert qcool_after > 0, ('切场地后 _qCool 应置正数', qcool_after)
     # A1: chk-qauto 取消勾选 → _qAutoOff 变 true
@@ -100,7 +84,7 @@ def run(pg):
     # B2: 键盘切机位 → 一次性 toast 报机位名（setView/toast 均为同步操作）
     pg.evaluate("document.activeElement && document.activeElement.blur()")
     pg.keyboard.press('2')
-    pg.wait_for_function("() => document.getElementById('toast').classList.contains('show') && document.getElementById('toast').textContent.includes('正侧')", timeout=5000)   # B3：setView/toast 同步——条件等待
+    pg.wait_for_function("() => document.getElementById('toast').classList.contains('show') && document.getElementById('toast').textContent.includes('正侧')", timeout=5000, polling=100)   # B3：setView/toast 同步——条件等待
     b2 = pg.evaluate("""(() => ({ txt: document.getElementById('toast').textContent,
                                    show: document.getElementById('toast').classList.contains('show'),
                                    view: __dbg.S.view }))()""")
@@ -377,21 +361,24 @@ def run(pg):
     # P6-M2: 任务模式 startMission → briefing（含完成/失败条件文案）
     pg.evaluate("document.querySelector('#mode-row [data-mode=\"mission\"]').click()")
     pg.evaluate("__dbg.startMission()")
-    pg.wait_for_function("() => __dbg.mission && __dbg.mission.phase === 'briefing' && document.getElementById('mission').classList.contains('show')", timeout=5000)   # B3：同步链条件等待
+    pg.wait_for_function("() => __dbg.mission && __dbg.mission.phase === 'briefing' && document.getElementById('mission').classList.contains('show')", timeout=5000, polling=100)   # B3：同步链条件等待
     m2 = pg.evaluate("() => { const mp=document.getElementById('mission');"
                      " return { phase: __dbg.mission && __dbg.mission.phase,"
                      " show: mp.classList.contains('show'), body: mp.innerHTML }; }")
     assert m2['phase'] == 'briefing' and m2['show'] and '完成条件' in m2['body'] and '失败条件' in m2['body'], ('P6(M2): 简报', m2)
     # P6-M3: briefing→active（beginMission 记录 t0/gun0）
     pg.evaluate("__dbg.beginMission()")
-    pg.wait_for_function("() => __dbg.mission.phase === 'active' && __dbg.mission.t0 !== null", timeout=5000)
+    pg.wait_for_function("() => __dbg.mission.phase === 'active' && __dbg.mission.t0 !== null", timeout=5000, polling=100)
     m3 = pg.evaluate("() => ({ phase: __dbg.mission.phase, t0: __dbg.mission.t0,"
                      " g0: __dbg.mission.gun0, hits: __dbg.mission.hits })")
     assert m3['phase'] == 'active' and m3['t0'] is not None and m3['g0'] == 1200 and m3['hits'] == 0, ('P6(M3): active', m3)
     # P6-M5: done 冻结——全歼后 updateMissionPanel 不再改写
     pg.evaluate("__dbg.air.enabled = false")
     pg.evaluate("__dbg.targets.targets.forEach(t => { if (t.alive) __dbg.targets.destroy(t,3); })")
-    pg.wait_for_function("() => __dbg.mission.phase === 'done' && __dbg.mission.frozen", timeout=15000)   # B3：loop 0.5s 判定——条件等待
+    # loop 0.5s 游戏节流判定。CI SwiftShader 下主循环 dt 钳制 0.05（70-loop.js），
+    # 游戏时间仅实速 1/10~1/50，墙钟等待物理不可达——改游戏时间步进（batch-E 范式，
+    # 与 test_challenge_variants/test_resources 一致），断言语义不变。
+    H.step_until(pg, "() => __dbg.mission.phase === 'done' && __dbg.mission.frozen", 15)
     st = pg.evaluate("() => ({ phase: __dbg.mission.phase, frozen: __dbg.mission.frozen })")
     assert st['phase'] == 'done' and st['frozen'], ('P6(M5): done 冻结', st)
     body0 = pg.evaluate("document.getElementById('mission-body').innerHTML")
@@ -400,7 +387,7 @@ def run(pg):
     assert body0 == body1, 'P6(M5): 冻结后面板被改写'
     # P6-M6: retry → briefing + 全清（air 复活/武器瞬态清/救援 idle）
     pg.evaluate("__dbg.retryMission()")
-    pg.wait_for_function("() => __dbg.mission.phase === 'briefing'", timeout=5000)
+    pg.wait_for_function("() => __dbg.mission.phase === 'briefing'", timeout=5000, polling=100)
     m6 = pg.evaluate("() => ({ phase: __dbg.mission.phase, airDead: __dbg.air.list.filter(t=>!t.alive).length,"
                      " rockets: __dbg.rig.rockets.filter(r=>r.g.visible).length, rstate: __dbg.rescue.state })")
     assert m6['phase'] == 'briefing' and m6['airDead'] == 0 and m6['rockets'] == 0 and m6['rstate'] == 'idle', ('P6(M6): retry 清理', m6)
@@ -416,12 +403,12 @@ def run(pg):
     # P6 修复批-M9: 任务 active 切 show → 统一清理（S._mission=null/_baseFound=false/面板隐藏）
     pg.evaluate("document.querySelector('#mode-row [data-mode=\"mission\"]').click()")
     pg.evaluate("__dbg.startMission()")
-    pg.wait_for_function("() => __dbg.mission && __dbg.mission.phase === 'briefing'", timeout=5000)
+    pg.wait_for_function("() => __dbg.mission && __dbg.mission.phase === 'briefing'", timeout=5000, polling=100)
     pg.evaluate("__dbg.beginMission()")
-    pg.wait_for_function("() => __dbg.mission.phase === 'active'", timeout=5000)
+    pg.wait_for_function("() => __dbg.mission.phase === 'active'", timeout=5000, polling=100)
     assert pg.evaluate("__dbg.mission.phase") == 'active', 'P6(M9): 前置 active'
     pg.evaluate("document.querySelector('#mode-row [data-mode=\"show\"]').click()")
-    pg.wait_for_function("() => __dbg.mission === null && __dbg.S._baseFound === false", timeout=5000)
+    pg.wait_for_function("() => __dbg.mission === null && __dbg.S._baseFound === false", timeout=5000, polling=100)
     m9 = pg.evaluate("(() => ({ m: __dbg.mission, found: __dbg.S._baseFound,"
                      " show: document.getElementById('mission').classList.contains('show') }))()")
     assert m9['m'] is None and m9['found'] is False and not m9['show'], ('P6(M9): 切 show 未统一清理', m9)
@@ -432,7 +419,7 @@ def run(pg):
     # P6 修复批-M10: 从 water 启动任务 → 立即 desert + rescue 就绪（不依赖下帧）
     pg.evaluate("document.querySelector('#terrain-row [data-terrain=\"water\"]').click()")
     pg.evaluate("__dbg.startMission()")
-    pg.wait_for_function("() => __dbg.W.terrainKey === 'desert' && __dbg.mission.phase === 'briefing'", timeout=5000)
+    pg.wait_for_function("() => __dbg.W.terrainKey === 'desert' && __dbg.mission.phase === 'briefing'", timeout=5000, polling=100)
     m10 = pg.evaluate("(() => ({ terr: __dbg.W.terrainKey, ok: __dbg.rescue.ok,"
                       " rstate: __dbg.rescue.state, gvis: __dbg.rescue.g.visible }))()")
     assert m10['terr'] == 'desert' and m10['ok'] and m10['rstate'] == 'idle' and m10['gvis'], ('P6(M10): water 启动未就绪', m10)
@@ -443,47 +430,47 @@ def run(pg):
     pg.evaluate("document.querySelector('#mode-row [data-mode=\"show\"]').click()")
     pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=0;
       F.yaw=0; F.pitch=0; F.roll=0; F.comp=0; __dbg.S._alt=0; __dbg.S.running=true; })()""")
-    pg.wait_for_function("() => __dbg.S._stability === 1", timeout=15000)   # B3：帧派生条件等待
+    H.step_until(pg, "() => __dbg.S._stability === 1", 15)   # 帧派生——游戏时间步进
     assert pg.evaluate("__dbg.S._stability") == 1, 'P7-1: 环绕静止 stability 应为 1'
     pg.evaluate("__dbg.keys['arrowleft'] = true")
-    pg.wait_for_function("() => __dbg.S._stability === 0.7", timeout=15000)
+    H.step_until(pg, "() => __dbg.S._stability === 0.7", 15)
     assert pg.evaluate("__dbg.S._stability") == 0.7, 'P7-1: 环绕平移 stability 应为 0.7'
     pg.evaluate("__dbg.keys['arrowleft'] = false")
-    pg.wait_for_function("() => __dbg.S._stability === 1", timeout=15000)
+    H.step_until(pg, "() => __dbg.S._stability === 1", 15)
     assert pg.evaluate("__dbg.S._stability") == 1, 'P7-1: 松键恢复 1'
     # P7-2: FPV 高速稳定性显著下降 + 恢复（无跨轴泄漏）
     pg.evaluate("__dbg.fp.enter()")
-    pg.wait_for_function("() => __dbg.S._stability > 0.9", timeout=15000)
+    H.step_until(pg, "() => __dbg.S._stability > 0.9", 15)
     assert pg.evaluate("__dbg.S._stability") > 0.9, 'P7-2: FPV 静止 stability 应接近 1'
     # B3：按到达标才松键（keys 直写键表——固定 900ms 低帧下加速不达标）
     pg.evaluate("__dbg.keys['w'] = true")
-    pg.wait_for_function("() => __dbg.S._stability < 0.75", timeout=15000)
+    H.step_until(pg, "() => __dbg.S._stability < 0.75", 15)
     pg.evaluate("__dbg.keys['w'] = false")
     stab_lo = pg.evaluate("__dbg.S._stability")
     assert stab_lo < 0.75, ('P7-2: FPV 高速 stability 应显著下降', stab_lo)
-    pg.wait_for_function("() => __dbg.fp.spd < 0.5 && __dbg.S._stability > 0.9", timeout=15000)
+    H.step_until(pg, "() => __dbg.fp.spd < 0.5 && __dbg.S._stability > 0.9", 15)
     # P7-3: 救援速度窗口——低速部署 / 高速拒绝 / 恢复部署（速度源 loop 派生）
     pg.evaluate("__dbg.FLY.alt=8; __dbg.FLY.x=26; __dbg.FLY.z=-14; __dbg.S._alt=8")
-    pg.wait_for_function("() => __dbg.rescue.speed < 0.5", timeout=15000)
+    H.step_until(pg, "() => __dbg.rescue.speed < 0.5", 15)
     pg.keyboard.press('KeyK')
-    pg.wait_for_function("() => __dbg.rescue.state === 'deploying'", timeout=15000)
+    H.step_until(pg, "() => __dbg.rescue.state === 'deploying'", 15)
     assert pg.evaluate("__dbg.rescue.state") == 'deploying', 'P7-3: 低速应可部署'
     pg.keyboard.press('KeyK')
-    pg.wait_for_function("() => __dbg.rescue.state === 'idle'", timeout=15000)
+    H.step_until(pg, "() => __dbg.rescue.state === 'idle'", 15)
     assert pg.evaluate("__dbg.rescue.state") == 'idle', 'P7-3: 收回应 idle'
     # B3：按到达标才松键（固定 900ms 低帧下 speed 爬不到 3）
     pg.evaluate("__dbg.keys['w'] = true")
-    pg.wait_for_function("() => __dbg.rescue.speed > 3", timeout=15000)
+    H.step_until(pg, "() => __dbg.rescue.speed > 3", 15)
     pg.evaluate("__dbg.keys['w'] = false")
     assert pg.evaluate("__dbg.rescue.speed") > 3, 'P7-3: 前置——高速 speed>3'
     pg.evaluate("document.getElementById('toast').textContent = ''")
     pg.keyboard.press('KeyK')
-    pg.wait_for_function("() => __dbg.rescue.state === 'idle'", timeout=15000)
+    H.step_until(pg, "() => __dbg.rescue.state === 'idle'", 15)
     st3 = pg.evaluate("({st:__dbg.rescue.state, toast:document.getElementById('toast').textContent})")
     assert st3['st'] == 'idle' and '绞车' in st3['toast'], ('P7-3: 高速应拒绝并提示', st3)
-    pg.wait_for_function("() => __dbg.rescue.speed < 3", timeout=15000)
+    H.step_until(pg, "() => __dbg.rescue.speed < 3", 15)
     pg.keyboard.press('KeyK')
-    pg.wait_for_function("() => __dbg.rescue.state === 'deploying'", timeout=15000)
+    H.step_until(pg, "() => __dbg.rescue.state === 'deploying'", 15)
     assert pg.evaluate("__dbg.rescue.state") == 'deploying', 'P7-3: 恢复低速应可再部署'
     pg.keyboard.press('KeyK')
     pg.wait_for_timeout(400)
@@ -498,18 +485,19 @@ def run(pg):
     pg.evaluate("__dbg.startMission()")
     pg.wait_for_timeout(250)
     pg.evaluate("__dbg.beginMission()")
-    pg.wait_for_timeout(200)
+    H.step_until(pg, "() => __dbg.targets._threat === 0", 2)
     assert pg.evaluate("__dbg.targets._threat") == 0, 'P8-1: 地面停放威胁应 0'
     pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=33;
       F.yaw=0; F.pitch=0; F.roll=0; F.comp=0; __dbg.S._alt=0; __dbg.S.running=true; })()""")
     # 条件等待替代固定 500ms（2026-09-09 修）：同 M6/D6，威胁派生依赖任务推进
-    pg.wait_for_function("() => __dbg.targets._threat >= 1", timeout=8000)
+    # （loop 逐帧派生——CI 慢帧下改游戏时间步进，与机器帧率解耦）
+    H.step_until(pg, "() => __dbg.targets._threat >= 1", 8)
     assert pg.evaluate("__dbg.targets._threat") >= 1, 'P8-1: 悬停反击区威胁应 ≥1'
     pg.evaluate("__dbg.targets._threatHitFlash = 3")
-    pg.wait_for_timeout(250)
+    H.step_until(pg, "() => __dbg.targets._threat === 3", 2)
     assert pg.evaluate("__dbg.targets._threat") == 3, 'P8-1: 受击威胁应 3'
     pg.evaluate("__dbg.FLY.alt=0; __dbg.FLY.state='ground'; __dbg.S._alt=0; __dbg.targets._threatHitFlash=0")
-    pg.wait_for_timeout(400)
+    H.step_until(pg, "() => __dbg.targets._threat === 0", 2)
     assert pg.evaluate("__dbg.targets._threat") == 0, 'P8-1: 解除应 0'
     # P8-2: 受损惩罚派生（onHeliHit→_dmgPenalty）+ 散布公式叠加
     pg.evaluate("__dbg.rig._dmgPenalty = 0")
@@ -518,7 +506,8 @@ def run(pg):
     assert abs(pg.evaluate("__dbg.rig._dmgPenalty") - 0.3) < 1e-6, 'P8-2: onHeliHit 应派生 0.3'
     # P8-3: 损伤≥12 → failed(damage) 归因（状态源一致）
     pg.evaluate("__dbg.targets._heliDmg = 12")
-    pg.wait_for_timeout(1200)
+    # loop 0.5s 游戏节流判失败——墙钟固定窗在 CI 慢帧下跑不完节流，改游戏时间步进
+    H.step_until(pg, "() => __dbg.mission.phase === 'failed' && __dbg.mission.failedReason === 'damage'", 10)
     m8 = pg.evaluate("(() => ({ phase: __dbg.mission.phase, reason: __dbg.mission.failedReason }))()")
     assert m8['phase'] == 'failed' and m8['reason'] == 'damage', ('P8-3: 损伤≥12 失败归因', m8)
     # P8-4: 重试清理（受损/威胁/惩罚）
