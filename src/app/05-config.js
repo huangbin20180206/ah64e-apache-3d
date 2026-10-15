@@ -97,3 +97,11 @@ function windVec(t) {
   const s = WIND.speed * (0.72 + 0.28 * Math.sin(t * TAU / WIND.gustT + 1.7));
   return [Math.sin(a) * s, Math.cos(a) * s];
 }
+
+// ---------- 敌方基地位置（2026-10-15 用户反馈"基地离机场太近、贴脸"）----------
+// 唯一真源：16-targets / 16-targetscenery / 16-town / 81-narrative / 82-cutscene /
+// 70-mission 全部从这里取。1u≈2.27m：z=75 ≈ 170m（旧值 42 ≈ 95m）。
+// 位置在远景沙丘环（r 31.5~48u）之外的平地上，从停机坪看要越过沙丘走廊才到基地。
+// FLY_BOUND = 飞行边界（旧 ±58u 只够到旧基地北墙，现放宽到能飞过基地和北侧小镇）。
+const BASE_C = { x: 0, z: 75 };
+const FLY_BOUND = 110;
