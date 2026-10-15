@@ -108,17 +108,19 @@ def run(pg):
     assert pg.evaluate("__dbg.targets.totalCount") == 10, 'C6 离开任务模式后目标应恢复 10'
 
 
-    # W：HESCO 警戒墙位置（scenery 沙色合批里只有 HESCO 块顶面高过 0.9u）
+    # W：基地围墙位置（2026-10-15：HESCO 连续墙并入 base-compound 顶点色合批；
+    #    只取墙体高度带 0.9~1.0u 的顶点——帐篷/哨塔/集装箱另有高度，接缝/顶框同带）
     w = pg.evaluate("""(() => {
-      const T = __dbg.targets, sm = T.scenery.children[0], pa = sm.geometry.attributes.position;
-      const pts = new Map();
+      const T = __dbg.targets, sm = T.scenery.getObjectByName('base-compound'), pa = sm.geometry.attributes.position;
+      const B = T.baseCenter, pts = new Map();
       for (let i = 0; i < pa.count; i++) {
-        if (pa.getY(i) < 0.9) continue;
-        const k = Math.round(pa.getX(i) * 2) + ',' + Math.round(pa.getZ(i) * 2);
-        pts.set(k, [pa.getX(i), pa.getZ(i)]);
+        const y = pa.getY(i); if (y < 0.9 || y > 1.0) continue;
+        const x = pa.getX(i) - B.x, z = pa.getZ(i) - B.z;
+        if (Math.abs(Math.abs(x) - 25) > 0.6 && Math.abs(z + 16) > 0.6 && Math.abs(z - 15) > 0.6) continue;   // 只要围墙线
+        pts.set(Math.round(x * 2) + ',' + Math.round(z * 2), [x, z]);
       }
       const P = [...pts.values()];
-      const L = T._evacLoop; let minLoop = 1e9;
+      const L = T._evacLoop.map(([x, z]) => [x - B.x, z - B.z]); let minLoop = 1e9;
       for (const [x, z] of P) for (let k = 0; k < L.length; k++) {
         const [ax, az] = L[k], [bx, bz] = L[(k + 1) % L.length];
         const dx = bx - ax, dz = bz - az, u = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
@@ -126,13 +128,13 @@ def run(pg):
       }
       const xs = P.map(p => p[0]), zs = P.map(p => p[1]);
       return { n: P.length, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), minLoop,
-        gate: P.filter(([x, z]) => Math.abs(x) < 2.3 && (Math.abs(z - 27.4) < 1 || Math.abs(z - 54) < 1)).length,
-        maxAz: Math.max(...P.map(([x, z]) => Math.abs(Math.atan2(x, z)))) };
+        gate: P.filter(([x, z]) => Math.abs(x) < 2.5 && (Math.abs(z + 16) < 1 || Math.abs(z - 15) < 1)).length,
+        minR: Math.min(...P.map(([x, z]) => Math.hypot(x + B.x, z + B.z))) };
     })()""")
     print('W', w)
-    assert w['n'] > 20, w
-    assert w['x0'] > -19.5 and w['x1'] < 19.5 and w['z0'] > 27 and w['z1'] < 54.5, ('HESCO 应围住基地', w)
-    assert w['minLoop'] >= 1.2 and w['gate'] == 0 and w['maxAz'] < 0.62, ('HESCO 挡路/无门洞/进沙丘', w)
+    assert w['n'] > 100, w
+    assert w['x0'] > -25.6 and w['x1'] < 25.6 and w['z0'] > -16.6 and w['z1'] < 15.6, ('HESCO 应围住基地', w)
+    assert w['minLoop'] >= 1.2 and w['gate'] == 0 and w['minR'] > 48, ('HESCO 挡路/无门洞/进沙丘', w)
 
 
 import pw_harness as H
