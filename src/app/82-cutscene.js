@@ -15,8 +15,8 @@ const CUT_PRESETS = {
   mission: {
     dur: 10,
     kf: [
-      { t: 0.0, tgt: [0, 1, 42],  phi: 0.50, dist: 46, theta: 0.40 },   // 基地远景
-      { t: 4.5, tgt: [0, 1, 40],  phi: 0.92, dist: 20, theta: 0.55 },   // 目标区推近
+      { t: 0.0, tgt: [0, 1, BASE_C.z],  phi: 0.50, dist: 52, theta: 0.40 },   // 基地远景
+      { t: 4.5, tgt: [0, 1, BASE_C.z - 2],  phi: 0.92, dist: 22, theta: 0.55 },   // 目标区推近
       { t: 8.0, tgt: [0, 1.2, 0], phi: 1.10, dist: 13, theta: 2.55 },   // 回机体
     ],
     sub: [[0.8, '作战简报已下发'], [4.8, '接近敌方基地后锁定开火'], [8.2, '祝好运']],
