@@ -7,7 +7,8 @@ def run(pg):
     pg.evaluate("document.querySelector('#terrain-row [data-terrain=\"desert\"]').click()")
     pg.wait_for_timeout(1500)
     # ① 接近基地：飞到距基地中心 22u 处 → 发现播报 + 简报面板
-    pg.evaluate("__dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.FLY.x=0; __dbg.FLY.z=20; "
+    #    （2026-10-15 P4f：基地中心 z 42→75，悬停点同步 20→53，保持 22u）
+    pg.evaluate("__dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.FLY.x=0; __dbg.FLY.z=53; "
                 "__dbg.FLY.yaw=0; __dbg.FLY.pitch=0; __dbg.FLY.comp=0; __dbg.S._alt=0; __dbg.S.running=true")
     pg.wait_for_timeout(1800)
     st = pg.evaluate("""(()=>({
@@ -45,7 +46,8 @@ def run(pg):
     assert not fin['mission'] and fin['found'] is False and not fin['show'], ('reset did not close mission', fin)
     print('reset OK:', fin)
     # ④ 再次接近 → 简报重新触发（重置后可再次触发是本修复的核心行为）
-    pg.evaluate("__dbg.FLY.z = 20")
+    #    （2026-10-15 P4f：悬停点随基地 20→53）
+    pg.evaluate("__dbg.FLY.z = 53")
     pg.wait_for_function("() => !!__dbg.S._mission && document.getElementById('mission').classList.contains('show')", timeout=15000)
     again = pg.evaluate("({mission:__dbg.S._mission, show:document.getElementById('mission').classList.contains('show')})")
     assert again['mission'] and again['show'], ('briefing not re-triggered after reset', again)

@@ -86,7 +86,7 @@ try:
             pg.evaluate("__dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.FLY.x=0; __dbg.FLY.z=0; "
                         "__dbg.FLY.yaw=0; __dbg.FLY.pitch=0; __dbg.FLY.comp=0; __dbg.S._alt=0; __dbg.S.running=true")
             pg.wait_for_timeout(300)
-            pg.evaluate("__dbg.FLY.z = 20")
+            pg.evaluate("__dbg.FLY.z = 53")
             # B6+：#mission 面板由 loop-reachable 路径写（70-app.js:954/958），固定睡 1800ms
             # 负载下会读到旧面板（分类器真候选 L64→L70/L71）
             pg.wait_for_function("""() => !!__dbg.S._mission
@@ -169,7 +169,7 @@ try:
             assert not after['mission'] and after['found'] is False and not after['show'], ('reset did not clear mission', after)
             pg.evaluate("document.getElementById('btn-panel').click()")
             pg.wait_for_timeout(300)
-            pg.evaluate("__dbg.FLY.z = 20")
+            pg.evaluate("__dbg.FLY.z = 53")
             pg.wait_for_function("() => !!__dbg.S._mission && document.getElementById('mission').classList.contains('show')", timeout=15000)
             again = pg.evaluate("({mission: __dbg.S._mission, show: document.getElementById('mission').classList.contains('show')})")
             assert again['mission'] and again['show'], ('briefing not re-triggered after mobile reset', again)

@@ -28,7 +28,8 @@ def run(pg):
     assert pg.evaluate("__dbg.S.mode") == 'show', 'M1: 默认应为展示模式'
     assert pg.evaluate("__dbg.mission") is None, 'M1: 展示模式不应有任务状态'
     # 展示模式下接近基地不触发任务（门控 S.mode==='mission'）——1500ms 为负断言观察窗（保留）
-    pg.evaluate("__dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.FLY.x=0; __dbg.FLY.z=20; __dbg.S._alt=0; __dbg.S.running=true")
+    # （2026-10-15 P4f：基地 z 42→75，接近点同步 20→53 保持 22u）
+    pg.evaluate("__dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.FLY.x=0; __dbg.FLY.z=53; __dbg.S._alt=0; __dbg.S.running=true")
     pg.wait_for_timeout(1500)
     assert pg.evaluate("__dbg.mission") is None, ('M1: 展示模式接近基地不应触发任务', pg.evaluate("__dbg.mission"))
     # 训练模式：提示条出现、任务状态不产生
@@ -122,10 +123,10 @@ def run(pg):
     assert pg.evaluate("__dbg.mission.phase") == 'done', 'M7: 重试后无法再次完成'
     print('M7 PASS: 重试清理（air/武器/救援）并可再次完成')
 
-    # ---- M8: 接近基地兼容触发（mission 模式） ----
+    # ---- M8: 接近基地兼容触发（mission 模式）----（2026-10-15 P4f：接近点 20→53）
     pg.evaluate("__dbg.retryMission()")
     pg.wait_for_function("() => __dbg.mission.phase === 'briefing'", timeout=5000)
-    pg.evaluate("__dbg.FLY.x=0; __dbg.FLY.z=20; __dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.S._alt=0")
+    pg.evaluate("__dbg.FLY.x=0; __dbg.FLY.z=53; __dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.S._alt=0")
     pg.wait_for_function("() => __dbg.mission && __dbg.mission.phase === 'active' && __dbg.S._baseFound", timeout=15000)   # B4：loop 每帧检测
     st = pg.evaluate("(() => ({ mission: !!__dbg.mission, phase: __dbg.mission && __dbg.mission.phase,"
                      " found: __dbg.S._baseFound }))()")

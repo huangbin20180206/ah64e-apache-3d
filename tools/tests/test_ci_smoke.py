@@ -382,10 +382,12 @@ def run(pg):
                      " rockets: __dbg.rig.rockets.filter(r=>r.g.visible).length, rstate: __dbg.rescue.state })")
     assert m6['phase'] == 'briefing' and m6['airDead'] == 0 and m6['rockets'] == 0 and m6['rstate'] == 'idle', ('P6(M6): retry 清理', m6)
     # P6-M8: show 模式接近基地不触发（模式边界）
+    # （2026-10-15 P4f：接近点随基地 20→53——原先 z=20 在基地北移后已不在接近圈内，
+    #  负断言会 vacuous pass，同步后才是真断言）
     pg.evaluate("document.querySelector('#mode-row [data-mode=\"show\"]').click()")
     pg.wait_for_timeout(200)
     pg.evaluate("__dbg.S._mission = null; __dbg.S._baseFound = false")
-    pg.evaluate("__dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.FLY.x=0; __dbg.FLY.z=20; __dbg.S._alt=0")
+    pg.evaluate("__dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.FLY.x=0; __dbg.FLY.z=53; __dbg.S._alt=0")
     pg.wait_for_timeout(1200)
     assert pg.evaluate("__dbg.mission") is None, 'P6(M8): show 模式接近不应触发任务'
     # P6 修复批-M9: 任务 active 切 show → 统一清理（S._mission=null/_baseFound=false/面板隐藏）

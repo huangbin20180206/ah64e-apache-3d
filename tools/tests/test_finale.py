@@ -50,7 +50,8 @@ def run(pg):
     H.step(pg, 1.2)
     assert fin(pg) == 3, fin(pg)
     r = pg.evaluate("[__dbg.rescue.ok, __dbg.rescue.g.visible, __dbg.rescue.g.position.x, __dbg.rescue.g.position.z, __dbg.rescue.state]")
-    assert r == [True, True, -14, 50, 'idle'], r
+    # 幸存者落点 = FINALE_POW = (-14, BASE_C.z+8)；2026-10-15 P4f 基地 z 42→75 后为 (-14, 83)
+    assert r == [True, True, -14, 83, 'idle'], r
     print('F3 ok')
     pg.evaluate("__dbg.rescue.state = 'delivered'")
     H.step_until(pg, "() => __dbg.S._mission.phase === 'done'", 10)

@@ -32,7 +32,8 @@ def run(pg):
     pg.wait_for_timeout(1500)
 
     # ---- 01 FPV mouse 单次累加（悬停于基地附近，沙尘/靶场环境入镜） ----
-    pg.evaluate("__dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.FLY.x=0; __dbg.FLY.z=20; "
+    # （2026-10-15 P4f：基地 z 42→75，接近点同步 20→53 保持 22u）
+    pg.evaluate("__dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.FLY.x=0; __dbg.FLY.z=53; "
                 "__dbg.FLY.yaw=0; __dbg.FLY.pitch=0; __dbg.FLY.comp=0; __dbg.S._alt=0; __dbg.S.running=true")
     pg.keyboard.press('KeyC')
     pg.wait_for_function("() => __dbg.fp.active === true", timeout=5000)   # B2：enter 同步置位，条件等待免固定窗
@@ -60,7 +61,8 @@ def run(pg):
                     "show:document.getElementById('mission').classList.contains('show')})")
     assert r['m'] is None and r['f'] is False and not r['show'], ('ui reset failed', r)
     print('02 ui reset OK: mission=null, _baseFound=false')
-    pg.evaluate("__dbg.FLY.z = 20")
+    # （2026-10-15 P4f：再次接近点随基地 20→53）
+    pg.evaluate("__dbg.FLY.z = 53")
     pg.wait_for_function("() => __dbg.S._mission && __dbg.S._mission.t0 > %s && document.getElementById('mission').classList.contains('show')" % st1['t0'], timeout=15000)
     st2 = pg.evaluate("({m:__dbg.S._mission, t0:__dbg.S._mission && __dbg.S._mission.t0, "
                       "show:document.getElementById('mission').classList.contains('show')})")

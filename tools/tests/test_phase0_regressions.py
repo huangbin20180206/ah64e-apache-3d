@@ -23,23 +23,25 @@ def run(pg):
     y2 = pg.evaluate("+__dbg.fp.vYaw.toFixed(5)")
     delta2 = y1 - y2
     assert abs(delta2 - 0.040) < 0.001, ('second mouse call should also be exactly 0.040 (no compounding)', y1, y2, delta2)
-    # 垂直输入同样只计算一次：dy=10 → vPitch 精确 -0.040，且与水平轴互不串扰
+    # 垂直输入同样只计算一次：dy=10 → vPitch 精确 +0.040，且与水平轴互不串扰。
+    # （2026-10-14 起鼠标下移=机头下俯：vPitch 与 dy 同号，故此处为 p1-p0=+0.040；
+    #  反转前为 vPitch -= dy*sens，期望式是 p0-p1，那次改动时本测试未同步）
     p0 = pg.evaluate("+__dbg.fp.vPitch.toFixed(5)")
     pg.evaluate("__dbg.fp.mouse(0, 10)")
     y3 = pg.evaluate("+__dbg.fp.vYaw.toFixed(5)")
     p1 = pg.evaluate("+__dbg.fp.vPitch.toFixed(5)")
     assert y3 == y2, ('dy must not touch yaw', y2, y3)
-    assert abs((p0 - p1) - 0.040) < 0.001, ('mouse dy=10 should add pitch exactly 0.040 once', p0, p1)
+    assert abs((p1 - p0) - 0.040) < 0.001, ('mouse dy=10 should add pitch exactly 0.040 once', p0, p1)
     pg.evaluate("__dbg.fp.mouse(0, 10)")
     p2 = pg.evaluate("+__dbg.fp.vPitch.toFixed(5)")
-    assert abs((p1 - p2) - 0.040) < 0.001, ('second dy call should also be exactly 0.040 (no compounding)', p1, p2)
-    print('0.1 FPV mouse: dx=10 -> deltaYaw=%.4f twice; dy=10 -> deltaPitch=%.4f twice; cross-axis isolated' % (delta1, p0 - p1))
+    assert abs((p2 - p1) - 0.040) < 0.001, ('second dy call should also be exactly 0.040 (no compounding)', p1, p2)
+    print('0.1 FPV mouse: dx=10 -> deltaYaw=%.4f twice; dy=10 -> deltaPitch=%.4f twice; cross-axis isolated' % (delta1, p1 - p0))
     pg.keyboard.press('KeyC')
     pg.wait_for_timeout(600)
 
     # ---------- 0.2 任务重置后再次触发（B 键路径 + UI 按钮路径） ----------
-    # 接近基地（z=20，距基地中心 22u）→ 简报触发
-    pg.evaluate("__dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.FLY.x=0; __dbg.FLY.z=20; "
+    # 接近基地（z=53，距基地中心 22u；2026-10-15 P4f 基地 z 42→75，同步 20→53）→ 简报触发
+    pg.evaluate("__dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.FLY.x=0; __dbg.FLY.z=53; "
                 "__dbg.FLY.comp=0; __dbg.S._alt=0; __dbg.S.running=true")
     # B2：接近触发是 loop 每帧检测（帧派生）——条件等待取代固定 1800ms
     pg.wait_for_function("() => __dbg.S._baseFound === true && __dbg.S._mission && document.getElementById('mission').classList.contains('show')", timeout=15000)
@@ -49,7 +51,7 @@ def run(pg):
     print('0.2 first briefing OK (t0=%.2f)' % st1['t0'])
     # B 键重置：先飞离基地再按 B（重置时直升机若仍在 30u 内，发现逻辑会合法地
     # 同帧重新触发——先飞离才能断言"清空"）
-    pg.evaluate("__dbg.FLY.z = -20")       # 62u > 30u 阈值
+    pg.evaluate("__dbg.FLY.z = -20")       # 95u > 30u 阈值（2026-10-15 P4f 基地北移后距 95u，原 62u）
     pg.wait_for_timeout(400)
     pg.keyboard.press('KeyB')
     pg.wait_for_timeout(800)
@@ -59,7 +61,8 @@ def run(pg):
         ('B reset did not clear mission/_baseFound', st2)
     print('0.2 B-key reset OK: _mission=null, _baseFound===false, panel closed')
     # 再次接近 → 第二次触发（t0 必须前进，证明是新一轮简报而非旧 DOM 残留）
-    pg.evaluate("__dbg.FLY.z = 20")
+    # （2026-10-15 P4f：接近点随基地 20→53）
+    pg.evaluate("__dbg.FLY.z = 53")
     pg.wait_for_function("() => __dbg.S._mission && __dbg.S._mission.t0 > %s && document.getElementById('mission').classList.contains('show')" % st1['t0'], timeout=15000)
     st3 = pg.evaluate("({m:__dbg.S._mission, t0:__dbg.S._mission && __dbg.S._mission.t0, "
                       "show:document.getElementById('mission').classList.contains('show')})")
@@ -76,8 +79,8 @@ def run(pg):
     assert st4['m'] is None and st4['found'] is False and not st4['show'], \
         ('UI button reset did not clear mission/_baseFound', st4)
     print('0.2 UI-button reset OK (toast=%s)' % st4['toast'])
-    # 再次接近 → 第三次触发（两条路径等价）
-    pg.evaluate("__dbg.FLY.z = 20")
+    # 再次接近 → 第三次触发（两条路径等价）（2026-10-15 P4f：接近点 20→53）
+    pg.evaluate("__dbg.FLY.z = 53")
     pg.wait_for_function("() => __dbg.S._mission && __dbg.S._mission.t0 > %s && document.getElementById('mission').classList.contains('show')" % st3['t0'], timeout=15000)
     st5 = pg.evaluate("({m:__dbg.S._mission, t0:__dbg.S._mission && __dbg.S._mission.t0, "
                       "show:document.getElementById('mission').classList.contains('show')})")

@@ -107,7 +107,9 @@ def run(pg):
     pg.evaluate("__dbg.fp.mouse(150, -100)")           # 合法但 >120px 快速输入：必须生效
     s3 = read()
     expYaw = vYaw0 - 150 * SENS
-    expPitch = max(-1.05, min(1.55, vPitch0 - (-100) * SENS))
+    # 2026-10-14 起鼠标下移=机头下俯：vPitch 与 dy 同号累加（vPitch += dy*sens），
+    # clamp 区间随俯冲上限调整（0.85→1.0 rad）为 -1.05..1.82——期望式同步
+    expPitch = max(-1.05, min(1.82, vPitch0 + (-100) * SENS))
     assert abs(s3['vYaw'] - expYaw) < 0.001, ('E1: 合法 >120px 输入应改变 vYaw', s3, expYaw)
     assert abs(s3['vPitch'] - expPitch) < 0.001, ('E1: 合法输入应改变 vPitch', s3, expPitch)
     print('E1(mousemove先于change) OK: 巨幅隔离→consumed→不重arm→合法150px生效')
