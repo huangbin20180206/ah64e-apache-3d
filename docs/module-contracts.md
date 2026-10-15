@@ -666,7 +666,13 @@
   "provides": [
    "Rescue"
   ],
-  "depends": {}
+  "depends": {
+   "00-utils.js": [
+    "mergeGeos",
+    "vcKit",
+    "vcMat"
+   ]
+  }
  },
  "50-controls.js": {
   "provides": [
