@@ -6,6 +6,13 @@
 # （Phase 0-0.1 核心行为），不依赖帧率；本地门禁同样运行它作为快速结构自检。
 def run(pg):
     import pw_harness as H
+    import sys as _sys
+    try:
+        _sys.stdout.reconfigure(line_buffering=True)   # DIAG：日志时序=执行时序
+    except Exception:
+        pass
+    # DIAG：捕获页面未捕获异常（onclick 处理器抛错会进这里）
+    pg.evaluate("window.__diagErr = []; addEventListener('error', e => { window.__diagErr.push(String(e.message)); });")
     # ① 引导完成：载入遮罩收起（finish() 末尾 setTimeout 260ms 才加 done 类——
     #    与 wait_for_function(__dbg) 之间存在 260ms 竞态，须显式等待该类）
     #    + __dbg 就绪（boot 是有界工作，与帧率无关）
@@ -43,7 +50,23 @@ def run(pg):
     # A1: 切场地后 _qCool 置正数（冷却豁免）
     pg.evaluate("__dbg.S._qCool = 0")
     pg.evaluate("document.querySelector('#terrain-row [data-terrain=\"water\"]').click()")
-    pg.wait_for_function("() => __dbg.S._qCool > 0", timeout=5000)   # B3：setTerrain 同步置冷却——条件等待免固定窗
+    try:
+        pg.wait_for_function("() => __dbg.S._qCool > 0", timeout=5000)   # B3：setTerrain 同步置冷却——条件等待免固定窗
+    except Exception as _e:
+        # DIAG：失败现场全量转储
+        _st = pg.evaluate("""(() => ({
+          qcool: __dbg.S._qCool,
+          terr: __dbg.W.terrainKey,
+          mode: __dbg.S.mode,
+          fpActive: !!__dbg.fp.active,
+          running: !!__dbg.S.running,
+          onclick: typeof (document.querySelector('#terrain-row [data-terrain="water"]') || {}).onclick,
+          n: document.querySelectorAll('#terrain-row [data-terrain="water"]').length,
+          chips: [...document.querySelectorAll('#terrain-row .chip')].map(c => c.dataset.terrain + ':' + (c.classList.contains('on') ? 'on' : 'off')),
+          diagErr: window.__diagErr
+        }))()""")
+        print('DIAG A1-FAIL: %r' % (_st,), flush=True)
+        raise
     qcool_after = pg.evaluate("__dbg.S._qCool")
     assert qcool_after > 0, ('切场地后 _qCool 应置正数', qcool_after)
     # A1: chk-qauto 取消勾选 → _qAutoOff 变 true
