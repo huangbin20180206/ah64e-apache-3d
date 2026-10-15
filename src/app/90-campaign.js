@@ -21,7 +21,7 @@
 //     权重可配置：GRADECFG 可经构造 opts.cfg 覆盖（纯 pytest 注入验证）。
 //
 //   D 战役存档：
-//     5 关解锁链（CAMPAIGN_LEVELS）：每关 = 变体×难度组合；前关 bestGrade
+//     6 关解锁链（CAMPAIGN_LEVELS）：每关 = 变体×难度组合；前关 bestGrade
 //     达 B 即解锁下一关。每关记最高分/最高评级/成就并集/累计机务损伤。
 //     schema_version:1；migrate() 处理 v0（无版本号）/缺字段；损坏 JSON
 //     一律回退全新档（绝不炸页面）；storage 不可用内存降级。
@@ -44,7 +44,7 @@ const GRADECFG = {
   COMBO_KEEP: 5,     // 最高连击达此值保档（抵一次降档）
 };
 
-// 战役关卡定义（5 关解锁链；variant/difficulty 组合递进——
+// 战役关卡定义（6 关解锁链；variant/difficulty 组合递进——
 // 关卡只描述"挑战参数"，实际开始由接线层 startMission(variant)+难度快照）
 const CAMPAIGN_LEVELS = [
   { name: '第一关 · 初次出击', variant: 'standard',     difficulty: 'standard' },
