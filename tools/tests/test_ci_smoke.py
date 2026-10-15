@@ -14,14 +14,14 @@ def run(pg):
     # ① 引导完成：载入遮罩收起（finish() 末尾 setTimeout 260ms 才加 done 类——
     #    与 wait_for_function(__dbg) 之间存在 260ms 竞态，须显式等待该类）
     #    + __dbg 就绪（boot 是有界工作，与帧率无关）
-    pg.wait_for_function("() => !!(window.__dbg && __dbg.apache && __dbg.fp)", timeout=120000)
-    pg.wait_for_function("() => document.getElementById('loading').classList.contains('done')", timeout=30000)
+    pg.wait_for_function("() => !!(window.__dbg && __dbg.apache && __dbg.fp)", timeout=120000, polling=100)   # boot 就绪：加载期主线程空闲，间隔轮询比 rAF 稳
+    pg.wait_for_function("() => document.getElementById('loading').classList.contains('done')", timeout=30000, polling=100)
     pg.evaluate("document.querySelector('#hint-close') && document.querySelector('#hint-close').click()")
     # ② FPV 进入 + 鼠标水平/垂直输入各自只计算一次（纯状态断言）
     pg.evaluate("__dbg.FLY.state='hover'; __dbg.FLY.alt=14; __dbg.FLY.x=0; __dbg.FLY.z=0; "
                 "__dbg.FLY.yaw=0; __dbg.FLY.pitch=0; __dbg.FLY.comp=0; __dbg.S._alt=0; __dbg.S.running=true")
     pg.keyboard.press('KeyC')
-    pg.wait_for_function("() => __dbg.fp.active === true", timeout=5000, polling=100)   # B3：enter 同步置位，条件等待免固定窗
+    H.step_until(pg, "() => __dbg.fp.active === true", 5)   # enter 同步置位——游戏时间步进，与帧率/墙钟解耦
     y0 = pg.evaluate("+__dbg.fp.vYaw.toFixed(5)")
     p0 = pg.evaluate("+__dbg.fp.vPitch.toFixed(5)")
     pg.evaluate("__dbg.fp.mouse(10, 0)")
@@ -48,9 +48,9 @@ def run(pg):
     # A1: 切场地后 _qCool 置正数（冷却豁免）
     pg.evaluate("__dbg.S._qCool = 0")
     pg.evaluate("document.querySelector('#terrain-row [data-terrain=\"water\"]').click()")
-    # polling=100：条件由 click handler 同步置位——间隔轮询不依赖 rAF 帧
-    # （CI SwiftShader 软渲染下 5s 墙钟可能零帧，rAF 轮询会假超时）
-    pg.wait_for_function("() => __dbg.S._qCool > 0", timeout=5000, polling=100)
+    # 条件由 click handler 同步置位——游戏时间步进（step_until 首查即中）。
+    # CI SwiftShader 下单帧可达 10s+，任何墙钟预算都可能小于最坏帧时长。
+    H.step_until(pg, "() => __dbg.S._qCool > 0", 5)
     qcool_after = pg.evaluate("__dbg.S._qCool")
     assert qcool_after > 0, ('切场地后 _qCool 应置正数', qcool_after)
     # A1: chk-qauto 取消勾选 → _qAutoOff 变 true
@@ -84,7 +84,7 @@ def run(pg):
     # B2: 键盘切机位 → 一次性 toast 报机位名（setView/toast 均为同步操作）
     pg.evaluate("document.activeElement && document.activeElement.blur()")
     pg.keyboard.press('2')
-    pg.wait_for_function("() => document.getElementById('toast').classList.contains('show') && document.getElementById('toast').textContent.includes('正侧')", timeout=5000, polling=100)   # B3：setView/toast 同步——条件等待
+    H.step_until(pg, "() => document.getElementById('toast').classList.contains('show') && document.getElementById('toast').textContent.includes('正侧')", 5)   # setView/toast 同步——游戏时间步进
     b2 = pg.evaluate("""(() => ({ txt: document.getElementById('toast').textContent,
                                    show: document.getElementById('toast').classList.contains('show'),
                                    view: __dbg.S.view }))()""")
@@ -361,14 +361,14 @@ def run(pg):
     # P6-M2: 任务模式 startMission → briefing（含完成/失败条件文案）
     pg.evaluate("document.querySelector('#mode-row [data-mode=\"mission\"]').click()")
     pg.evaluate("__dbg.startMission()")
-    pg.wait_for_function("() => __dbg.mission && __dbg.mission.phase === 'briefing' && document.getElementById('mission').classList.contains('show')", timeout=5000, polling=100)   # B3：同步链条件等待
+    H.step_until(pg, "() => __dbg.mission && __dbg.mission.phase === 'briefing' && document.getElementById('mission').classList.contains('show')", 5)   # B3：同步链条件等待
     m2 = pg.evaluate("() => { const mp=document.getElementById('mission');"
                      " return { phase: __dbg.mission && __dbg.mission.phase,"
                      " show: mp.classList.contains('show'), body: mp.innerHTML }; }")
     assert m2['phase'] == 'briefing' and m2['show'] and '完成条件' in m2['body'] and '失败条件' in m2['body'], ('P6(M2): 简报', m2)
     # P6-M3: briefing→active（beginMission 记录 t0/gun0）
     pg.evaluate("__dbg.beginMission()")
-    pg.wait_for_function("() => __dbg.mission.phase === 'active' && __dbg.mission.t0 !== null", timeout=5000, polling=100)
+    H.step_until(pg, "() => __dbg.mission.phase === 'active' && __dbg.mission.t0 !== null", 5)
     m3 = pg.evaluate("() => ({ phase: __dbg.mission.phase, t0: __dbg.mission.t0,"
                      " g0: __dbg.mission.gun0, hits: __dbg.mission.hits })")
     assert m3['phase'] == 'active' and m3['t0'] is not None and m3['g0'] == 1200 and m3['hits'] == 0, ('P6(M3): active', m3)
@@ -387,7 +387,7 @@ def run(pg):
     assert body0 == body1, 'P6(M5): 冻结后面板被改写'
     # P6-M6: retry → briefing + 全清（air 复活/武器瞬态清/救援 idle）
     pg.evaluate("__dbg.retryMission()")
-    pg.wait_for_function("() => __dbg.mission.phase === 'briefing'", timeout=5000, polling=100)
+    H.step_until(pg, "() => __dbg.mission.phase === 'briefing'", 5)
     m6 = pg.evaluate("() => ({ phase: __dbg.mission.phase, airDead: __dbg.air.list.filter(t=>!t.alive).length,"
                      " rockets: __dbg.rig.rockets.filter(r=>r.g.visible).length, rstate: __dbg.rescue.state })")
     assert m6['phase'] == 'briefing' and m6['airDead'] == 0 and m6['rockets'] == 0 and m6['rstate'] == 'idle', ('P6(M6): retry 清理', m6)
@@ -403,12 +403,12 @@ def run(pg):
     # P6 修复批-M9: 任务 active 切 show → 统一清理（S._mission=null/_baseFound=false/面板隐藏）
     pg.evaluate("document.querySelector('#mode-row [data-mode=\"mission\"]').click()")
     pg.evaluate("__dbg.startMission()")
-    pg.wait_for_function("() => __dbg.mission && __dbg.mission.phase === 'briefing'", timeout=5000, polling=100)
+    H.step_until(pg, "() => __dbg.mission && __dbg.mission.phase === 'briefing'", 5)
     pg.evaluate("__dbg.beginMission()")
-    pg.wait_for_function("() => __dbg.mission.phase === 'active'", timeout=5000, polling=100)
+    H.step_until(pg, "() => __dbg.mission.phase === 'active'", 5)
     assert pg.evaluate("__dbg.mission.phase") == 'active', 'P6(M9): 前置 active'
     pg.evaluate("document.querySelector('#mode-row [data-mode=\"show\"]').click()")
-    pg.wait_for_function("() => __dbg.mission === null && __dbg.S._baseFound === false", timeout=5000, polling=100)
+    H.step_until(pg, "() => __dbg.mission === null && __dbg.S._baseFound === false", 5)
     m9 = pg.evaluate("(() => ({ m: __dbg.mission, found: __dbg.S._baseFound,"
                      " show: document.getElementById('mission').classList.contains('show') }))()")
     assert m9['m'] is None and m9['found'] is False and not m9['show'], ('P6(M9): 切 show 未统一清理', m9)
@@ -419,7 +419,7 @@ def run(pg):
     # P6 修复批-M10: 从 water 启动任务 → 立即 desert + rescue 就绪（不依赖下帧）
     pg.evaluate("document.querySelector('#terrain-row [data-terrain=\"water\"]').click()")
     pg.evaluate("__dbg.startMission()")
-    pg.wait_for_function("() => __dbg.W.terrainKey === 'desert' && __dbg.mission.phase === 'briefing'", timeout=5000, polling=100)
+    H.step_until(pg, "() => __dbg.W.terrainKey === 'desert' && __dbg.mission.phase === 'briefing'", 5)
     m10 = pg.evaluate("(() => ({ terr: __dbg.W.terrainKey, ok: __dbg.rescue.ok,"
                       " rstate: __dbg.rescue.state, gvis: __dbg.rescue.g.visible }))()")
     assert m10['terr'] == 'desert' and m10['ok'] and m10['rstate'] == 'idle' and m10['gvis'], ('P6(M10): water 启动未就绪', m10)
