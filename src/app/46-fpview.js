@@ -416,8 +416,8 @@ class FPView {
     // 俯冲/爬升：机头俯角把前向速度分解出垂直分量（-sin(pitch)·spd——
     // 渲染约定 rotation.x 正=机头下俯，故取负号：下俯时高度掉、拉起爬升）
     const fx = Math.sin(FLY.yaw), fz = Math.cos(FLY.yaw);
-    FLY.x = clamp(FLY.x + (fx * this.spd - Math.cos(FLY.yaw) * this.vSide) * dt, -58, 58);
-    FLY.z = clamp(FLY.z + (fz * this.spd + Math.sin(FLY.yaw) * this.vSide) * dt, -58, 58);
+    FLY.x = clamp(FLY.x + (fx * this.spd - Math.cos(FLY.yaw) * this.vSide) * dt, -FLY_BOUND, FLY_BOUND);
+    FLY.z = clamp(FLY.z + (fz * this.spd + Math.sin(FLY.yaw) * this.vSide) * dt, -FLY_BOUND, FLY_BOUND);
     FLY.alt = clamp(FLY.alt + (this.vy - Math.sin(FLY.pitch) * this.spd) * dt, 1.2, 40);
 
     // 相机：眼位 + 机体姿态（不加额外偏角——所见即机头）。
