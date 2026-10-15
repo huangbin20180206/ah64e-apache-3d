@@ -90,7 +90,7 @@ function _placeRescue(x, z) {
   rescue._home = { x, z };
   rescue.g.position.set(x, 0, z);
   rescue.smoke.position.set(x, 2.4, z);
-  rescue.beacon.position.set(x, 0.22, z);
+  rescue.beacon.position.set(x + 0.45, 0.07, z + 0.3);   // 与 48-rescue 一致：频闪灯在人身旁
 }
 // P3c：雷达联动防空——雷达活着时基地火力更密，致盲后明显稀疏（3-1）
 function _tickLevelThreat() {
