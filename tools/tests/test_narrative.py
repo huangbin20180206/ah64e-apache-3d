@@ -48,7 +48,7 @@ def run(pg):
     #    对象入视锥），比较叙事开/关的 renderer.info.render.calls（增量 ≤8）
     pg.evaluate("""() => {
       const o = __dbg.orbit;
-      o.tTarget.set(0, 1, 42); o.target.copy(o.tTarget);   // 基地中心
+      o.tTarget.set(0, 1, 75); o.target.copy(o.tTarget);   // 基地中心
       o.tPhi = 0.8; o.tDist = 100; o.tTheta = 0.3;          // 远距俯视：水平半宽
                                                              // 100·sin0.8·tan17°≈22u
                                                              // > 基地对象最大偏移 18.8u → 全入镜
