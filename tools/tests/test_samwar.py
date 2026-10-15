@@ -21,8 +21,8 @@ def run(pg):
     s0 = pg.evaluate("(() => ({ phase: __dbg.samwar.state().phase, flares: __dbg.samwar.state().flares }))()")
     assert s0['phase'] == 'idle', ('S1: 地面停放 RWR 应为 idle', s0)
     assert s0['flares'] == 6, ('S1: 干扰弹初始应为 6 发', s0)
-    # 悬停 z=0 alt=14（距基地 42u 在反击区 8~55u 内）
-    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=0;
+    # 悬停 z=33 alt=14（距基地 BASE_C z=75 为 42u 在反击区 8~55u 内）
+    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=33;
       F.yaw=0; F.pitch=0; F.roll=0; F.comp=0; F.fp=false; __dbg.S._alt=0; __dbg.S.running=true; })()""")
     H.step_until(pg, "() => __dbg.samwar.state().phase !== 'idle'", 20)
     p1 = pg.evaluate("__dbg.samwar.state().phase")
