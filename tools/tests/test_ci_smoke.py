@@ -631,5 +631,9 @@ def run(pg):
     print('ci smoke OK: P18 轻街机层（槽位注册/HUD id 契约/难度默认值）')
 
 import pw_harness as H
-H.guarded_main(run, hard_timeout=300)
+# 900s：CI SwiftShader 实测全程 7-8 分钟（前 9 章 3 分钟：B2 11:27:52 → P5-D 11:30:57；
+# 单程 evaluate 往返 1-14s、startMission 地形重活 ~39s）。300s 看门狗杀死过功能已跑通
+# 的测试（PR run 38727231852：P5-D OK 后 11s 被 hard_timeout 斩掉）。job timeout 45
+# 分钟，900s 留足余量；本地约 60-90s，不受影响。
+H.guarded_main(run, hard_timeout=900)
 print('PASS')
