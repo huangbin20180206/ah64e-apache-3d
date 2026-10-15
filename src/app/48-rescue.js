@@ -1,12 +1,14 @@
 // ============================================================
 // 48-rescue.js — 绞车救援任务（P2-3）
 // 幸存者随场地生成（沙漠/草原各一处，水上/棚拍无），信标闪烁+信号烟
-// P4g：幸存者 = 真人士兵 GLB（CC0，assets/targets/survivor.glb，骨骼摆姿挥手求救 / 吊带上举）；
+// P4g：幸存者 = 真人士兵 GLB（CC0，assets/targets/survivor.glb，骨骼摆姿挥手求救 / 吊起时双臂抱胸）；
+// 吊钩总成、钢索（末端橙色警示段）、马项圈救援环按 Breeze-Eastern / LSC 实物照片与美海军救援规范建模。
 // GLB 未到或加载失败时用程序化兜底身体。与 AH-64E 同比例（1u≈2.27m，身高 1.85m）。
 // 辅助寻找。玩法闭环：悬停对位 → K 放绞车 → 吊钩落地自动挂接 →
 // 收绞车救起 → 低空返回停机坪 → 救援完成。
 // 吊钩跟随机腹，随悬停移动自然摆动；K 可中途收回（幸存者原地放下）。
 // ============================================================
+const _rsUp = new THREE.Vector3(0, 1, 0), _rsV = new THREE.Vector3();
 class Rescue {
   constructor(scene) {
     this.scene = scene;
@@ -58,16 +60,39 @@ class Rescue {
       return pv;
     };
     this.armL = arm(-1); this.armR = arm(1);
-    // 救援吊带（腋下环 + 向上连到吊钩的短带），挂接后才显示
+    // 救援吊带（"马项圈"式救援环：黄橙色软垫环从腋下绕过后背，两端在胸前上方汇成 V 形环挂到吊钩；
+    // 外加一根胸前收紧带）。挂接后才显示。尺寸单位：米（fig 统一缩放）
+    const SV = [0, 1.9, 0.2];                                          // V 形环位置（头顶前上方）
+    const stc = new THREE.CatmullRomCurve3([
+      [0, 1.9, 0.2], [-0.12, 1.62, 0.19], [-0.23, 1.41, 0.08], [-0.22, 1.37, -0.12], [0, 1.35, -0.21],
+      [0.22, 1.37, -0.12], [0.23, 1.41, 0.08], [0.12, 1.62, 0.19]].map(a => new THREE.Vector3(...a)), true);
     const ks = vcKit();
-    ks.add(new THREE.TorusGeometry(0.27, 0.03, 6, 16), PATCH, 0, 1.4, 0, Math.PI / 2, 0, 0);
-    ks.box(0.04, 0.5, 0.03, PATCH, 0, 1.65, 0.2);
-    ks.box(0.04, 0.5, 0.03, PATCH, 0, 1.65, -0.2);
+    ks.add(new THREE.TubeGeometry(stc, 48, 0.035, 6, true), 0xf0a020);
+    ks.add(new THREE.TorusGeometry(0.035, 0.008, 5, 10), 0x9a9ea2, SV[0], SV[1], SV[2]);
+    ks.box(0.42, 0.04, 0.02, 0x2e2e2a, 0, 1.3, 0.18);                  // 胸前收紧带
     this.strap = new THREE.Mesh(mergeGeos(ks.list), mat);
     this.strap.visible = false;
     fig.add(this.strap);
-    fig.scale.setScalar(1 / 2.27 * 0.99);
-    this.HANG = 1.92 / 2.27;                  // 吊钩到脚底的距离（u）
+    fig.scale.setScalar(1 / 2.27);
+    // 吊钩总成（照 Breeze-Eastern / LSC 救援钩：钢索压头 → 橙色防撞缓冲块 → 旋转节 → 带弹簧锁舌的银色锻钩）
+    const HK = 0.48;                                                    // 缆端到钩底（米）
+    const kh = vcKit();
+    kh.cyl(0.015, 0.015, 0.05, 8, 0x8a8d90, 0, -0.025, 0);              // 钢索压头
+    kh.cyl(0.055, 0.05, 0.14, 12, 0xe5631a, 0, -0.12, 0);               // 防撞缓冲块
+    kh.cyl(0.058, 0.058, 0.014, 12, 0x232323, 0, -0.06, 0);
+    kh.cyl(0.052, 0.052, 0.014, 12, 0x232323, 0, -0.18, 0);
+    kh.cyl(0.03, 0.024, 0.07, 10, 0xa9adb1, 0, -0.225, 0);             // 旋转节
+    kh.prism([[-0.02, 0], [0.02, 0], [0.025, -0.06], [0.06, -0.12], [0.075, -0.17], [0.06, -0.205], [0.02, -0.225],
+      [-0.03, -0.215], [-0.06, -0.185], [-0.07, -0.15], [-0.055, -0.12], [-0.035, -0.13], [-0.035, -0.165],
+      [-0.015, -0.19], [0.02, -0.192], [0.042, -0.168], [0.036, -0.13], [0.004, -0.07], [-0.02, -0.06]],
+      0.034, 0xb9bdc1, 0, -0.26, 0);                                    // 锻钩
+    kh.box(0.012, 0.075, 0.02, 0xc9cdd1, -0.038, -0.35, 0, 0, 0, -0.5); // 锁舌
+    kh.box(0.02, 0.02, 0.012, 0xf2c419, 0.005, -0.3, 0.022);            // 黄色解锁钮
+    this._hookMesh = new THREE.Mesh(mergeGeos(kh.list), vcMat(0.35, 0.6));
+    this._hookMesh.scale.setScalar(1 / 2.27);
+    this.HOOK_H = HK / 2.27;
+    this.SV = SV.map(v => v / 2.27);                                    // V 形环（u，人物本地）
+    this.HANG = (HK + SV[1]) / 2.27;                                    // 缆端到脚底（u）
     this._fig = fig;
     this.g = new THREE.Group();
     this.g.add(fig);
@@ -98,18 +123,21 @@ class Rescue {
     this.beacon.visible = false;
     scene.add(this.beacon);
 
-    // 绞车绳索（细圆柱，按绳长缩放）+ 吊钩
-    this.rope = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1, 6),
-      new THREE.MeshBasicMaterial({ color: 0x14140f }));
+    // 绞车钢索（银灰；末端 6m 为橙色警示段，与实装一致）+ 吊钩总成
+    this.rope = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1, 6),
+      new THREE.MeshBasicMaterial({ color: 0x6a6d70 }));
     this.rope.visible = false;
     scene.add(this.rope);
-    this.hook = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.022, 6, 12),
-      new THREE.MeshBasicMaterial({ color: 0x2a2a26 }));
+    this.ropeEnd = new THREE.Mesh(new THREE.CylinderGeometry(0.0088, 0.0088, 1, 6),
+      new THREE.MeshBasicMaterial({ color: 0xe5631a }));
+    this.rope.add(this.ropeEnd);
+    this.hook = new THREE.Group();
+    this.hook.add(this._hookMesh);
     this.hook.visible = false;
     scene.add(this.hook);
   }
 
-  // 接入真人模型：按身高 1.85m 缩放、面朝 +Z，预先算好"挥手 A/B""吊起上举"三套手臂骨骼姿态
+  // 接入真人模型：按身高 1.85m 缩放、面朝 +Z，预先算好"挥手 A/B""吊起抱胸"三套手臂骨骼姿态
   _useGlb(gltf) {
     const m = gltf.scene, B = {};
     m.traverse(o => { if (o.isBone) B[o.name] = o; });
@@ -156,7 +184,7 @@ class Rescue {
     const P = {
       waveA: pose([...lDown, [R * 0.45, 0.89, 0.12], [R * 0.05, 1, 0.12]]),
       waveB: pose([...lDown, [R * 0.45, 0.89, 0.12], [R * 0.8, 0.6, 0.12]]),
-      hoist: pose([[L * 0.25, 0.97, 0.05], [L * 0.06, 1, 0.04], [R * 0.25, 0.97, 0.05], [R * 0.06, 1, 0.04]]),
+      hoist: pose([[L * 0.12, -0.95, 0.3], [R * 0.85, 0.2, 0.5], [R * 0.12, -0.95, 0.3], [L * 0.85, 0.3, 0.5]]),   // 双臂抱胸（救援规范：不可举手，否则会从吊带滑脱）
     };
     // CPU 蒙皮：把骨骼网格换成普通网格，由 _skin() 按骨骼姿态改写顶点（软件渲染下骨骼着色器会失败，
     // 实测丢失整个画面；一个人约 1.8 万顶点，限频 15 次/秒，开销很小）
@@ -380,23 +408,30 @@ class Rescue {
     // 绳/钩视觉跟随（deploying/holding/lifting/retracting）
     if (this.state !== 'idle' && this.state !== 'delivered') {
       this.rope.visible = this.hook.visible = true;
-      const len = Math.max(this.ropeLen, 0.05);
+      const sw = Math.min(0.3, this.ropeLen * 0.04);
+      const hx = bx + Math.sin(this._sway * 1.4) * sw, hz = bz + Math.cos(this._sway * 1.4) * sw;
+      this.hook.position.set(hx, by - this.ropeLen, hz);
+      // 钢索从机腹吊点直连钩头（随摆动倾斜，不再是竖直棍子）
+      const dx = hx - bx, dy = -Math.max(this.ropeLen, 0.05), dz = hz - bz, len = Math.hypot(dx, dy, dz);
+      this.rope.position.set(bx + dx / 2, by + dy / 2, bz + dz / 2);
+      this.rope.quaternion.setFromUnitVectors(_rsUp, _rsV.set(-dx / len, -dy / len, -dz / len));
       this.rope.scale.set(1, len, 1);
-      this.rope.position.set(bx, by - len / 2, bz);
-      this.hook.position.set(bx + Math.sin(this._sway * 1.4) * Math.min(0.3, this.ropeLen * 0.04),
-        by - this.ropeLen, bz + Math.cos(this._sway * 1.4) * Math.min(0.3, this.ropeLen * 0.04));
-      // 挂接后幸存者跟随吊钩
+      const el = Math.min(len, 6 / 2.27) / len;                         // 末端 6m 橙色段（局部坐标）
+      this.ropeEnd.scale.set(1, el, 1);
+      this.ropeEnd.position.y = -0.5 + el / 2;
+      // 挂接后：人的 V 形环正好挂在钩底，绕钢索缓慢自转
       if (this.attached) {
-        this.g.position.set(this.hook.position.x, Math.max(by - this.ropeLen - this.HANG, 0), this.hook.position.z);
+        const yaw = this.g.rotation.y, v = this.SV;
+        this.g.position.set(hx - Math.sin(yaw) * v[2], Math.max(by - this.ropeLen - this.HANG, 0), hz - Math.cos(yaw) * v[2]);
       }
     }
-    // 姿态：地面上面朝直升机挥手求救；挂上吊带后双臂上举抓带、吊带显示
+    // 姿态：地面上面朝直升机挥手求救；挂上吊带后双臂抱胸、吊带显示
     if (this.g.visible) {
       this.strap.visible = this.attached;
       const sk = this._sk;
       if (this.attached) {
         if (sk) this._setPose(sk.P.hoist);
-        else { this.armL.rotation.set(0, 0, -2.75); this.armR.rotation.set(0, 0, 2.75); }
+        else { this.armL.rotation.set(-0.9, 0, -0.1); this.armR.rotation.set(-0.9, 0, 0.1); }
         this.g.rotation.y += dt * 0.6;       // 吊在绳上缓慢自转
       } else {
         this.g.rotation.y = Math.atan2(heliPos.x - this.g.position.x, heliPos.z - this.g.position.z);
