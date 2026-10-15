@@ -247,7 +247,7 @@ def run(pg):
     # 注意：FPV 退出触发的 R1 flyTo 会每帧驱动 orbit 参数（指向机体眼位）——
     # 测试设置自定义视角前必须清 orbit.fly，否则视线中心被动画覆盖
     pg.evaluate("__dbg.orbit.fly = null")
-    v1 = visibility("__dbg.orbit.tTarget.set(0, 3, 42); __dbg.orbit.target.copy(__dbg.orbit.tTarget); __dbg.orbit.tDist = 60; __dbg.orbit.tPhi = 1.0; __dbg.orbit.tTheta = 0.4;", settle_orbit=True)
+    v1 = visibility("__dbg.orbit.tTarget.set(0, 3, 75); __dbg.orbit.target.copy(__dbg.orbit.tTarget); __dbg.orbit.tDist = 60; __dbg.orbit.tPhi = 1.0; __dbg.orbit.tTheta = 0.4;", settle_orbit=True)
     # 核心件（radar/sam/lamp/patrol）必须可见；烟柱在基地外围北侧（82-130u），
     # 该视角下天然位于相机背后/锥外——不强制可见（其"存在+呼吸"由 S5 验证）
     coreOk = [d for d in v1['det'] if not d['name'].startswith('narrative-smoke-')]
@@ -271,7 +271,7 @@ def run(pg):
     pg.evaluate("document.querySelector('#env-row [data-env=\"night\"]').click()")
     pg.wait_for_timeout(600)
     pg.evaluate("__dbg.orbit.fly = null")   # 同上：清残留过渡动画
-    v3 = visibility("__dbg.orbit.tTarget.set(0, 3, 42); __dbg.orbit.target.copy(__dbg.orbit.tTarget); __dbg.orbit.tDist = 60; __dbg.orbit.tPhi = 1.0; __dbg.orbit.tTheta = 0.4;", settle_orbit=True)
+    v3 = visibility("__dbg.orbit.tTarget.set(0, 3, 75); __dbg.orbit.target.copy(__dbg.orbit.tTarget); __dbg.orbit.tDist = 60; __dbg.orbit.tPhi = 1.0; __dbg.orbit.tTheta = 0.4;", settle_orbit=True)
     assert v3['vis'] >= v3['total'] - 2, ('S8: 夜间视角对象不可辨', v3)
     stN = pg.evaluate("__dbg.narrative.state()")
     assert stN['enabled'] and stN['groupVisible'], ('S8: 夜间叙事应可见', stN)
