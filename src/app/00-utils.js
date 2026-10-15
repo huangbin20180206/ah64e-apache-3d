@@ -159,6 +159,51 @@ function countScene(root) {
   return STATS;
 }
 
+// ---------- 顶点色零件拼装（2026-10-15 敌方模型真实化）----------
+// 每个零件一种颜色，摆好位置后烘进同一个几何：配 vertexColors 材质 = 整件只画 1 次。
+// 全部零件先转非索引（ExtrudeGeometry 本身非索引，统一后 mergeGeos 才能拼）。
+// 用法：const K = vcKit(); K.box(w,h,d,0x556b2f, x,y,z, rx,ry,rz); ... K.build()
+// scratch 懒创建：00-utils 会被 tests_pure 用桩 THREE 求值，模块顶层不能 new THREE 对象
+let _vcT = null;
+function vcKit() {
+  if (!_vcT) _vcT = { M: new THREE.Matrix4(), Q: new THREE.Quaternion(), E: new THREE.Euler(),
+    P: new THREE.Vector3(), S: new THREE.Vector3(1, 1, 1), C: new THREE.Color() };
+  const { M: _vcM, Q: _vcQ, E: _vcE, P: _vcP, S: _vcS, C: _vcC } = _vcT;
+  const list = [];
+  const add = (geo, color, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => {
+    let g = geo.index ? geo.toNonIndexed() : geo;
+    if (g !== geo) geo.dispose();
+    for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
+    if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+    _vcE.set(rx, ry, rz); _vcQ.setFromEuler(_vcE); _vcP.set(x, y, z);
+    g.applyMatrix4(_vcM.compose(_vcP, _vcQ, _vcS));
+    _vcC.set(color);
+    const n = g.attributes.position.count, c = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { c[i * 3] = _vcC.r; c[i * 3 + 1] = _vcC.g; c[i * 3 + 2] = _vcC.b; }
+    g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    list.push(g);
+    return g;
+  };
+  return {
+    list, add,
+    box: (w, h, d, col, x, y, z, rx, ry, rz) => add(new THREE.BoxGeometry(w, h, d), col, x, y, z, rx, ry, rz),
+    cyl: (rt, rb, h, seg, col, x, y, z, rx, ry, rz) => add(new THREE.CylinderGeometry(rt, rb, h, seg), col, x, y, z, rx, ry, rz),
+    sph: (r, col, x, y, z, sx = 1, sy = 1, sz = 1) => { const g = new THREE.SphereGeometry(r, 10, 7); g.scale(sx, sy, sz); return add(g, col, x, y, z); },
+    // 侧面轮廓挤出：pts=[[a,b],...] 为 X-Y 平面闭合轮廓，沿 Z 挤出 depth（居中）
+    prism: (pts, depth, col, x, y, z, rx, ry, rz) => {
+      const sh = new THREE.Shape(); sh.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) sh.lineTo(pts[i][0], pts[i][1]);
+      const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false });
+      g.translate(0, 0, -depth / 2);
+      return add(g, col, x, y, z, rx, ry, rz);
+    },
+    build: () => { const g = mergeGeos(list); return g; },
+  };
+}
+function vcMat(roughness = 0.8, metalness = 0.15) {
+  return new THREE.MeshStandardMaterial({ vertexColors: true, roughness, metalness });
+}
+
 const fmtK = n => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(n);
 
 // ---------- 静态几何合并（draw call 合批；PERF-AUDIT C1/C2 的工具底座） ----------
