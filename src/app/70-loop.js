@@ -126,8 +126,8 @@ function _frame(dt, doRender) {
       if (mxF || mzF) {
         const fs = Math.sin(FLY.yaw), fc = Math.cos(FLY.yaw);
         const sp = 7 * (S._pen ? S._pen.speedMul : 1) * dt;   // 战损降平移速度（表引用）
-        FLY.x = clamp(FLY.x + (mzF * fs - mxF * fc) * sp, -58, 58);
-        FLY.z = clamp(FLY.z + (mzF * fc + mxF * fs) * sp, -58, 58);
+        FLY.x = clamp(FLY.x + (mzF * fs - mxF * fc) * sp, -FLY_BOUND, FLY_BOUND);
+        FLY.z = clamp(FLY.z + (mzF * fc + mxF * fs) * sp, -FLY_BOUND, FLY_BOUND);
         S._leanP = lerp(S._leanP || 0, mzF * 0.10, damp(0.10, dt));   // 前飞低头
         S._leanR = lerp(S._leanR || 0, -mxF * 0.10, damp(0.10, dt));  // 侧飞压坡度
       } else {
