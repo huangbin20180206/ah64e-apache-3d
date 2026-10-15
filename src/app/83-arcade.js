@@ -12,7 +12,7 @@
 //   G2 分数：击毁基础分（按目标类型）× 难度系数 × 连击系数（6s 窗口，
 //      1 + 0.15×min(combo-1,5) 封顶 ×1.75）+ 任务结算奖励；HUD 实时显示；
 //      最高分 localStorage ah64_arcade_hi_<难度>（隐私模式静默降级内存）。
-//   G3 成就 8 项：first_blood/combo5/wipeout 游玩中即时 toast（S2）；
+//   G3 成就 10 项：first_blood/combo5/wipeout 游玩中即时 toast（S2）；
 //      ghost/speedrun/frugal/veteran_s 在结算时授予（依赖最终时长/损伤/评级）；
 //      all_variants 跨局持久（重启不重弹）。单局内解锁随 startMission 清零
 //      （除 all_variants 与最高分外）。
