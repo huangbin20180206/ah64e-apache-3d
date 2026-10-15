@@ -1,0 +1,54 @@
+name: deploy-pages
+
+# 把 node build.mjs 产出的 dist/（单文件 HTML + assets/）部署到 GitHub Pages，
+# 让游戏在线可玩。dist/ 被 gitignore，故必须经 CI 构建，而非直接提交产物。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build single-file bundle (dist/)
+        # build.mjs 仅用 Node 内置模块 + 本地 tools/*.mjs，无需 npm install；
+        # 产物含 index.html 与 assets/（GLB/音频/贴图，相对路径引用）
+        run: node build.mjs
+
+      - name: Disable Jekyll
+        # 纯静态单页，跳过 Jekyll 处理避免误改/忽略文件
+        run: touch dist/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
