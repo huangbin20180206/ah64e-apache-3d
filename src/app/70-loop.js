@@ -78,9 +78,13 @@ function _frame(dt, doRender) {
     if (FLY.alt !== S._alt) { orbit.tTarget.y += (FLY.alt - S._alt) * 0.92; S._alt = FLY.alt; }
 
     // 机体姿态 = 飞行俯仰 + 高转速下的毫米级高频微颤（幅度收敛，避免拖拉机感）
+    // 2026-10-14 用户反馈「起飞后抖动太厉害」：离地后微颤降到地面的 35%（离地 0~3u 平滑过渡），
+    // 地面怠速/起转时的震感不变
     let jx = 0, jy = 0, jz = 0, rx = 0, rz = 0;
     if (S.vib && s > 0.02) {
-        const a = s * s * 0.0026 * (S._dmgFx ? S._dmgFx.vibMul : 1);   // Phase 19：旋翼损伤振动放大
+      const airT = Math.min(1, Math.max(0, FLY.alt / 3));
+      const airMul = 1 - 0.65 * airT * airT * (3 - 2 * airT);
+      const a = s * s * 0.0026 * airMul * (S._dmgFx ? S._dmgFx.vibMul : 1);   // Phase 19：旋翼损伤振动放大
       jx = Math.sin(S.time * 47.3) * a;
       jy = Math.sin(S.time * 61.7) * a * 1.3;
       jz = Math.sin(S.time * 53.1) * a;
