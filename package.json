@@ -1,0 +1,26 @@
+{
+  "name": "apache_web-main",
+  "version": "1.0.0",
+  "description": "零依赖单文件 HTML 产品：three.js + GLTFLoader + 全部应用代码打进一个 `dist/index.html`， 无打包器、无 npm 依赖、无外部 CDN 请求（GLB/蒙皮保持外部文件流式下载）。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/huangbin20180206/ah64e-apache-3d.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/huangbin20180206/ah64e-apache-3d/issues"
+  },
+  "homepage": "https://github.com/huangbin20180206/ah64e-apache-3d#readme",
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

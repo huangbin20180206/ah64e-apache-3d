@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "target": "ES2020",
+    "module": "ESNext"
+  },
+  "include": ["src/app", "build.mjs", "tools/*.mjs"],
+  "exclude": ["node_modules", "dist", "vendor"]
+}

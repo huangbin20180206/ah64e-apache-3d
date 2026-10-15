@@ -9,6 +9,10 @@ dist/
 Thumbs.db
 .DS_Store
 
+# Node（给 LSP 用的 typescript 依赖，不入库）
+node_modules/
+package-lock.json
+
 # Python 缓存与临时输出（区别于 docs/ai-reviews/ 下有意保留的验收证据）
 __pycache__/
 *.pyc
