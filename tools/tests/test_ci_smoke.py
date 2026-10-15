@@ -475,7 +475,7 @@ def run(pg):
     pg.evaluate("__dbg.beginMission()")
     pg.wait_for_timeout(200)
     assert pg.evaluate("__dbg.targets._threat") == 0, 'P8-1: 地面停放威胁应 0'
-    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=0;
+    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=33;
       F.yaw=0; F.pitch=0; F.roll=0; F.comp=0; __dbg.S._alt=0; __dbg.S.running=true; })()""")
     # 条件等待替代固定 500ms（2026-09-09 修）：同 M6/D6，威胁派生依赖任务推进
     pg.wait_for_function("() => __dbg.targets._threat >= 1", timeout=8000)
