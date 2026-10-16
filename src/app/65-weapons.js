@@ -30,6 +30,11 @@ const _W_AIM = new THREE.Vector3();       // 瞄准点（发射时构造）
 const _W_TO = new THREE.Vector3();       // 火箭半瞄准修正向量
 const _HF_TO = new THREE.Vector3();       // 地狱火导引目标点（每弹每帧）
 
+// Q3：各时段烟尘受光系数（乘到烟尘颜色上；与 32-envpreset 的环境键一致）
+const SMOKE_TINT = { day: [1, 1, 1], afternoon: [1, 0.96, 0.9], dawn: [0.92, 0.8, 0.74],
+  dusk: [0.9, 0.68, 0.5], night: [0.24, 0.26, 0.32], studio: [1, 1, 1] };
+const _SMOKE_C = new THREE.Color();
+
 class WeaponRig {
   constructor(scene, apache) {
     this.apache = apache;
@@ -203,6 +208,9 @@ class WeaponRig {
       p.life0 = p.life = opt.life ?? 0.5;
       p.s0 = opt.s0 ?? 0.2; p.s1 = opt.s1 ?? 0.9; p.rise = opt.rise ?? 0.4;
       p.m.material.color.setHex(opt.color ?? 0x8b949c);
+      // Q3 烟尘受环境光：烟/尘是不发光的材质，黄昏偏暖、夜里压暗，
+      // 不再在夜空里发灰白光（火光/闪光这类叠加发光的不受影响）
+      if (!opt.add) { const k = SMOKE_TINT[(HOST.S && HOST.S.env) || 'day'] || SMOKE_TINT.day; p.m.material.color.multiply(_SMOKE_C.setRGB(k[0], k[1], k[2])); }
       p.m.material.blending = opt.add ? THREE.AdditiveBlending : THREE.NormalBlending;
       p.m.material.opacity = p.base;
       return p;
