@@ -801,6 +801,13 @@ class WeaponRig {
             break;
           }
         }
+        // P5-G2 敌方步兵（27-infantry）：30mm 一发倒地
+        if (this.onInfantryHit && this.onInfantryHit(t.m.position)) {
+          t.m.visible = false;
+          if (this.onHitMark) this.onHitMark();
+          consumed = true;
+          break;
+        }
         // 打进远景树林（31-scenery）：飞叶 + 摇晃，挨够子弹倒下
         if (this.onTreeHit && this.onTreeHit(t.m.position, t.dir)) {
           t.m.visible = false;
