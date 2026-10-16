@@ -34,6 +34,7 @@ class WeaponRig {
   constructor(scene, apache) {
     this.apache = apache;
     this.scene = scene;
+    this._initImpactFx();
     this.gunAmmo = GUN.AMMO;
     this.hfAmmo = 8;
     this.rocketAmmo = ROCKET.AMMO;
@@ -258,8 +259,75 @@ class WeaponRig {
 
   // 击毁特效：按武器威力分档 —— tier 1 机炮击毁 / 2 火箭 / 3 地狱火·殉爆
   // （倍率缩放爆闪与烟柱；地狱火级追加冲击波环 + 实体破片抛射）
+  // ---- P5-G1 爆炸照亮 + 地面弹坑（2026-10-16）----
+  // 一盏常驻橙色点光源（空闲时亮度 0，常驻不增删 → 不触发材质重编；不投影 → 不加
+  // 阴影绘制）。每次爆炸把它挪到爆心，按威力闪一下再快速熄灭：地面、房子、树、机身
+  // 都会被照亮一瞬，夜间关最明显。同时有多个爆炸时取更亮的那个。
+  // 弹坑：48 块焦痕贴花环形复用（最旧的被新的顶掉），贴地爆炸（y<1.6）才留，整关保留，
+  // 换场地/新任务清空。水面不留。
+  _initImpactFx() {
+    this._xLight = new THREE.PointLight(0xff9440, 0, 34, 2);
+    this._xLight.castShadow = false;
+    this.scene.add(this._xLight);
+    this._xl = { t: 1, life: 1, peak: 0 };
+    this._craters = [];
+    this._craterI = 0;
+    this._craterTerr = null;
+    const mat = new THREE.MeshBasicMaterial({ map: scorchTexture(), transparent: true, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const geo = new THREE.PlaneGeometry(1, 1);
+    for (let i = 0; i < 48; i++) {
+      const m = new THREE.Mesh(geo, mat);
+      m.rotation.x = -PI / 2;
+      m.visible = false; m.renderOrder = 2;
+      m.matrixAutoUpdate = false;
+      this.scene.add(m);
+      this._craters.push(m);
+    }
+  }
+  _groundH(x, z) {
+    const cv = this.targets && this.targets.canyon;
+    if (cv && cv.active && cv.inZone({ x, z })) return cv.heightAt(x, z);
+    if (this.terrainKey === 'desert') return Math.max(0, duneFarH(x, z));
+    return 0;
+  }
+  _crater(x, z, size) {
+    if (this.terrainKey === 'water') return;
+    const m = this._craters[this._craterI];
+    this._craterI = (this._craterI + 1) % this._craters.length;
+    m.position.set(x, this._groundH(x, z) + 0.025, z);
+    m.rotation.z = rnd(TAU);
+    m.scale.set(size, size, 1);
+    m.updateMatrix();
+    m.visible = true;
+  }
+  clearImpacts() {
+    for (const m of this._craters) m.visible = false;
+    this._xl.t = this._xl.life; this._xLight.intensity = 0;
+  }
+  _updateImpactFx(dt) {
+    const tk = this.terrainKey || null;   // 70-loop 每帧写入（避免反向引用 W）
+    if (tk !== this._craterTerr) { this._craterTerr = tk; for (const m of this._craters) m.visible = false; }
+    const L = this._xl;
+    if (L.t < L.life) {
+      L.t += dt;
+      const k = Math.max(0, 1 - L.t / L.life);
+      this._xLight.intensity = L.peak * k * k * (0.85 + rnd() * 0.3);
+    } else if (this._xLight.intensity !== 0) this._xLight.intensity = 0;
+  }
+
   explosion(x, y, z, tier = 2) {
     if (this.onSfx) this.onSfx('explo', tier);
+    {
+      const peak = tier >= 3 ? 260 : tier <= 1 ? 70 : 150;
+      const L = this._xl;
+      const cur = L.t < L.life ? L.peak * Math.pow(1 - L.t / L.life, 2) : 0;
+      if (peak >= cur) {
+        L.peak = peak; L.t = 0; L.life = tier >= 3 ? 0.55 : tier <= 1 ? 0.25 : 0.4;
+        this._xLight.position.set(x, y + 1.4, z);
+      }
+      if (y < 1.6) this._crater(x, z, tier >= 3 ? 3.4 : tier <= 1 ? 1.1 : 2.3);
+    }
     if (this.onBlast) this.onBlast(x, y, z, tier);   // 31-scenery：附近树木摇晃/折倒/起火
     const T = tier >= 3 ? 1.45 : tier <= 1 ? 0.55 : 1.0;
     // 三层爆闪
@@ -556,6 +624,7 @@ class WeaponRig {
 
   update(dt, cam, time, spinRatio) {
     const a = this.apache;
+    this._updateImpactFx(dt);
     this._camQuat = cam.quaternion;
     this._cam = cam;   // 锁定轴 = 玩家视线（环绕模式下机头与视线可差 90°）
 
