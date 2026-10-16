@@ -33,7 +33,8 @@ def test_route_flyable():
     for x in _load():
         assert x['minAlt'] >= 1.2, x            # 不贴地穿模
         assert x['maxSp'] < 12, x               # 电影航线：速度可看清
-        assert x['maxAbs'] <= 60, x             # 不飞出地图
+        # 不飞出地图：城镇在基地以北（中心 z=99），上限取飞行边界 FLY_BOUND=110；其余航线 60
+        assert x['maxAbs'] <= (110 if x['id'] == 'town' else 60), x
 
 
 def test_canyon_follows_centerline():
