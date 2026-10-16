@@ -732,6 +732,12 @@ class WeaponRig {
             break;
           }
         }
+        // 打进远景树林（31-scenery）：飞叶 + 摇晃，挨够子弹倒下
+        if (this.onTreeHit && this.onTreeHit(t.m.position, t.dir)) {
+          t.m.visible = false;
+          consumed = true;
+          break;
+        }
         // 触地
         if (t.m.position.y <= 0.05) {
           this._puff(t.m.position.x, 0.08, t.m.position.z,
