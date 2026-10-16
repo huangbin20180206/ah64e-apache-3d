@@ -462,6 +462,22 @@
    ]
   }
  },
+ "27-infantry.js": {
+  "provides": [
+   "Infantry"
+  ],
+  "depends": {
+   "00-utils.js": [
+    "PI",
+    "TAU",
+    "mergeGeos",
+    "rnd"
+   ],
+   "05-config.js": [
+    "BASE_C"
+   ]
+  }
+ },
  "28-washfx.js": {
   "provides": [
    "WashFX"
@@ -791,6 +807,7 @@
    "enemyVis",
    "fp",
    "hitMark",
+   "infantry",
    "killFeed",
    "music",
    "narrative",
@@ -1076,6 +1093,7 @@
     "disc",
     "discMat",
     "fp",
+    "infantry",
     "killFeed",
     "music",
     "narrative",
@@ -1178,6 +1196,7 @@
     "enemyAir",
     "enemyVis",
     "fp",
+    "infantry",
     "music",
     "narrative",
     "progress",
@@ -1267,6 +1286,9 @@
    "26-airtargets.js": [
     "AirTargets"
    ],
+   "27-infantry.js": [
+    "Infantry"
+   ],
    "28-washfx.js": [
     "WashFX"
    ],
@@ -1315,6 +1337,7 @@
     "enemyVis",
     "fp",
     "hitMark",
+    "infantry",
     "killFeed",
     "music",
     "narrative",
@@ -1397,6 +1420,7 @@
     "enemyAir",
     "enemyVis",
     "fp",
+    "infantry",
     "music",
     "narrative",
     "nlights",
