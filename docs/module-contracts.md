@@ -183,7 +183,8 @@
    "mergeTargetStatics",
    "scorchTexture",
    "targetMat",
-   "wreckEmber"
+   "wreckEmber",
+   "wreckPop"
   ],
   "depends": {
    "00-utils.js": [
@@ -220,7 +221,8 @@
     "loadTargetModels",
     "makeWreck",
     "mergeTargetStatics",
-    "wreckEmber"
+    "wreckEmber",
+    "wreckPop"
    ],
    "16-targetscenery.js": [
     "buildRangeScenery"
@@ -771,6 +773,9 @@
     "canvas2d",
     "rnd",
     "tex"
+   ],
+   "01-host.js": [
+    "HOST"
    ],
    "05-config.js": [
     "GUN",
