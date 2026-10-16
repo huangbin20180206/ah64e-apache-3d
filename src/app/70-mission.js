@@ -479,8 +479,15 @@ function completeMission() {
       missionTimeout: missionTimeout(),
       damageMul: damageSys ? damageSys.bonusMul() : 1,   // Phase 19：战损风险回报系数
     });
+    // P5-G4：步兵全歼奖励（基础 150 × 难度得分系数；不改 onMissionDone 既有公式）
+    m._infBonus = 0;
+    if (infantry && infantry.active && infantry.men.length && infantry.aliveCount() === 0) {
+      m._infBonus = arcade.addBonus(150 * arcade.coeffs(m).scoreMul);
+    }
+    m._settleBonus = bonus;
     UI('mission-body').insertAdjacentHTML('beforeend',
       '<div class="mrow"><span>得分</span><b>' + bonus + '</b></div>' +
+      (m._infBonus > 0 ? '<div class="mrow"><span>步兵全歼奖励</span><b>+' + m._infBonus + '</b></div>' : '') +
       // Phase 23：本局摧毁雷达则单列 SEAD 压制奖励（已含在得分内，此行仅可见化战果）
       (arcade._lastSeadBonus > 0 ? '<div class="mrow"><span>SEAD 压制奖励</span><b>+' + arcade._lastSeadBonus + '</b></div>' : '') +
       '<div class="mrow"><span>总分 / 最高分</span><b>' + arcade.score + ' / ' + arcade.hi(m.difficulty) + '</b></div>' +
@@ -497,6 +504,8 @@ function completeMission() {
   }
   // P2：关卡局记档（星级 + 附加目标 + 解锁下一关）——92-progress record
   const LV = _missionLevel();
+  const prevBest = LV && progress ? (progress.rec(LV.id).bestScore || 0) : null;   // P5-G4 个人最佳对比（记档前快照）
+  _appendDebrief(m, prevBest);                    // 战报放在关卡按钮（下一关/重玩）之前
   if (LV && progress) {
     const r = progress.record(LV.id, grade, arcade ? arcade.score : 0, {
       damage: dmgLv, acc: acc / 100, elapsed: el, fuelPct,
@@ -514,6 +523,48 @@ function completeMission() {
         (r.unlockedNext ? '<div class="mhint">已解锁 ' + r.next + ' ' + HOST.levels.byId(r.next).name + '</div>' : ''));
     }
     if (HOST.onLevelResult) HOST.onLevelResult(r);
+  }
+}
+
+// ---- P5-G4 战报（2026-10-16）：结算面板末尾追加——分武器命中、击毁明细、中弹次数、
+// 最高连击、得分来源、个人最佳对比。只读展示，不改评级与既有得分公式。
+const _KILL_NAMES = { tank: '坦克', truck: '卡车', barrel: '油桶', drone: '无人机', balloon: '热气球', plane: '靶机',
+  enemy: '敌直升机', radar: '雷达', sam: '防空导弹车', ammo: '弹药库', infantry: '步兵' };
+function _appendDebrief(m, prevBest) {
+  const body = UI('mission-body');
+  if (!body || !rig) return;
+  const hb = m.hitsBy || { 1: 0, 2: 0, 3: 0 };
+  const w = (name, used, hit) => used > 0
+    ? '<i>' + name + ' 中 ' + hit + ' / 发 ' + used + '（' + Math.round(Math.min(1, hit / used) * 100) + '%）</i>'
+    : '<i class="off">' + name + ' 未使用</i>';
+  const gunU = Math.max(0, m.gun0 - rig.gunAmmo), rkU = Math.max(0, m.rk0 - rig.rocketAmmo), hfU = Math.max(0, m.hf0 - rig.hfAmmo);
+  const st = arcade ? arcade.stats() : { killsBy: {}, killScore: 0 };
+  const kills = Object.entries(st.killsBy).map(([k, n]) => (_KILL_NAMES[k] || k) + ' ×' + n).join(' · ') || '无';
+  const as = arcade ? arcade.state() : null;
+  const score = arcade ? arcade.score : 0;
+  const src = arcade ? '击毁 ' + st.killScore + ' · 结算 ' + (m._settleBonus || 0) + (m._infBonus ? ' · 步兵全歼 ' + m._infBonus : '') : '—';
+  let pb = '';
+  if (prevBest != null) {
+    pb = score > prevBest
+      ? '<div class="mrow p5-pb new"><span>最佳</span><b>' + score + '　新纪录！（原 ' + prevBest + '）</b></div>'
+      : '<div class="mrow p5-pb"><span>最佳</span><b>' + prevBest + '　本局差 ' + (prevBest - score) + '</b></div>';
+  }
+  body.insertAdjacentHTML('beforeend',
+    '<div class="p5-deb"><div class="p5-deb-h">战报</div>' +
+    '<div class="mrow"><span>武器</span><b class="p5-w">' + w('机炮', gunU, hb[1]) + w('火箭', rkU, hb[2]) + w('地狱火', hfU, hb[3]) + '</b></div>' +
+    '<div class="mrow"><span>击毁</span><b>' + kills + '</b></div>' +
+    '<div class="mrow"><span>中弹</span><b>' + (m.hitsTaken || 0) + ' 次' + ((m.hitsTaken || 0) === 0 ? '　无伤！' : '') + '</b></div>' +
+    '<div class="mrow"><span>连击</span><b>×' + (as ? as.comboMax : 1) + '</b></div>' +
+    '<div class="mrow"><span>来源</span><b>' + src + '</b></div>' +
+    pb + '</div>');
+  if (!document.getElementById('p5-deb-css')) {
+    const s = document.createElement('style'); s.id = 'p5-deb-css';
+    s.textContent = '.p5-deb{margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,.15)}' +
+      '.p5-deb-h{font-size:12px;letter-spacing:4px;opacity:.7;margin-bottom:2px}' +
+      '.p5-deb .mrow span{flex:0 0 auto;white-space:nowrap;margin-right:12px}.p5-deb .mrow b{text-align:right}'+
+      '.p5-w i{display:block;font-style:normal;white-space:nowrap}.p5-w i.off{opacity:.45}' +
+      '.p5-pb.new b{color:var(--accent2)}';
+    document.head.appendChild(s);
   }
 }
 // P6：失败路径——超时未全歼即失败，结果冻结并给出可重试入口
