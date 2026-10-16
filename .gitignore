@@ -28,6 +28,7 @@ tools/tests/_shot_*.py
 
 # 测试运行态产物（每次回归都会覆写的临时输出；正式证据归档在 docs/ai-reviews/）
 tools/tests/last_result.json
+ci_art/
 tools/tests/fail_shot.png
 
 # 3D 原始产物（FBX/未压缩原始件不入库；归一化 GLB 明确保留）
