@@ -25,6 +25,7 @@ const HOST = {
   rig: null,        // 武器系统实例（70-app finish 装配后注册；47-betty 弹药告警取用）
   bindUI: null,     // UI 绑定入口（72-uibind 声明后注册；70-app finish 调用）
   setPlayMode: null,// P1：玩法模式切换（72-uibind bindUI 注册 setMode；70-appmode 调用）
+  coachTip: null,  // Q1：训练关实时教练提示函数（73-coach 注册；70-hud 提示条取用）
   onLevelResult: null, // P2：关卡结算回调（70-play 注册；70-mission 结算后调用，刷新面板按钮区）
   levels: null,     // P2：关卡表（91-levels 注册；70 层只经此取用）
   appMode: null,    // P1：产品层模式（70-appmode 注册；menu/show/play/all 只读状态 + 测试出口）
