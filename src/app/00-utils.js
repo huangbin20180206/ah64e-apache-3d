@@ -136,7 +136,8 @@ function rrect(x, X, Y, w, h, r) {
 function disposeObject3D(root) {
   const geos = new Set(), mats = new Set();
   root.traverse(o => {
-    if (o.geometry) geos.add(o.geometry);
+    // P5-G1：noDispose 网格共享他处几何（残骸借用原车几何），只释放材质
+    if (o.geometry && !(o.userData && o.userData.noDispose)) geos.add(o.geometry);
     const ms = Array.isArray(o.material) ? o.material : [o.material];
     for (const m of ms) if (m) mats.add(m);
   });
