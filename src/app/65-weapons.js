@@ -313,7 +313,21 @@ class WeaponRig {
       L.t += dt;
       const k = Math.max(0, 1 - L.t / L.life);
       this._xLight.intensity = L.peak * k * k * (0.85 + rnd() * 0.3);
-    } else if (this._xLight.intensity !== 0) this._xLight.intensity = 0;
+    } else {
+      // P5-G3 火光：没有爆炸时，这盏灯挪到最近一处正在燃烧的残骸上微弱闪烁（夜里看得见火光映地）
+      let best = null, bd = 1e9;
+      const T = this.targets, cam = this._cam;
+      if (T && T.enabled && cam) for (const t of T.targets) {
+        if (t.alive || !(t.burn > 1) || !t.wreck) continue;
+        const d = cam.position.distanceToSquared(t.wreck.position);
+        if (d < bd) { bd = d; best = t; }
+      }
+      if (best) {
+        const w = best.wreck.position;
+        this._xLight.position.set(w.x, w.y + 1.1, w.z);
+        this._xLight.intensity = 26 * Math.min(1, best.burn / 4) * (0.7 + rnd() * 0.5);
+      } else if (this._xLight.intensity !== 0) this._xLight.intensity = 0;
+    }
   }
 
   explosion(x, y, z, tier = 2) {
