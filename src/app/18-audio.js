@@ -150,6 +150,38 @@ class RotorAudio {
     this._src = {};
     this._sampGain = {};
     for (const n of ['engine', 'wind', 'brass', 'pad']) this._loadSample(n);
+    this._loadSfx();
+  }
+  // P5-G1：真实录音武器音效（CC0 Red Library，assets/audio/sfx/LICENSE.txt）。
+  // 独立于 samples（不改 A1 样本计数语义）；没加载到就照旧用合成音。
+  _loadSfx() {
+    if (this.sfxBuf) return;
+    this.sfxBuf = {};
+    this._sfxRR = 0;
+    for (const n of ['gun1', 'gun2', 'gun3', 'explo_s', 'explo_s2', 'explo_m', 'explo_l']) {
+      fetch('assets/audio/sfx/' + n + '.mp3')
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+        .then(buf => this.ctx.decodeAudioData(buf))
+        .then(ab => { if (this.sfxBuf) this.sfxBuf[n] = ab; })
+        .catch(() => { this.sfxFailed = (this.sfxFailed || 0) + 1; });
+    }
+  }
+  // 播一段录音（多变体轮换 + 轻微变速防"复读机"）；成功返回 true
+  _playBuf(names, gain, jit, wetMix) {
+    const B = this.sfxBuf;
+    if (!B) return false;
+    const list = names.filter(n => B[n]);
+    if (!list.length) return false;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = B[list[(this._sfxRR++) % list.length]];
+    src.playbackRate.value = 1 + (rnd() - 0.5) * 2 * jit;
+    const g = ctx.createGain();
+    g.gain.value = gain;
+    src.connect(g).connect(this.dry);
+    if (wetMix > 0) { const w = ctx.createGain(); w.gain.value = wetMix; g.connect(w).connect(this.wet); }
+    src.start(t);
+    return true;
   }
   _loadSample(name) {
     const ctx = this.ctx;
@@ -362,14 +394,16 @@ class RotorAudio {
     this.setLoopGain('wind', windTarget, 0.4);
   }
 
-  // —— 武器/事件一次性音效（全程序化合成，播完自毁）——
+  // —— 武器/事件一次性音效（机炮/爆炸优先真实录音，其余程序化合成，播完自毁）——
   // type: gun 机炮哒哒 | rocket 火箭啸声 | explo 爆炸轰(power 1/2/3 分级)
   //       hit 命中叮 | hf 地狱火低嘶 | shoot? 由 65-weapons/16-targets 回调触发
   playSfx(type, power = 1) {
     if (!this.started || !this.ctx || !this.enabled) return;
     const ctx = this.ctx, t = ctx.currentTime;
     try {
-      if (type === 'gun') {
+      if (type === 'gun' && this._playBuf(['gun1', 'gun2', 'gun3'], 0.5, 0.05, 0)) {
+        // P5-G1 真实机炮录音（合成版留作兜底）
+      } else if (type === 'gun') {
         // M230：低频方波闷响 60ms + 噪声爆点 40ms（625RPM 连发天然成串）
         const o = ctx.createOscillator(), g = ctx.createGain();
         o.type = 'square';
@@ -440,6 +474,19 @@ class RotorAudio {
         nb.out.connect(lp2).connect(ng2).connect(this.dry);
         ng2.connect(this.wet);
         nb.src.start(t); nb.src.stop(t + 0.85);
+      } else if (type === 'explo' && this._playBuf(
+          power >= 3 ? ['explo_l'] : power <= 1 ? ['explo_s', 'explo_s2'] : ['explo_m'],
+          power >= 3 ? 1.0 : power <= 1 ? 0.55 : 0.8, 0.07, 0.35)) {
+        // P5-G1 真实爆炸录音 + 保留合成次声冲击（胸腔震感，录音低频不足）
+        const o = ctx.createOscillator(), og = ctx.createGain();
+        const dur = 0.6 + 0.5 * power;
+        o.type = 'sine';
+        o.frequency.setValueAtTime(58, t);
+        o.frequency.exponentialRampToValueAtTime(26, t + dur * 0.8);
+        og.gain.setValueAtTime(0.35 * power, t);
+        og.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.8);
+        o.connect(og).connect(this.dry);
+        o.start(t); o.stop(t + dur);
       } else if (type === 'explo') {
         // 爆炸：低通噪声轰 0.6+0.5×power 秒 + 55Hz 正弦次声冲击（tier 分级音量）
         const dur = 0.6 + 0.5 * power;
