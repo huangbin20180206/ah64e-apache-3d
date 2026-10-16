@@ -205,6 +205,7 @@ class TargetRange {
           if (c.type !== 'radar_site') this.canyon.splash(worldPos.x, worldPos.z, R, pw);
         }
         if (c.type === 'radar_site') {
+          this._hitPow = power;                   // P5-G4 战报：命中来自哪种武器（1 机炮 / 2 火箭 / 3 地狱火）
           if (this.onHitFx) this.onHitFx();
           if (this.onSfx) this.onSfx('hit');
         }
@@ -219,6 +220,7 @@ class TargetRange {
     }
     if (!best) return null;
     best.hp -= this._effDamage(power);
+    this._hitPow = power;                        // P5-G4 战报：武器分类命中
     if (this.onHitFx) this.onHitFx();            // FPV 命中标记（击毁/受击都闪）
     if (this.onSfx) this.onSfx('hit');           // 命中叮（受击/击毁都响）
     if (best.hp <= 0) this.destroy(best, power);
