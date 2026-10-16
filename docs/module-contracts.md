@@ -1129,6 +1129,9 @@
    "70-mission.js": [
     "_tickMission",
     "_tickMissionMaps"
+   ],
+   "70-nightops.js": [
+    "_tickNightOps"
    ]
   }
  },
@@ -1208,6 +1211,43 @@
     "targets",
     "updateTargetHUD",
     "washfx"
+   ],
+   "70-nightops.js": [
+    "resetNightOps"
+   ]
+  }
+ },
+ "70-nightops.js": {
+  "provides": [
+   "NIGHT",
+   "_tickNightOps",
+   "launchFlare",
+   "resetNightOps",
+   "setFlir"
+  ],
+  "depends": {
+   "00-utils.js": [
+    "PI",
+    "TAU",
+    "rnd"
+   ],
+   "01-host.js": [
+    "toast"
+   ],
+   "45-flight.js": [
+    "FLY"
+   ],
+   "70-app.js": [
+    "W",
+    "air",
+    "apache",
+    "audio",
+    "composer",
+    "enemyVis",
+    "infantry",
+    "narrative",
+    "rig",
+    "targets"
    ]
   }
  },
@@ -1469,6 +1509,11 @@
     "startMission",
     "trainToastMs",
     "updateMissionPanel"
+   ],
+   "70-nightops.js": [
+    "NIGHT",
+    "launchFlare",
+    "setFlir"
    ],
    "70-play.js": [
     "startLevel"
