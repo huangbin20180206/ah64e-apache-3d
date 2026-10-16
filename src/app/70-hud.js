@@ -242,6 +242,9 @@ function _tickHud(dt, s, rpm) {
     // Phase 2-A3：首访三步引导——覆盖默认提示，点击画面跳过
     // Phase 11 T2：第三步改为"导览或训练"双入口；引导结束（2→3 完成时）
     // 不再自动消失——给"进入训练/自由探索"的选择 toast（localStorage 键沿用 ah64_seen）
+    // Q1：训练关由 73-coach 实时教练接管，首访引导（含「切到训练模式」提示）让位
+    const lc = HOST.coachTip ? HOST.coachTip() : '';
+    if (lc && S._guide) S._guide = 0;
     if (S._guide) {
       if (S._guide === 1 && S.running) S._guide = 2;                 // ①→②：旋翼已启动
       if (S._guide === 2 && FLY.state === 'hover') {                 // ②→③：已到悬停
@@ -259,6 +262,8 @@ function _tickHud(dt, s, rpm) {
     if (S.mode === 'train' && S._train) {
       tip = '训练 ' + TRAIN_NUM[S._train - 1] + '/⑤ ' + TRAIN_STEPS[S._train - 1] + '（按 Esc 跳过）';
     }
+    // Q1：训练关（1-1~1-4）实时教练——按关卡状态给「第 n 步」，覆盖通用提示（73-coach）
+    if (lc && !(fp && fp.active)) tip = lc;
     const gEl = UI('guide');
     if (gEl.dataset.tip !== tip) { gEl.dataset.tip = tip; gEl.textContent = tip; gEl.style.opacity = tip ? 1 : 0; }
     S._fa = 0; S._ft = 0;
