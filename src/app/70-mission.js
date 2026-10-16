@@ -579,6 +579,7 @@ function startMission(variant, levelIdx, levelId) {
   if (rig && rig.clearImpacts) rig.clearImpacts();   // P5-G1 清弹坑/爆闪
   if (air) air.reset();
   if (infantry) infantry.reset();   // P5-G2 步兵归位复活
+  resetNightOps();                  // P5-G3 照明弹补满
   if (samwar) samwar.reset();   // Phase 19：新任务清 SAM 状态（干扰弹补满/导弹清空/相位复位）
   if (damageSys) damageSys.reset();   // Phase 19：新任务清机务损伤（系统归零/卡壳过热处置全清）
   if (enemyAir) enemyAir.reset();   // Phase 20：清 A2A 状态（spawn 在下方统一做）
