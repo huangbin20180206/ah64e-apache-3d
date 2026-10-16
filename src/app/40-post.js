@@ -22,6 +22,7 @@ class Composer {
     this.sunPos = new THREE.Vector2(-2, -2);   // 太阳屏幕坐标（<-1 = 屏外）
     this.flare = 0.0;                          // 光晕强度
     this.flash = 0.0;                          // 击毁白闪
+    this.thermal = 0;                          // P5-G3 热成像（70-nightops 开关）
     this.shake = 0.0;                          // 震屏幅度
     // 电影镜头包第 2 阶段 M3：体积光 God Rays（70-app 每帧驱动）
     this.god = 0.0;                            // 体积光强度（沙暴加成由 70-app 算好传入）
@@ -232,6 +233,7 @@ class Composer {
         uSunPos: { value: new THREE.Vector2(-2, -2) },   // 太阳屏幕坐标（-2=屏外）
         uFlare: { value: 0.0 },                          // 光晕强度（太阳入屏才有）
         uFlash: { value: 0.0 },                          // 击毁白闪 0~1
+        uThermal: { value: 0.0 },                        // P5-G3 热成像白热单色
         uShake: { value: 0.0 },                          // 震屏幅度（UV 偏移）
         // 电影镜头包 M3：体积光叠加（tGod 光柱图 + 强度 + 太阳光色）
         tGod: { value: null },
@@ -245,7 +247,7 @@ class Composer {
         uniform sampler2D tScene, tBloom, tGod;
         uniform float uExposure, uBloom, uChroma, uGrain, uVign, uTime;
         uniform vec2 uSunPos;
-        uniform float uFlare, uFlash, uShake, uGod;
+        uniform float uFlare, uFlash, uShake, uGod, uThermal;
         uniform vec3 uGodCol;
 
         // ACES filmic 近似（Narkowicz）
@@ -302,6 +304,14 @@ class Composer {
           // 击毁白闪（电影镜头包 S3）：ACES 之后叠加，保证"闪白"不被色调映射压暗
           if (uFlash > 0.002) {
             col = mix(col, vec3(1.0, 0.985, 0.95), clamp(uFlash, 0.0, 1.0) * 0.85);
+          }
+
+          // P5-G3 热成像：亮度 → 白热单色（热目标自发光压满变白，背景压暗），微绿 + 扫描线
+          if (uThermal > 0.5) {
+            float lt = dot(col, vec3(0.3, 0.59, 0.11));
+            lt = pow(smoothstep(0.03, 1.05, lt), 1.35) * 0.92 + 0.04;
+            float scan = 0.94 + 0.06 * sin(gl_FragCoord.y * 1.6);
+            col = vec3(lt * 0.86, lt, lt * 0.84) * scan;
           }
 
           // 暗角
@@ -482,6 +492,7 @@ class Composer {
     f.uSunPos.value.copy(this.sunPos);
     f.uFlare.value = this.flare;
     f.uFlash.value = this.flash;
+    f.uThermal.value = this.thermal || 0;
     f.uShake.value = this.shake;
     // 电影镜头包 M3：体积光——太阳屏内 + 强度阈值 + 画质档门控三者同时满足才
     // 渲染光柱 pass（屏外/0.75 档/强度≈0 时跳过，uGod=0 让 final 零开销）
