@@ -77,7 +77,7 @@ def run(pg):
     assert c2b['comboMax'] >= 5 and c2b['grade'] == 'S', ('C2b: 连击保档应抵消 fuel 降档 → S', c2b)
     print('C2b PASS: 连击保档（comboMax=%d → fuel 降档被抵 → S）' % c2b['comboMax'])
 
-    # ---- C3: 战役 chips（5 关；第 1 关可点、第 2 关锁定） ----
+    # ---- C3: 战役 chips（6 关；第 1 关可点、第 2 关锁定） ----
     pg.evaluate("(() => { __dbg.startMission('standard'); })()")
     c3 = pg.evaluate("""(() => {
         const cs = [...document.querySelectorAll('#mission-campaign .chip')];
