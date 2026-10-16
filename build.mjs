@@ -177,6 +177,11 @@ for (const f of fs.readdirSync(path.join(ROOT, 'assets', 'targets'))) {
   }
 }
 // P10 重点部件细节件（Blender 受控低模，仅独立小 GLB；高模/源资产绝不复制）
+// 远景树线贴图图集（31-scenery，CC0 Poly Haven 渲染图拼合）
+fs.mkdirSync(path.join(DIST, 'assets', 'scenery'), { recursive: true });
+for (const f of fs.readdirSync(path.join(ROOT, 'assets', 'scenery'))) {
+  if (f.endsWith('.webp')) fs.copyFileSync(path.join(ROOT, 'assets', 'scenery', f), path.join(DIST, 'assets', 'scenery', f));
+}
 fs.mkdirSync(path.join(DIST, 'assets', 'details'), { recursive: true });
 let _detN = 0;
 for (const f of fs.readdirSync(path.join(ROOT, 'assets', 'details'))) {
@@ -194,4 +199,4 @@ console.log('dist/index.html  ' + kb(Buffer.byteLength(html)));
 console.log('  three          ' + kb(Buffer.byteLength(three.js)));
 console.log('  loader         ' + kb(Buffer.byteLength(loaderJs)) + '（解构 ' + needs.length + ' 个符号）');
 console.log('  app            ' + kb(Buffer.byteLength(appJs)));
-console.log('dist/assets/     apache_v2.glb + skin_army.jpg + targets/' + _tgtN + ' glb + details/' + _detN + ' glb + audio/' + _audioN + ' wav');
+console.log('dist/assets/     apache_v2.glb + skin_army.jpg + targets/' + _tgtN + ' glb + details/' + _detN + ' glb + audio/' + _audioN + ' wav + scenery/trees.webp');
