@@ -1,0 +1,15 @@
+assets/audio/sfx/*.mp3 — 真实录音音效（P5-G1，2026-10-16）
+
+来源：Internet Archive「Red Library」音效库（USC Cinema / Sunset Editorial Collection），
+许可：CC0 1.0 Universal（公有领域，可商用、可修改、可再分发，无需署名）
+  https://archive.org/details/Red_Library_Explosions
+  https://archive.org/details/Red_Library_Guns_Artillery
+  https://creativecommons.org/publicdomain/zero/1.0/
+
+剪辑（截取单发/单次爆炸、淡入淡出、峰值归一、单声道 32kHz 80kbps MP3）：
+  explo_l.mp3   ← R09-53 Huge Explosion           （地狱火/殉爆等大爆炸）
+  explo_m.mp3   ← R11-53 Explosive Blast          （火箭等中爆炸）
+  explo_s.mp3   ← R11-55 Large Blasts（第 1 声）   （机炮高爆弹等小爆炸）
+  explo_s2.mp3  ← R11-55 Large Blasts（第 2 声）
+  gun1-3.mp3    ← R12-33 Large Automatic Artillery（单发，3 个变体轮换）
+剪辑脚本：仓库外 /workspace/work/sfx/mk.py（Hark 沙盒）
