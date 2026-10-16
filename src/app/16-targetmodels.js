@@ -6,6 +6,7 @@
 // 提供：targetMat / addBox / makeTank|Truck|BarrelTarget / TARGET_TYPES /
 //       TARGET_MODELS / loadTargetModels / applyModelToTarget / mergeTargetStatics
 //       makeWreck / wreckEmber / scorchTexture（P5-G1 真实残骸）
+//       splitTurretGeo / wreckPop（Q3 坦克炮塔掀飞）
 // ============================================================
 
 // ---------- 靶标程序化建模 ----------
@@ -325,6 +326,9 @@ function makeWreck(t) {
   } else {
     // 车体：原模型可见网格 → 烧焦壳（倾斜 + 下沉）
     const hull = new THREE.Group();
+    const turret = new THREE.Group();
+    // Q3：约七成坦克殉爆时炮塔被掀飞（弹药舱殉爆的标志性画面）；种子随机，可复现
+    const popTurret = t.type === 'tank' && rnd() < 0.7;
     const inv = new THREE.Matrix4().copy(t.group.matrixWorld).invert();
     const cache = new Map();
     t.group.traverse(o => {
@@ -332,13 +336,30 @@ function makeWreck(t) {
       const srcMat = Array.isArray(o.material) ? o.material[0] : o.material;
       let cm = cache.get(srcMat);
       if (!cm) { cm = charMaterial(srcMat); cache.set(srcMat, cm); mats.push(cm); }
-      const m = new THREE.Mesh(o.geometry, cm);
-      m.userData.noDispose = true;               // 几何属于原车，复位后原车还要用
-      m.matrixAutoUpdate = false;
-      m.matrix.copy(inv).multiply(o.matrixWorld);
-      m.castShadow = true; m.receiveShadow = true;
-      hull.add(m);
+      const mtx = new THREE.Matrix4().copy(inv).multiply(o.matrixWorld);
+      // Q3 炮塔掀飞：坦克按高度把网格切成车体/炮塔两份（切分几何按源几何缓存复用）
+      const parts = popTurret ? splitTurretGeo(o.geometry, mtx) : null;
+      const add = (geo, parent) => {
+        const m = new THREE.Mesh(geo, cm);
+        m.userData.noDispose = true;             // 几何属于原车（或与原车共享顶点缓冲），复位时不释放
+        m.matrixAutoUpdate = false;
+        m.matrix.copy(mtx);
+        m.castShadow = true; m.receiveShadow = true;
+        parent.add(m);
+      };
+      if (!parts) add(o.geometry, hull);
+      else { if (parts.lo) add(parts.lo, hull); if (parts.hi) add(parts.hi, turret); }
     });
+    if (popTurret) {
+      // 炮塔绕自身中心转：把切下来的网格挂在以炮塔环为原点的子组里
+      turret.position.set(...TURRET_PIVOT);
+      const back = new THREE.Matrix4().makeTranslation(-TURRET_PIVOT[0], -TURRET_PIVOT[1], -TURRET_PIVOT[2]);
+      for (const m of turret.children) m.matrix.premultiply(back);
+      hull.add(turret);
+      const a = rnd(TAU), hv = rnd(0.6, 1.6);
+      g.userData.pop = { obj: turret, t: 0, vx: Math.cos(a) * hv, vz: Math.sin(a) * hv, vy: rnd(4.2, 5.6),
+        sx: rnd(-3, 3), sy: rnd(-4, 4), sz: rnd(-3, 3), land: false };
+    }
     hull.rotation.y = t.group.rotation.y;
     hull.scale.copy(t.group.scale);
     const tilt = new THREE.Group();
@@ -371,6 +392,70 @@ function makeWreck(t) {
   g.userData.charMats = mats;
   g.userData.ember0 = t.type === 'barrel' ? 1.1 : 0.85;
   return g;
+}
+// Q3 炮塔掀飞：按「连通块」切分——同一块零件（顶点相连，或位置重合的接缝顶点）
+// 整块归属，不切三角形（按高度切三角形会在车体上留下尖刺）。连通块最低点
+// 高于 TURRET_MIN_Y（车体局部坐标）的算炮塔（炮塔本体/炮管/观瞄等）。
+// 共享原几何顶点属性、只新建索引——零顶点复制；按源几何缓存，所有坦克复用。
+// 实测（T-80U GLB 车体局部）：车体 0.07~0.96、炮塔 0.76~1.10、炮管 0.88~1.03。
+const TURRET_MIN_Y = 0.74;
+const TURRET_PIVOT = [0, 0.9, 0.25];   // 炮塔转轴（车体局部；GLB 与兜底模型炮塔都在 z≈0.25）
+const _turretSplit = new Map();
+function splitTurretGeo(geo, mtx) {
+  if (_turretSplit.has(geo)) return _turretSplit.get(geo);
+  const pos = geo.attributes.position, n = pos.count;
+  const idx = geo.index ? geo.index.array : null;
+  const tri = idx ? idx.length : n;
+  const par = new Int32Array(n);
+  for (let i = 0; i < n; i++) par[i] = i;
+  const f = i => { while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; };
+  const seam = new Map();
+  for (let i = 0; i < n; i++) {
+    const k = Math.round(pos.getX(i) * 1e3) + ',' + Math.round(pos.getY(i) * 1e3) + ',' + Math.round(pos.getZ(i) * 1e3);
+    if (seam.has(k)) par[f(i)] = f(seam.get(k)); else seam.set(k, i);
+  }
+  for (let k = 0; k < tri; k += 3) {
+    const a = idx ? idx[k] : k;
+    par[f(idx ? idx[k + 1] : k + 1)] = f(a); par[f(idx ? idx[k + 2] : k + 2)] = f(a);
+  }
+  const e = mtx.elements, low = new Map();
+  for (let i = 0; i < n; i++) {
+    const y = e[1] * pos.getX(i) + e[5] * pos.getY(i) + e[9] * pos.getZ(i) + e[13];
+    const r = f(i); if (!(low.get(r) <= y)) low.set(r, y);
+  }
+  const lo = [], hi = [];
+  for (let k = 0; k < tri; k += 3) {
+    const a = idx ? idx[k] : k;
+    (low.get(f(a)) >= TURRET_MIN_Y ? hi : lo).push(a, idx ? idx[k + 1] : k + 1, idx ? idx[k + 2] : k + 2);
+  }
+  const mk = arr => {
+    if (!arr.length) return null;
+    const g2 = new THREE.BufferGeometry();
+    for (const k in geo.attributes) g2.setAttribute(k, geo.attributes[k]);
+    g2.setIndex(arr);
+    return g2;
+  };
+  const r = { lo: mk(lo), hi: mk(hi) };
+  _turretSplit.set(geo, r);
+  return r;
+}
+// 炮塔飞行：抛物线 + 翻滚，落地后歪斜停住（16-targets 残骸循环每帧调用）
+const POP_G = 4.3;             // 重力（u/s²；1u≈2.27m）
+function wreckPop(wreck, dt) {
+  const P = wreck.userData.pop;
+  if (!P || P.land) return;
+  const o = P.obj;
+  P.t += dt;
+  P.vy -= POP_G * dt;
+  o.position.x += P.vx * dt; o.position.z += P.vz * dt; o.position.y += P.vy * dt;
+  o.rotation.x += P.sx * dt; o.rotation.y += P.sy * dt; o.rotation.z += P.sz * dt;
+  if (P.vy < 0 && o.position.y <= 0.2) {
+    // 落地：贴地并压成侧翻姿态（不穿地即可，不做物理）
+    o.position.y = 0.2;
+    o.rotation.x = Math.max(-0.5, Math.min(0.5, o.rotation.x));
+    o.rotation.z = Math.max(-0.6, Math.min(0.6, o.rotation.z));
+    P.land = true;
+  }
 }
 // 余烬：燃烧剩余比例 → 自发光强度（越烧越暗，熄灭后归零）
 function wreckEmber(wreck, frac, flick) {
