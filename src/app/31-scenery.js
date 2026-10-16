@@ -71,7 +71,8 @@ const _scnWarm = new THREE.Color(1.12, 0.94, 0.80);
 
 function buildWorldScenery(W) {
   const scene = W.scene;
-  const S = { hills: null, trees: null, shore: null, apron: null, lamps: null, _key: '' };
+  const S = { hills: null, trees: null, shore: null, apron: null, lamps: null, _key: '',
+    blast: () => 0, updateTrees: () => {}, resetTrees: () => {} };   // 真实树线加载后替换
 
   // ---- 远山 ----
   {
@@ -196,7 +197,120 @@ function buildWorldScenery(W) {
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeBoundingSphere();
-    const Y0 = pos.filter((_, i) => i % 3 === 1);           // 平地时各顶点高度
+    // ---- 树木受爆炸影响（2026-10-16）：冲击波摇晃 / 近爆折倒 / 烧焦起火冒烟 ----
+    // 每棵树的 12 个顶点 = 树根 + 局部偏移；倾倒 = 绕树根、沿"背离爆心"方向旋转
+    const LOC = new Float32Array(NV * 3);
+    for (let i = 0; i < NV; i++) {
+      const T = trees[root[i]];
+      LOC[i * 3] = pos[i * 3] - T.x; LOC[i * 3 + 1] = pos[i * 3 + 1]; LOC[i * 3 + 2] = pos[i * 3 + 2] - T.z;
+    }
+    trees.forEach(T => { T.yoff = 0; T.lx = 1; T.lz = 0; T.ang = 0; T.fall = 0; T.fallV = 0; T.sway = 0; T.swayT = 0; T.burn = 0; T.fire = 0; T.char = 0; });
+    function _writeTree(ti) {
+      const T = trees[ti], a = T.fall + T.sway, c = Math.cos(a), sn = Math.sin(a), pa = pos;
+      const k = 1 - T.char;
+      for (let v = ti * 12; v < ti * 12 + 12; v++) {
+        const ox = LOC[v * 3], oy = LOC[v * 3 + 1], oz = LOC[v * 3 + 2];
+        const d = ox * T.lx + oz * T.lz, px = ox - d * T.lx, pz = oz - d * T.lz;   // 沿倒向分量 / 垂直分量
+        const d2 = d * c + oy * sn, y2 = -d * sn + oy * c;
+        pa[v * 3] = T.x + px + d2 * T.lx; pa[v * 3 + 1] = GROUND_Y + T.yoff + Math.max(y2, -0.05); pa[v * 3 + 2] = T.z + pz + d2 * T.lz;
+        // 烧焦：颜色压向炭黑
+        col[v * 3] = T.tint[0] * k + 0.16 * T.char; col[v * 3 + 1] = T.tint[1] * k + 0.13 * T.char; col[v * 3 + 2] = T.tint[2] * k + 0.11 * T.char;
+      }
+    }
+    const _active = new Set();
+    // 爆炸：tier 1 机炮击毁 / 2 火箭 / 3 地狱火（半径单位 u，1u≈2.27m）
+    S.blast = function (x, y, z, tier) {
+      if (y > 9) return 0;                               // 空中爆炸（打无人机/直升机）不波及树
+      if (!S.trees || S.trees.name !== 'scn-trees' || !S.trees.isMesh || S.trees.isInstancedMesh || !S.trees.visible) return 0;
+      const R = tier >= 3 ? [3.6, 6.5, 11] : tier <= 1 ? [0, 1.2, 3.5] : [2.2, 4.2, 7.5];   // 折倒 / 烧焦起火 / 摇晃
+      let n = 0;
+      for (let i = 0; i < trees.length; i++) {
+        const T = trees[i], dx = T.x - x, dz = T.z - z;
+        if (Math.abs(dx) > R[2] || Math.abs(dz) > R[2]) continue;
+        const d = Math.hypot(dx, dz);
+        if (d > R[2]) continue;
+        const L = d > 0.01 ? d : 1;
+        if (T.fall === 0) { T.lx = d > 0.01 ? dx / L : 1; T.lz = d > 0.01 ? dz / L : 0; }
+        if (d < R[0] && T.fall === 0) {                  // 折倒：先被推一下，再在重力下倒地
+          T.fallV = 0.6 + (1 - d / R[0]) * 1.4; T.fall = 0.001;
+        } else if (T.fall === 0) {                       // 摇晃：越近幅度越大
+          T.sway = Math.max(T.sway, (1 - d / R[2]) * (tier >= 3 ? 0.35 : 0.22)); T.swayT = 0;
+        }
+        if (d < R[1]) {                                  // 烧焦 + 起火（灌木/阔叶更易着）
+          T.char = Math.min(0.85, T.char + (1 - d / R[1]) * 0.9 + 0.25);
+          if (rnd() < 0.75) T.fire = Math.max(T.fire, 6 + rnd() * 8);
+          T.burn = Math.max(T.burn, 16 + rnd() * 10);
+        }
+        _active.add(i); n++;
+      }
+      return n;
+    };
+    // 火焰/烟：独立小池子，不占武器烟尘池
+    const _fx = [];
+    {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+      const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+      const tx = new THREE.CanvasTexture(cv);
+      for (let i = 0; i < 64; i++) {
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, transparent: true, depthWrite: false, opacity: 0 }));
+        sp.visible = false; sp.renderOrder = 6; scene.add(sp);
+        _fx.push({ sp, t: 0, life: 1, s0: 1, s1: 2, rise: 1, base: 1 });
+      }
+    }
+    function _emit(x, y, z, fire) {
+      for (const f of _fx) {
+        if (f.sp.visible) continue;
+        f.sp.visible = true; f.sp.position.set(x, y, z); f.t = 0;
+        const m = f.sp.material;
+        if (fire) { m.color.setHex(rnd() < 0.5 ? 0xff6a1c : 0xffa040); m.blending = THREE.AdditiveBlending; f.life = 0.5 + rnd() * 0.4; f.s0 = 1.0; f.s1 = 2.2; f.rise = 2.2; f.base = 1.0; }
+        else { m.color.setHex(0x34302b); m.blending = THREE.NormalBlending; f.life = 4 + rnd() * 2; f.s0 = 1.4; f.s1 = 6.5; f.rise = 1.6; f.base = 0.7; }
+        return;
+      }
+    }
+    S.updateTrees = function (dt) {
+      for (const f of _fx) {
+        if (!f.sp.visible) continue;
+        f.t += dt; const k = f.t / f.life;
+        if (k >= 1) { f.sp.visible = false; continue; }
+        f.sp.position.y += f.rise * dt;
+        f.sp.scale.setScalar(f.s0 + (f.s1 - f.s0) * k);
+        f.sp.material.opacity = f.base * (k < 0.15 ? k / 0.15 : 1 - (k - 0.15) / 0.85);
+      }
+      if (!_active.size) return;
+      let dirty = false;
+      for (const i of _active) {
+        const T = trees[i];
+        if (T.fall > 0 && T.fall < 1.45) {             // 倒下：角速度随倾角增大（重力），着地轻弹一下停住
+          T.fallV += Math.sin(T.fall + 0.15) * 3.2 * dt; T.fall = Math.min(1.45, T.fall + T.fallV * dt);
+          if (T.fall >= 1.45) T.fallV = 0;
+        }
+        if (T.sway > 0.002) { T.swayT += dt; T.sway *= Math.exp(-2.2 * dt); }
+        else T.sway = 0;
+        const sw = T.sway ? T.sway * Math.cos(T.swayT * 7) : 0;
+        const keep = T.sway; T.sway = sw; _writeTree(i); T.sway = keep;
+        dirty = true;
+        if (T.fire > 0) {
+          T.fire -= dt;
+          const top = T.fall > 0.6 ? 0.8 : T.h * 0.55;
+          if (rnd() < dt * 9) _emit(T.x + T.lx * (T.fall > 0.6 ? T.h * 0.4 : 0) + (rnd() - 0.5), GROUND_Y + T.yoff + top * rnd(0.3, 1), T.z + T.lz * (T.fall > 0.6 ? T.h * 0.4 : 0) + (rnd() - 0.5), true);
+        }
+        if (T.burn > 0) {
+          T.burn -= dt;
+          if (rnd() < dt * 2.2) _emit(T.x + (rnd() - 0.5), GROUND_Y + T.yoff + (T.fall > 0.6 ? 1 : T.h * 0.35), T.z + (rnd() - 0.5), false);
+        }
+        if (!(T.fall > 0 && T.fall < 1.45) && T.sway === 0 && T.fire <= 0 && T.burn <= 0) _active.delete(i);
+      }
+      if (dirty) { geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true; }
+    };
+    // 换场地/重开任务：树全部复原
+    S.resetTrees = function () {
+      trees.forEach((T, i) => { T.fall = T.fallV = T.sway = T.fire = T.burn = T.char = 0; _writeTree(i); });
+      _active.clear();
+      for (const f of _fx) f.sp.visible = false;
+      geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true;
+    };
     new THREE.TextureLoader().load('assets/scenery/trees.webp', (tex) => {
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 4;
@@ -211,10 +325,8 @@ function buildWorldScenery(W) {
       bb.frustumCulled = false;
       // 与兜底树同一接口：place(meadow) 让树落在草地坡面上
       bb.userData.place = (meadow) => {
-        const pa = geo.attributes.position;
-        const off = trees.map(T => meadow ? scnMeadowH(T.x, T.z) - 0.2 : 0);
-        for (let i = 0; i < NV; i++) pa.array[i * 3 + 1] = Y0[i] + GROUND_Y + off[root[i]];
-        pa.needsUpdate = true;
+        for (let i = 0; i < trees.length; i++) { trees[i].yoff = meadow ? scnMeadowH(trees[i].x, trees[i].z) - 0.2 : 0; _writeTree(i); }
+        geo.attributes.position.needsUpdate = true;
       };
       const old = S.trees;
       bb.visible = old.visible;
@@ -361,6 +473,7 @@ function buildWorldScenery(W) {
     const key = terrain + '|' + env + '|' + (mission ? 1 : 0);
     if (key === S._key) return false;
     S._key = key;
+    S.resetTrees();
     const P = ENV_PRESETS[env] || ENV_PRESETS.day;
     const studio = env === 'studio';
     S.hills.visible = !studio;
