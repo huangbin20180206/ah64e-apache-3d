@@ -576,6 +576,7 @@ function startMission(variant, levelIdx, levelId) {
   // 清任务相关状态：靶场/空中目标复位、武器瞬态清空、救援重生成、HUD/击毁计数清零
   if (targets) targets.reset();
   if (scenery) scenery.resetTrees();   // 上一关被炸倒/烧焦的树复原
+  if (rig && rig.clearImpacts) rig.clearImpacts();   // P5-G1 清弹坑/爆闪
   if (air) air.reset();
   if (samwar) samwar.reset();   // Phase 19：新任务清 SAM 状态（干扰弹补满/导弹清空/相位复位）
   if (damageSys) damageSys.reset();   // Phase 19：新任务清机务损伤（系统归零/卡壳过热处置全清）
