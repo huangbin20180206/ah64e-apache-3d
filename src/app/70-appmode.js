@@ -182,7 +182,9 @@ function setAppMode(m, opts) {
     else if (!S._mission) showLevelMap();
   }
   if (m === 'show' || m === 'play') {
-    if (panel && panel.classList.contains('hide') && window.innerWidth > 820) {
+    // Q1：触屏进游戏不自动展开面板——面板会盖住摇杆和 77-mobilefire 浮动操作键
+    const touchPlay = m === 'play' && typeof matchMedia === 'function' && matchMedia('(pointer:coarse)').matches;
+    if (panel && panel.classList.contains('hide') && window.innerWidth > 820 && !touchPlay) {
       panel.classList.remove('hide');
       const bp = UI('btn-panel');
       if (bp) { bp.classList.add('on'); bp.setAttribute('aria-expanded', 'true'); }
