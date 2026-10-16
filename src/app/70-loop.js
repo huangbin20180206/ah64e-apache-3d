@@ -200,6 +200,7 @@ function _frame(dt, doRender) {
 
     // 武器特效：机炮 / 地狱火 / 烟尘 / 起降尘环
     if (rig) rig.update(dt, W.camera, S.time, s);
+    if (scenery) scenery.updateTrees(dt);   // 树木受爆：摇晃/倒下/火与烟
     // 靶场：油桶殉爆 / 残骸燃烧烟柱
     _tickMissionMaps(dt);
     if (targets) targets.update(dt, apache.root.position, S._mission);   // P8：传 heliPos——否则反击/威胁/受损全链（aaActive）恒不触发
