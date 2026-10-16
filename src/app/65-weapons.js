@@ -260,6 +260,7 @@ class WeaponRig {
   // （倍率缩放爆闪与烟柱；地狱火级追加冲击波环 + 实体破片抛射）
   explosion(x, y, z, tier = 2) {
     if (this.onSfx) this.onSfx('explo', tier);
+    if (this.onBlast) this.onBlast(x, y, z, tier);   // 31-scenery：附近树木摇晃/折倒/起火
     const T = tier >= 3 ? 1.45 : tier <= 1 ? 0.55 : 1.0;
     // 三层爆闪
     this._puff(x, y, z, { color: 0xffffff, s0: 0.6 * T, s1: 2.6 * T, life: 0.18, base: 0.95, add: true });
