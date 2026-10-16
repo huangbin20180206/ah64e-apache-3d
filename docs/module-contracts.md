@@ -179,13 +179,18 @@
    "addBox",
    "applyModelToTarget",
    "loadTargetModels",
+   "makeWreck",
    "mergeTargetStatics",
-   "targetMat"
+   "scorchTexture",
+   "targetMat",
+   "wreckEmber"
   ],
   "depends": {
    "00-utils.js": [
     "PI",
-    "mergeGeos"
+    "TAU",
+    "mergeGeos",
+    "rnd"
    ]
   }
  },
@@ -206,20 +211,22 @@
    "01-host.js": [
     "HOST"
    ],
+   "05-config.js": [
+    "BASE_C"
+   ],
    "16-targetmodels.js": [
     "TARGET_TYPES",
     "applyModelToTarget",
     "loadTargetModels",
-    "mergeTargetStatics"
+    "makeWreck",
+    "mergeTargetStatics",
+    "wreckEmber"
    ],
    "16-targetscenery.js": [
     "buildRangeScenery"
    ],
    "31-scenery.js": [
     "buildScenery"
-   ],
-   "05-config.js": [
-    "BASE_C"
    ]
   }
  },
@@ -336,7 +343,8 @@
   ],
   "depends": {
    "00-utils.js": [
-    "mulberry32"
+    "mulberry32",
+    "rnd"
    ]
   }
  },
@@ -751,6 +759,12 @@
    "05-config.js": [
     "GUN",
     "ROCKET"
+   ],
+   "15-terrain.js": [
+    "duneFarH"
+   ],
+   "16-targetmodels.js": [
+    "scorchTexture"
    ]
   }
  },
@@ -884,12 +898,16 @@
  "70-combat.js": {
   "provides": [
    "_dmgApply",
+   "_hitFeedback",
    "_tickDamage",
    "_tickEnemyAir",
    "_tickResources",
    "_tickSamwar"
   ],
   "depends": {
+   "00-utils.js": [
+    "rnd"
+   ],
    "01-host.js": [
     "toast"
    ],
@@ -904,6 +922,7 @@
    ],
    "70-app.js": [
     "S",
+    "W",
     "_kills",
     "apache",
     "arcade",
@@ -1322,7 +1341,8 @@
     "buildViewBar"
    ],
    "70-combat.js": [
-    "_dmgApply"
+    "_dmgApply",
+    "_hitFeedback"
    ],
    "70-loop.js": [
     "loop"
