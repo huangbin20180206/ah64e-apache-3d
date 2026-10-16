@@ -219,6 +219,7 @@ function _frame(dt, doRender) {
     if (washfx) washfx.update(dt, s, FLY.alt, apache.root.position.x, apache.root.position.z, S.time);
     // 空中打击目标：机动 + 击落坠毁动画
     if (air) air.update(dt, S.time);
+    _tickNightOps(dt);   // P5-G3 热成像扫描 / 照明弹
     // P5-G2 敌方步兵：仅游戏关卡 + 基地靶场（非城镇/峡谷/训练/航线）出现，任务进行中才开火
     if (infantry) {
       const m = S._mission, cd = arcade && m ? arcade.coeffs(m) : null;
