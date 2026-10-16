@@ -71,7 +71,7 @@ const S = {
 // 46-fpview / 47-betty）经 HOST 取用，不再依赖"恰好此处先声明了同名 const"
 HOST.renderer = renderer; HOST.orbit = orbit; HOST.S = S;
 
-let apache = null, disc = null, discMat = null, shotPending = false, rig = null, targets = null, washfx = null, audio = null, refl = null, air = null, nlights = null, fp = null, rescue = null, dp = null, weather = null, music = null, narrative = null, arcade = null, samwar = null, samvis = null, damageSys = null, enemyAir = null, enemyVis = null, resources = null, campaign = null, progress = null, course = null;
+let apache = null, disc = null, discMat = null, shotPending = false, rig = null, targets = null, washfx = null, audio = null, refl = null, air = null, nlights = null, fp = null, rescue = null, dp = null, weather = null, music = null, narrative = null, arcade = null, samwar = null, samvis = null, damageSys = null, enemyAir = null, enemyVis = null, resources = null, campaign = null, progress = null, course = null, infantry = null;
 
 // 靶场 HUD：存活/击毁计数
 let _kills = 0;
