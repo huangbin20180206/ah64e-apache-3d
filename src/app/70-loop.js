@@ -219,6 +219,17 @@ function _frame(dt, doRender) {
     if (washfx) washfx.update(dt, s, FLY.alt, apache.root.position.x, apache.root.position.z, S.time);
     // 空中打击目标：机动 + 击落坠毁动画
     if (air) air.update(dt, S.time);
+    // P5-G2 敌方步兵：仅游戏关卡 + 基地靶场（非城镇/峡谷/训练/航线）出现，任务进行中才开火
+    if (infantry) {
+      const m = S._mission, cd = arcade && m ? arcade.coeffs(m) : null;
+      const IE = S._infEnv || (S._infEnv = { dt: 0, heli: null, alt: 0, can: false, fire: false, rate: 1, dmg: 1 });
+      IE.dt = dt; IE.heli = apache.root.position; IE.alt = FLY.alt;
+      IE.can = !!(m && (m.phase === 'active' || m.phase === 'briefing') && targets && targets.enabled && !targets.passive
+        && !(targets.town && targets.town.active) && !(targets.canyon && targets.canyon.active));
+      IE.fire = IE.can && m.phase === 'active';
+      IE.rate = cd ? cd.aaRate : 1; IE.dmg = cd ? cd.aaDmg : 1;
+      infantry.update(IE);
+    }
     // 机体指示灯：环境亮度淡入淡出 + 信标/频闪节拍（随引擎）
     if (nlights) nlights.searchTerrainMul = W.terrainKey === 'desert' ? 0.45 : 1;   // P4c 沙漠搜索灯过曝
     if (scenery && scenery.sync(W.terrainKey, S.env, S.mode === 'mission') && W.terrainKey === 'desert' && W.duneFar) {
