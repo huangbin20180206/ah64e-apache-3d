@@ -536,6 +536,7 @@ function bindUI() {
     get rescue() { return rescue; },
     get refl() { return refl; },
     get air() { return air; },
+    get infantry() { return infantry; },     // P5-G2：敌方步兵遥测
     get nl() { return nlights; },
     get fp() { return fp; },
     get weather() { return weather; },        // Phase 13-M4：天气遥测
