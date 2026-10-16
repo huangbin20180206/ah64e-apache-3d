@@ -36,6 +36,52 @@ function _dmgApply(delta, wx, wy, wz) {
   damageSys.applyHit({ dmg: delta, dir: { x: dx, y: dy, z: dz } });
 }
 
+// ---- P5-G1 受击反馈（2026-10-16）----
+// 被打中时：屏幕四周红色暗角闪一下 + 指向火力来向的红色弧形标记（绕屏幕中心，
+// 上=正前方）+ 机身溅几点火花。全部挂在 onHeliHit 一个入口（防空炮/导弹/敌机共用）。
+// DOM 由脚本动态建（不进模板，不占 DOM ID 契约）；CSS 动画自己淡出，无每帧开销。
+let _hitEl = null, _hitArc = null;
+const _hfV = new THREE.Vector3(), _hfF = new THREE.Vector3();
+function _hitFeedback(src) {
+  if (!_hitEl) {
+    const st = document.createElement('style');
+    st.textContent = '#p5-hitvig{position:fixed;inset:0;pointer-events:none;z-index:40;opacity:0;' +
+      'background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(170,0,0,.55) 100%)}' +
+      '#p5-hitvig.on{animation:p5hv .9s ease-out}' +
+      '#p5-hitarc{position:fixed;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:41;opacity:0}' +
+      '#p5-hitarc i{position:absolute;left:-90px;top:-200px;width:180px;height:50px;border-top:8px solid rgba(255,40,30,.9);' +
+      'border-radius:50% 50% 0 0/100% 100% 0 0;filter:drop-shadow(0 0 6px rgba(255,0,0,.8))}' +
+      '#p5-hitarc.on{animation:p5ha 1.6s ease-out}' +
+      '@keyframes p5hv{0%{opacity:1}100%{opacity:0}}@keyframes p5ha{0%,40%{opacity:1}100%{opacity:0}}';
+    document.head.appendChild(st);
+    _hitEl = document.createElement('div'); _hitEl.id = 'p5-hitvig';
+    _hitArc = document.createElement('div'); _hitArc.id = 'p5-hitarc'; _hitArc.appendChild(document.createElement('i'));
+    document.body.appendChild(_hitEl); document.body.appendChild(_hitArc);
+  }
+  const restart = (el) => { el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); };
+  restart(_hitEl);
+  if (apache && src && Number.isFinite(src.x)) {
+    const hp = apache.root.position;
+    _hfV.set(src.x - hp.x, 0, src.z - hp.z);
+    W.camera.getWorldDirection(_hfF); _hfF.y = 0;
+    if (_hfV.lengthSq() > 1e-4 && _hfF.lengthSq() > 1e-6) {
+      _hfV.normalize(); _hfF.normalize();
+      // 屏幕顺时针角：右侧为正（相机右向量 = forward × up 的反向）
+      const right = _hfF.z * _hfV.x - _hfF.x * _hfV.z;   // (f × v).y 的相反数
+      const ang = Math.atan2(-right, _hfF.x * _hfV.x + _hfF.z * _hfV.z);
+      _hitArc.style.transform = 'rotate(' + ang.toFixed(3) + 'rad)';
+      restart(_hitArc);
+    }
+  }
+  if (rig && apache) {
+    const hp = apache.root.position;
+    for (let i = 0; i < 4; i++) {
+      rig._puff(hp.x + (rnd() - 0.5) * 1.6, hp.y + 0.6 + rnd() * 0.8, hp.z + (rnd() - 0.5) * 1.6,
+        { color: 0xffd27a, s0: 0.08, s1: 0.35, life: 0.18, base: 0.9, add: true });
+    }
+  }
+}
+
 // 以下 _tick* 由 70-loop.js 的 loop() 在 if (apache) 段内按原顺序逐帧调用。
 function _tickSamwar(dt) {
   // Phase 19：SAM 威胁（纯逻辑）。组装 scratch 环境 → update → 消费事件；
