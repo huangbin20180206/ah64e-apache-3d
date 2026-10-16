@@ -1166,6 +1166,7 @@
     "resources",
     "rig",
     "samwar",
+    "scenery",
     "targets",
     "updateTargetHUD",
     "washfx"
@@ -1308,6 +1309,7 @@
     "rig",
     "samvis",
     "samwar",
+    "scenery",
     "targets",
     "updateTargetHUD",
     "washfx",
