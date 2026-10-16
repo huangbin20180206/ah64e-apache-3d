@@ -182,6 +182,8 @@ class Infantry {
     this._rpgWarned = false;
     this._tracers = [];
     this._rpgs = [];
+    // 自动化测试（webdriver）默认不出现，保老测试不被步兵挡子弹/打伤；截图脚本可置 allow=true
+    this.allow = !(typeof navigator !== 'undefined' && navigator.webdriver);
     this._layout();
     new THREE.GLTFLoader().load('assets/targets/survivor.glb', (g) => this._build(g), undefined, () => {});
   }
@@ -298,7 +300,7 @@ class Infantry {
 
   // 每帧：env = { dt, heli: Vector3, alt, can: 是否允许出现, fire: 是否允许开火, rate, dmg }
   update(env) {
-    const want = !!(this.ready && env.can);
+    const want = !!(this.ready && env.can && this.allow);
     if (want !== this.active) {
       this.active = want;
       for (const k in this.meshes) this.meshes[k].visible = want;
