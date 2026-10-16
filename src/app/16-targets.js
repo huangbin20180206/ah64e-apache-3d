@@ -568,6 +568,7 @@ class TargetRange {
     for (const t of this.targets) {
       if (t.alive || !(t.burn > 0) || !t.wreck) continue;
       t.burn -= dt;
+      wreckPop(t.wreck, dt);   // Q3 炮塔掀飞（无炮塔弹出的残骸直接返回）
       // P5-G1 余烬发光随燃烧衰减（熄灭时归零）
       wreckEmber(t.wreck, t.burn > 0 ? t.burn / (t.burn0 || 5) : 0, 0.8 + rnd() * 0.4);
       t._smk -= dt;
