@@ -37,12 +37,21 @@ function renderLevelMap() {
         : '<em class="b-star">' + _starStr(rec.stars) + '</em>';
       html += '<button class="' + cls + '" data-level="' + L.id + '"' + (open ? '' : ' aria-disabled="true"') + '>' +
         '<span class="lv-id">' + L.id + '</span><span class="lv-n">' + L.name + '</span>' + badge +
-        '<span class="lv-m">' + L.mech + (L.timeout ? ' · ' + Math.round(L.timeout / 60) + ' 分钟' : '') + '</span></button>';
+        '<span class="lv-m">' + L.mech + (L.timeout ? ' · ' + Math.round(L.timeout / 60) + ' 分钟' : '') + '</span>' +
+        // P5-G4：已通关显示本关最高分 / 最佳评级 / 三星条件提示
+        (open && L.ready && rec.clears > 0 ? '<span class="lv-best">最高 ' + (rec.bestScore || 0) + ' · 最佳 ' + (rec.bestGrade || '—') +
+          (rec.stars < 3 && L.stars ? ' · 3★需 ' + L.stars.three + ' 级' + (L.bonus && L.bonus.length ? '+' + L.bonus.map(b => b.label).join('、') : '') : '') + '</span>' : '') +
+        '</button>';
     }
     html += '</div>';
   }
   html += '</div><div class="lm-foot">上一关拿到 1 颗星即解锁下一关 · 评级达标 2 星 · 再完成附加目标 3 星</div>';
   box.innerHTML = html;
+  if (!document.getElementById('p5-lvbest-css')) {
+    const s = document.createElement('style'); s.id = 'p5-lvbest-css';
+    s.textContent = '.lm-lv .lv-best{display:block;grid-column:1/-1;font-size:11px;opacity:.72;margin-top:2px;color:var(--accent2,#ffd27a)}';
+    document.head.appendChild(s);
+  }
   for (const b of box.querySelectorAll('.lm-lv')) {
     b.onclick = () => {
       const id = b.dataset.level;
