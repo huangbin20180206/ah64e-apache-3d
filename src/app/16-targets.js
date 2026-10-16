@@ -286,27 +286,9 @@ class TargetRange {
     // 残骸燃烧时长：油桶（燃料）最久 > 卡车 > 装甲车
     t.burn = t.type === 'barrel' ? 16 : t.type === 'truck' ? 9 : 5;
     t._smk = 0;
-    // 焦黑残骸：扁平化的烧毁箱体
-    const wreckMat = new THREE.MeshStandardMaterial({ color: 0x181613, roughness: 0.95, metalness: 0.2 });
-    const wreck = new THREE.Group();
-    for (let i = 0; i < 4; i++) {
-      const b = new THREE.Mesh(
-        new THREE.BoxGeometry(rnd(0.3, 0.8), rnd(0.12, 0.35), rnd(0.3, 0.9)), wreckMat);
-      b.position.set(p.x + (rnd() - 0.5) * 1.4, 0.1 + rnd(0.12), p.z + (rnd() - 0.5) * 1.4);
-      b.rotation.y = rnd(TAU);
-      // PERF-AUDIT C3：残骸小件不投影——42u 外阴影不可辨（P10 细节件同款
-      // 结论），每残骸省 4 次 shadow pass draw
-      b.castShadow = false;
-      wreck.add(b);
-    }
-    // 烧蚀地面贴片
-    const scorch = new THREE.Mesh(
-      new THREE.CircleGeometry(1.5, 20),
-      new THREE.MeshBasicMaterial({ color: 0x0c0b09, transparent: true, opacity: 0.55, depthWrite: false }));
-    scorch.rotation.x = -PI / 2;
-    scorch.position.set(p.x, 0.012, p.z);
-    scorch.renderOrder = 2;
-    wreck.add(scorch);
+    // P5-G1 真实残骸：原车烧焦壳 + 碎片 + 焦痕（16-targetmodels makeWreck）
+    const wreck = makeWreck(t);
+    t.burn0 = t.burn;
     this.scene.add(wreck);
     t.wreck = wreck;
     if (this.onHit) this.onHit(t);
@@ -481,6 +463,8 @@ class TargetRange {
           // 的比较语义不变——受损分级/失败归因读同一累计值）
           this._heliDmg += (this._aaDmgMul || 1);
           this._threatHitFlash = 3;          // 高威胁持续 3s（HUD 红闪/音效反馈）
+          // P5-G1：记下火力来向（沿曳光反推 12u），供受击方向指示
+          this._lastHitFrom = tr.m.position.clone().addScaledVector(tr.dir, -12);
           if (this.onHeliHit) this.onHeliHit(this._heliDmg, tr.m.position);
         } else if (tr.t >= tr.life) {
           tr.m.visible = false;              // 未命中飞出寿命回收
@@ -582,6 +566,8 @@ class TargetRange {
     for (const t of this.targets) {
       if (t.alive || !(t.burn > 0) || !t.wreck) continue;
       t.burn -= dt;
+      // P5-G1 余烬发光随燃烧衰减（熄灭时归零）
+      wreckEmber(t.wreck, t.burn > 0 ? t.burn / (t.burn0 || 5) : 0, 0.8 + rnd() * 0.4);
       t._smk -= dt;
       if (t._smk > 0) continue;
       t._smk = 0.24;
