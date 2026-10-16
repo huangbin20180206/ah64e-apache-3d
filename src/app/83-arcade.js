@@ -144,7 +144,12 @@ class ArcadeModule {
     this._radarKilled = false;   // Phase 21：sead 判定源清零
     this._lastSeadBonus = 0;     // Phase 23：SEAD 结算奖励展示值清零
     this._comboExpire = -1;
+    this._killsBy = {}; this._killScore = 0;   // P5-G4 战报：按类型击毁数 / 击毁得分（不进 state()，见 stats()）
   }
+  // P5-G4 战报只读快照（结算面板用）
+  stats() { return { killsBy: Object.assign({}, this._killsBy || {}), killScore: this._killScore || 0 }; }
+  // P5-G4 额外奖励（步兵全歼等；不改 onMissionDone 既有公式）
+  addBonus(n) { n = Math.round(n || 0); this._score += n; return n; }
   // 击毁计分：typeKey = 目标 type 键（TARGET_SCORES 键表）；返回本次得分
   onKill(typeKey, m = null) {
     this._kills++;
@@ -162,6 +167,7 @@ class ArcadeModule {
     // 使用传入的任务难度 m (可能为 null) 来读取系数；若 m 为 null，则回退到当前选定难度
     const gain = Math.round(base * this.coeffs(m).scoreMul * comboMul);
     this._score += gain;
+    if (this._killsBy) { this._killsBy[typeKey] = (this._killsBy[typeKey] || 0) + 1; this._killScore += gain; }
     if (this._combo > this._comboMax) this._comboMax = this._combo;
     this._grantImmediate();          // S2：击杀类成就（首杀/连击/清场）即时 toast
     return gain;
