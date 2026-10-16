@@ -1,5 +1,10 @@
 # Standing operating procedures (WSL)
 
+## Escalation（拿不准就停）
+- 出错/口径不明/要密码要确认时：停下来，贴原文+中文解释+选项问人，不擅自往下走。
+- 网页视觉问题：生成截图文件（如 `shot_*.jpg`）留档，由人在 Windows 侧双击验收。
+  Agent 无屏幕，看不到图形界面，不承诺截图确认。
+
 ## Web search (in order, stop at first that works)
 1. Built-in `websearch` tool.
 2. `tools/tinyfish-search.sh "query" [news|web]` — FREE (12k/day). Prefer over paid APIs.
@@ -7,8 +12,7 @@
 4. `webfetch` / `firecrawl scrape` for page content. Keys live in `~/.search_env`
    (auto-sourced by scripts); never print key values, only lengths/hashes.
 
-## Merge gate（完工三件套，全绿才算完）
-1. `node build.mjs` 通过（含 UI id 契约检查）。
+## Merge gate（完工三件套，全绿才算完）1. `node build.mjs` 通过（含 UI id 契约检查）。
 2. `node --check dist/app-check.mjs` 语法体检通过。
 3. 页面截图验证（起飞/开火/改动点），截图留档。
 4. 动了 `src/app/` 必须跑 `tools/tests` 浏览器回归。
