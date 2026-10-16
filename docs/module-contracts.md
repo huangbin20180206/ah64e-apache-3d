@@ -1414,6 +1414,8 @@
  },
  "72-uibind.js": {
   "provides": [
+   "actChaff",
+   "actHoist",
    "bindUI",
    "enhanceA11y"
   ],
@@ -1520,6 +1522,23 @@
    ]
   }
  },
+ "73-coach.js": {
+  "provides": [],
+  "depends": {
+   "01-host.js": [
+    "HOST"
+   ],
+   "45-flight.js": [
+    "FLY"
+   ],
+   "70-app.js": [
+    "S",
+    "course",
+    "rescue",
+    "targets"
+   ]
+  }
+ },
  "74-tour.js": {
   "provides": [
    "clickEnv",
@@ -1610,6 +1629,28 @@
    ],
    "46-fpview.js": [
     "keys"
+   ]
+  }
+ },
+ "77-mobilefire.js": {
+  "provides": [],
+  "depends": {
+   "01-host.js": [
+    "UI",
+    "toast"
+   ],
+   "70-app.js": [
+    "fp",
+    "rig"
+   ],
+   "70-nightops.js": [
+    "NIGHT",
+    "launchFlare",
+    "setFlir"
+   ],
+   "72-uibind.js": [
+    "actChaff",
+    "actHoist"
    ]
   }
  },
@@ -2081,6 +2122,12 @@
 - **依赖**: 70-app.js（LABELS, S, W, _kills, air, apache, applyQuality, audio, beginMission, buildLabels, canvas, composer, fp, hideLabelInfo, labelBox, nlights, orbit, refl, renderer, rescue, retryMission, rig, setView, shotPending, startMission, syncFlyText, targets, updateLabels, updateMissionPanel, updateTargetHUD, washfx）；32-envpreset.js（applyPreset）；47-betty.js（betty）；45-flight.js（FLY, flyUpdate）；01-host.js（HOST, UI, toast）；46-fpview.js（keys）；15-terrain.js（TERRAINS）；50-controls.js（VIEWS）
 - **调用时机**: UI 绑定与事件路由：70-app finish 经 HOST.bindUI() 调用；尾部注册 HOST.bindUI 供其取用。P6 新增三模式 chip（show/train/mission）+ 开始/重试任务按钮；resetRange 统一靶场/空中目标/救援/任务/瞬态全清理（键盘 B 与按钮同语义）。Phase 11：训练引导入口（setMode train 分支启动 S._train、Esc/点击画面跳过、拖拽环绕=第③步观察完成）；模式/变体 chip aria-pressed（enhanceA11y 扩展 data-mode/data-variant）；变体 chip 方向键切换（#mission-variants keydown）；__dbg 暴露 setMissionVariant。
 
+## 73-coach.js
+
+- **提供**: levelCoachTip（经 HOST.coachTip 注册）
+- **依赖**: 01-host.js（HOST）；45-flight.js（FLY）；70-app.js（S, course, targets, rescue）
+- **调用时机**: Q1 训练关实时教练：70-hud 上下文提示条刷新时经 HOST.coachTip() 取一句「第 n 步」提示（仅 S.mode==='mission' 且变体 train_flight/train_weapons/train_hellfire/train_rescue 且 phase==='active'）；非空时覆盖通用提示并清掉首访引导 S._guide；触屏（pointer:coarse）用 77-mobilefire 按钮名替换按键名。零状态机，全部读既有状态源。
+
 ## 74-tour.js
 
 - **提供**: clickEnv, clickTerrain, syncTourCtl, tour, tourCap, tourGo, tourKey, tourNext, tourStart, tourSteps, tourStop, tourTick, tourTogglePause
@@ -2092,6 +2139,12 @@
 - **提供**: MobileSticks, mobileSticks
 - **依赖**: 00-utils.js（clamp）；01-host.js（UI）；45-flight.js（FLY）；46-fpview.js（keys）
 - **调用时机**: P4-A 移动端虚拟驾驶摇杆（环绕模式）：构造于脚本求值期（DOM 已就绪，静态绑定 Pointer Events）；左摇杆写 keys 表 arrowup/down/left/right（与键盘方向键同通路）、右摇杆 X 写 keys a/d（与 A/D 蹬舵同通路）、Y 事件驱动写 FLY.userAlt（仅 hover 且非 fp）；FPV 态经 body.fp-mode 由 CSS 隐藏（FPV 内由 #fp-touch 接管）；启旋/起降/FPV/武器复用面板按钮，本模块零新增按钮；遥测经 __dbg.mobile 供测试读取（250ms 轮询挂上后自清）。
+
+## 77-mobilefire.js
+
+- **提供**: MobileFire, mobileFire
+- **依赖**: 01-host.js（UI, toast）；70-app.js（rig, fp）；70-nightops.js（NIGHT, setFlir, launchFlare）；72-uibind.js（actHoist, actChaff）
+- **调用时机**: Q1 触屏浮动操作键 #mfire（3×3：启旋/起降/热成像/机炮/火箭/地狱火/绞车/干扰弹/照明弹）：构造于脚本求值期；仅 pointer:coarse 显示，面板打开时由 CSS 让位，第一人称下保留；机炮/火箭按住期间写 rig.gunOn/rocketOn，pointerup/cancel/lostpointercapture/blur/页面隐藏即释放；启旋/起降复用 #btn-start/#btn-fly 点击；遥测经 __dbg.mobileFire。
 
 ## 79-weather.js
 
