@@ -199,7 +199,7 @@ function _frame(dt, doRender) {
     W.csMat.opacity = 0.75 * (1 - smoothstep(1.2, 4.5, FLY.alt));
 
     // 武器特效：机炮 / 地狱火 / 烟尘 / 起降尘环
-    if (rig) rig.update(dt, W.camera, S.time, s);
+    if (rig) { rig.terrainKey = W.terrainKey; rig.update(dt, W.camera, S.time, s); }
     if (scenery) scenery.updateTrees(dt);   // 树木受爆：摇晃/倒下/火与烟
     // 靶场：油桶殉爆 / 残骸燃烧烟柱
     _tickMissionMaps(dt);
