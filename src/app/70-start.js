@@ -139,6 +139,9 @@ function finish() {
     if (rig) rig._dmgPenalty = Math.min(0.5, dmg * 0.06)   // 散布惩罚：每伤 0.06，上限 +50%
       + (damageSys ? damageSys.fx().spreadAdd : 0);   // Phase 19：武器系统散布追加（事件驱动，保 D2 断言语义）
     if (audio) audio.playSfx('hit');
+    // P5-G1 受击反馈：红色暗角 + 来向弧标 + 火花（来向优先用曳光反推点）
+    _hitFeedback(targets._lastHitFrom || hitPos);
+    targets._lastHitFrom = null;
     // Phase 19：命中方位 → 四子系统确定性分配（86-damage 纯逻辑）
     _dmgApply(dmg, hitPos ? hitPos.x : null, hitPos ? hitPos.y : null, hitPos ? hitPos.z : null);
   };
