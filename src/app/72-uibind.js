@@ -453,6 +453,8 @@ function bindUI() {
         else toast(damageSys.abCool > 0 ? '航电重启冷却中…' : '重启进行中…'); }
     }
     else if (key === 'b') { resetRange(); }
+    else if (key === 'o') setFlir(!NIGHT.flir);          // P5-G3 热成像
+    else if (key === 'y') launchFlare();                // P5-G3 照明弹
     else if (key === 'g') { if (rig) rig.gunOn = true; }
     else if (key === 'x') { if (rig) rig.rocketOn = true; }
   });
