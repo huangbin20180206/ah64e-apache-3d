@@ -1,0 +1,4 @@
+trees.webp — 远景树线贴图图集（8 种：冷杉一对 / 云杉 ×2 / 松 / 阔叶树 / 蓝花楹 / 橄榄型老树 / 灌木丛）
+来源：Poly Haven（https://polyhaven.com）以下资产的官方渲染图，裁剪拼合为 2048×1024 图集：
+  fir_tree_01, fir_sapling_medium, pine_sapling_medium, tree_small_02, jacaranda_tree, island_tree_01, searsia_lucida
+许可：CC0 1.0（Poly Haven 全部内容为 CC0，可商用，无需署名）。https://polyhaven.com/license
