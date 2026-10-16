@@ -179,7 +179,7 @@ function showMissionBriefing() {
   renderBriefing();
   mp.classList.add('show');
 }
-// Phase 20-D：战役关卡 chips（5 关解锁链；动态渲染照 renderVariantChips
+// Phase 20-D：战役关卡 chips（旧战役 6 关解锁链，见 90-campaign CAMPAIGN_LEVELS；动态渲染照 renderVariantChips
 // 先例自补可访问性——enhanceA11y 静态扫描覆盖不到动态 DOM）。选中关卡经
 // startCampaign 快照难度进入对应变体；锁定关卡 disabled+锁标（前关达 B 解锁）。
 function renderCampaignChips() {
