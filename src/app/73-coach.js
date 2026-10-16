@@ -11,7 +11,8 @@
 // 判定全部读既有状态源（S / FLY / course / targets / rescue）。
 // 触屏设备（pointer:coarse）把按键名换成屏幕按钮名（与 77-mobilefire
 // 浮动按钮的文字一致），摇杆说法替换方向键说法。
-// 只在 S.mode==='mission' 且变体为 train_* 时生效；其余模式返回 ''。
+// 只在 S.mode==='mission' 时生效：train_* 给分步教练；其余关卡（有 levelId）
+// 给通用操作速查（Q2）；展示/旧全功能模式返回 ''。
 // ============================================================
 
 const _coachTouch = (typeof matchMedia === 'function') && matchMedia('(pointer:coarse)').matches;
@@ -32,8 +33,20 @@ function _coachAlive(type) {
 function levelCoachTip() {
   if (S.mode !== 'mission' || !S._mission || S._mission.phase !== 'active') return '';
   const v = S._mission.variant;
-  if (v !== 'train_flight' && v !== 'train_weapons' && v !== 'train_hellfire' && v !== 'train_rescue') return '';
   const K = _CK;
+  const train = v === 'train_flight' || v === 'train_weapons' || v === 'train_hellfire' || v === 'train_rescue';
+  if (!train) {
+    // Q2：作战关（2-1 起）只给通用操作速查，替换展示模式的「切场地与环境」说法
+    if (!S._mission.levelId) return '';
+    if (FLY.state === 'ground' && !S.running) return '按 ' + K.start + ' 启动旋翼';
+    if (FLY.state === 'ground' && S.spin < FLY.MIN_SPIN) return '旋翼加速中…转速 92% 后按 ' + K.fly + ' 起飞';
+    if (FLY.state === 'ground') return '按 ' + K.fly + ' 起飞';
+    if (FLY.state !== 'hover') return '';
+    const chaff = (v === 'sead_strike' || v === 'finale' || v === 'canyon_run') ? (_coachTouch ? ' ·「干扰弹」躲导弹' : ' · J 干扰弹') : '';
+    return _coachTouch
+      ? '按住「机炮」「火箭」开火 ·「地狱火」打坦克' + chaff
+      : 'G/左键 机炮 · X 火箭 · F 地狱火' + chaff + ' · C 第一人称 · ' + K.fly + ' 降落';
+  }
   // 共用起步两步：启动旋翼 → 起飞
   if (FLY.state === 'ground' && !S.running) return '第 1 步：按 ' + K.start + ' 启动旋翼';
   if (FLY.state === 'ground' && S.spin < FLY.MIN_SPIN) return '旋翼加速中…等转速到 92%';
