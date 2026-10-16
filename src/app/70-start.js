@@ -135,12 +135,26 @@ function finish() {
     killFeed(label);
     if (arcade && S._mission && S._mission.phase === 'active') arcade.onKill('infantry', S._mission);
   };
-  rig.onInfantryHit = (p) => infantry.bulletHit(p);
+  rig.onInfantryHit = (p) => {
+    const h = infantry.bulletHit(p);
+    const m = S._mission;
+    if (h && m && !m.done) { const hb = m.hitsBy || (m.hitsBy = { 1: 0, 2: 0, 3: 0 }); hb[1]++; m.infHits = (m.infHits || 0) + 1; }   // P5-G4：步兵命中只进分武器统计，不改命中率口径
+    return h;
+  };
   rig.onBlast = (x, y, z, t) => { scenery.blast(x, y, z, t); infantry.blast(x, y, z, t); };   // 爆炸波及远景树（31-scenery）+ 步兵
   rig.onTreeHit = (p, d) => scenery.bulletHit(p, d);         // 机炮打树：飞叶/打断
   rig.onHitMark = () => hitMark();
   targets.onSfx = rig.onSfx;
-  targets.onHitFx = () => { rig.onHitMark(); if (S._mission && !S._mission.done) S._mission.hits++; };
+  targets.onHitFx = () => {
+    rig.onHitMark();
+    const m = S._mission;
+    if (m && !m.done) {
+      m.hits++;
+      const hb = m.hitsBy || (m.hitsBy = { 1: 0, 2: 0, 3: 0 });   // P5-G4 战报：分武器命中
+      const pw = targets._hitPow >= 3 ? 3 : targets._hitPow === 2 ? 2 : 1;
+      hb[pw]++;
+    }
+  };
   // P8：机体受击反馈——损伤分级 toast + 受损后果（散布惩罚/武器卡壳）在此派生
   targets.onHeliHit = (dmg, hitPos) => {
     toast(`机体受损（Lv.${Math.min(3, Math.ceil(dmg / 4))}）——注意规避反击`);
@@ -149,6 +163,7 @@ function finish() {
     if (audio) audio.playSfx('hit');
     // P5-G1 受击反馈：红色暗角 + 来向弧标 + 火花（来向优先用曳光反推点）
     _hitFeedback(targets._lastHitFrom || hitPos);
+    if (S._mission && !S._mission.done) S._mission.hitsTaken = (S._mission.hitsTaken || 0) + 1;   // P5-G4 战报：中弹次数
     targets._lastHitFrom = null;
     // Phase 19：命中方位 → 四子系统确定性分配（86-damage 纯逻辑）
     _dmgApply(dmg, hitPos ? hitPos.x : null, hitPos ? hitPos.y : null, hitPos ? hitPos.z : null);
