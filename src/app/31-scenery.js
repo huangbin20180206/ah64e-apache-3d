@@ -3,7 +3,7 @@
 // ============================================================
 // 设计文档 §4.4。全部为静态合并几何，按场地/时段切显隐与配色：
 //   hills  远山剪影环（两层，近深远浅；山脚混入地平线色 = 高度雾感）  1 draw，棚拍隐藏
-//   trees  远景树线（InstancedMesh，半径 96~170）                     1 draw，停机坪/草地/湖面
+//   trees  远景树线（CC0 树木图集十字面片 8 种 1360 棵，半径 90~170；贴图未到前为锥形兜底）1 draw，停机坪/草地/湖面
 //   shore  湖岸（沙滩 → 草地，半径 92~620，把无边水面收成湖）          1 draw，仅湖面
 //   meadow 草地远景起伏（r 85~330，共用远景材质）                   1 draw，仅草地（P4d）
 //   padGrass 停机坪外缘向草地过渡（r 40→75 渐显）                    1 draw，仅停机坪（P4d）
@@ -137,6 +137,93 @@ function buildWorldScenery(W) {
     im.frustumCulled = false;
     scene.add(im);
     S.trees = im;
+  }
+
+  // ---- 真实树线（2026-10-16）：Poly Haven CC0 树木渲染图做"十字交叉面片"（每棵 3 片 60° 交叉），
+  // 8 种树：冷杉/云杉/松（针叶林成片）+ 阔叶树/蓝花楹/老橄榄树（阔叶林成片）+ 林缘灌木。
+  // 全部合并成一个网格（1 次绘制）；贴图加载成功即替换上面的锥形兜底树，失败则保留兜底。
+  {
+    // 图集单元：[u0, v0, u1, v1, 宽高比]（assets/scenery/trees.webp，2048×1024，4×2 格，底对齐）
+    const CELLS = [[0.0459, 0.5, 0.2041, 0.9961, 0.638], [0.3037, 0.5, 0.4458, 0.9961, 0.573],
+      [0.5586, 0.5, 0.6909, 0.9961, 0.533], [0.8179, 0.5, 0.9321, 0.9961, 0.461],
+      [0.041, 0.0, 0.209, 0.4961, 0.677], [0.252, 0.0, 0.498, 0.3701, 1.33],
+      [0.5093, 0.0, 0.7402, 0.4961, 0.931], [0.752, 0.0, 0.998, 0.3193, 1.541]];
+    // 树种：[图集格, 高度下限, 高度上限（u，1u≈2.27m）]
+    const CONIFER = [[0, 9, 12.5, 0.5], [1, 6, 9, 0.17], [2, 6, 8.5, 0.17], [3, 7, 10, 0.16]];   // 冷杉 20~28m 等
+    const BROAD = [[4, 4.5, 7, 0.4], [5, 4, 6, 0.3], [6, 4, 6.5, 0.3]];                       // 阔叶 9~16m
+    let seed = 11;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const pick = (L) => { let r = rnd(), i = 0; for (; i < L.length - 1; i++) { r -= L[i][3]; if (r <= 0) break; } return L[i]; };
+    const trees = [];   // {x, z, cell, h, rot, tint:[r,g,b]}
+    for (let i = 0; i < 1250; i++) {
+      const a = rnd() * Math.PI * 2, r = 96 + Math.pow(rnd(), 0.7) * 74;
+      // 林分：按方位角起伏分出针叶林片区和阔叶林片区（不是均匀撒混）
+      const stand = 0.5 + 0.5 * Math.sin(a * 5 + 1.3) * Math.cos(a * 2.1 + 0.4);
+      const con = rnd() < 0.15 + 0.7 * stand;
+      const sp = pick(con ? CONIFER : BROAD);
+      const h = sp[1] + rnd() * (sp[2] - sp[1]);
+      const k = 0.78 + rnd() * 0.3;                         // 明暗
+      const tint = con ? [k * 0.95, k, k * 0.95] : [k * (1 + rnd() * 0.12), k * (1 + rnd() * 0.05), k * (0.82 + rnd() * 0.12)];
+      trees.push({ x: Math.sin(a) * r, z: Math.cos(a) * r, cell: sp[0], h, rot: rnd() * Math.PI, tint });
+    }
+    for (let i = 0; i < 110; i++) {                         // 林缘灌木（内圈 90~100）
+      const a = rnd() * Math.PI * 2, r = 90 + rnd() * 10, k = 1.0 + rnd() * 0.25;
+      trees.push({ x: Math.sin(a) * r, z: Math.cos(a) * r, cell: 7, h: 1.4 + rnd() * 1.2, rot: rnd() * Math.PI, tint: [k, k, k * 0.9] });
+    }
+    const NV = trees.length * 12;
+    const pos = new Float32Array(NV * 3), nor = new Float32Array(NV * 3), uv = new Float32Array(NV * 2),
+      col = new Float32Array(NV * 3), idx = new Uint32Array(trees.length * 18), root = new Uint16Array(NV);
+    let v = 0, t = 0;
+    trees.forEach((T, ti) => {
+      const C = CELLS[T.cell], w = T.h * C[4] / 2;
+      for (let q = 0; q < 3; q++) {
+        const ang = T.rot + q * Math.PI / 3, dx = Math.cos(ang) * w, dz = Math.sin(ang) * w;
+        const base = v;
+        [[-1, 0, C[0], C[1]], [1, 0, C[2], C[1]], [1, 1, C[2], C[3]], [-1, 1, C[0], C[3]]].forEach(([sx, sy, u, vv]) => {
+          pos[v * 3] = T.x + dx * sx; pos[v * 3 + 1] = sy * T.h - (T.cell === 7 ? 0.1 : 0.05); pos[v * 3 + 2] = T.z + dz * sx;
+          nor[v * 3 + 1] = 1;                               // 法线朝上：任何角度看过去明暗一致，不会侧面发黑
+          uv[v * 2] = u; uv[v * 2 + 1] = vv;
+          col[v * 3] = T.tint[0]; col[v * 3 + 1] = T.tint[1]; col[v * 3 + 2] = T.tint[2];
+          root[v] = ti; v++;
+        });
+        idx.set([base, base + 1, base + 2, base, base + 2, base + 3], t); t += 6;
+      }
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.computeBoundingSphere();
+    const Y0 = pos.filter((_, i) => i % 3 === 1);           // 平地时各顶点高度
+    new THREE.TextureLoader().load('assets/scenery/trees.webp', (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 4;
+      const mat = new THREE.MeshLambertMaterial({ map: tex, vertexColors: true, alphaTest: 0.4, side: THREE.DoubleSide });
+      // 双面材质默认把背面法线翻到朝下 → 一半面片发黑；这里去掉翻转，正反面同样受光
+      mat.onBeforeCompile = (sh) => {
+        sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>',
+          THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', ''));
+      };
+      const bb = new THREE.Mesh(geo, mat);
+      bb.name = 'scn-trees';
+      bb.frustumCulled = false;
+      // 与兜底树同一接口：place(meadow) 让树落在草地坡面上
+      bb.userData.place = (meadow) => {
+        const pa = geo.attributes.position;
+        const off = trees.map(T => meadow ? scnMeadowH(T.x, T.z) - 0.2 : 0);
+        for (let i = 0; i < NV; i++) pa.array[i * 3 + 1] = Y0[i] + GROUND_Y + off[root[i]];
+        pa.needsUpdate = true;
+      };
+      const old = S.trees;
+      bb.visible = old.visible;
+      mat.color.copy(old.material.color);
+      bb.userData.place(!!S._treesMeadow);
+      scene.remove(old);
+      scene.add(bb);
+      S.trees = bb;
+    });
   }
 
   // ---- 湖岸（沙滩 → 草地；只在湖面显示） ----
