@@ -45,6 +45,14 @@ function enhanceA11y() {
   }
 }
 
+// Q1：绞车 / 干扰弹动作——键盘 K / J 与 77-mobilefire 触屏键共用
+function actHoist() { if (rescue && apache) rescue.toggle(apache.root.position); }
+function actChaff() {
+  if (!samwar) return;
+  if (samwar.dispenseFlare()) toast('干扰弹投放——剩余 ' + samwar.flares + ' 发');
+  else toast(samwar.flares > 0 ? '干扰弹冷却中…' : '干扰弹已耗尽');
+}
+
 function bindUI() {
   const btnStart = UI('btn-start');
   // P6：三模式定位（展示/训练/任务）+ 任务入口
@@ -428,15 +436,10 @@ function bindUI() {
     else if (key === 'h') toggleHint();
     else if (key === 'a' && !fpOn) toggleArcade();   // P18：成就面板（FP 中 A=左转向，让位）
     else if (key === 'f') { if (rig && !rig.launchHf()) toast('地狱火已打完或未挂载，按 V 装填'); }
-    else if (key === 'k') { if (rescue && apache) rescue.toggle(apache.root.position); }
+    else if (key === 'k') actHoist();                    // 与 77-mobilefire 触屏键同一份逻辑
     else if (key === 'v') { if (rig) { rig.reload(UI('chk-hellfire').checked); toast('弹药已装填'); } }
     // Phase 19：J 投放干扰弹（一次性操作，repeat 守卫已拦长按连发）
-    else if (key === 'j') {
-      if (samwar) {
-        if (samwar.dispenseFlare()) toast('干扰弹投放——剩余 ' + samwar.flares + ' 发');
-        else toast(samwar.flares > 0 ? '干扰弹冷却中…' : '干扰弹已耗尽');
-      }
-    }
+    else if (key === 'j') actChaff();                    // 与 77-mobilefire 触屏键同一份逻辑
     // Phase 19 机务处置：U 引擎降功率（持续开关）/ N 武器重新上膛 /
     // I 航电重启（一次性；hudFail 窗口中提示条不可见——信息战语义）
     else if (key === 'u') {
