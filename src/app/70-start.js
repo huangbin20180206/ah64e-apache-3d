@@ -129,6 +129,7 @@ function finish() {
   // 打击反馈闭环：音效回调 + 命中标记 + 击杀确认（统一计数+信息流）
   rig.onSfx = (t, p) => audio.playSfx(t, p);
   rig.onBlast = (x, y, z, t) => scenery.blast(x, y, z, t);   // 爆炸波及远景树（31-scenery）
+  rig.onTreeHit = (p, d) => scenery.bulletHit(p, d);         // 机炮打树：飞叶/打断
   rig.onHitMark = () => hitMark();
   targets.onSfx = rig.onSfx;
   targets.onHitFx = () => { rig.onHitMark(); if (S._mission && !S._mission.done) S._mission.hits++; };
