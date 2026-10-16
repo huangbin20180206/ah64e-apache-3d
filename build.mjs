@@ -167,6 +167,15 @@ for (const f of fs.readdirSync(path.join(ROOT, 'assets', 'audio'))) {
     _audioN++;
   }
 }
+// P5-G1：真实录音武器音效（CC0，assets/audio/sfx/*.mp3 + LICENSE.txt）
+fs.mkdirSync(path.join(DIST, 'assets', 'audio', 'sfx'), { recursive: true });
+let _sfxN = 0;
+for (const f of fs.readdirSync(path.join(ROOT, 'assets', 'audio', 'sfx'))) {
+  if (f.endsWith('.mp3') || f.endsWith('.txt')) {
+    fs.copyFileSync(path.join(ROOT, 'assets', 'audio', 'sfx', f), path.join(DIST, 'assets', 'audio', 'sfx', f));
+    if (f.endsWith('.mp3')) _sfxN++;
+  }
+}
 // AI 生成的高质量靶标模型（FBX 原始产物体积大，不入库不复制）
 fs.mkdirSync(path.join(DIST, 'assets', 'targets'), { recursive: true });
 let _tgtN = 0;
@@ -199,4 +208,4 @@ console.log('dist/index.html  ' + kb(Buffer.byteLength(html)));
 console.log('  three          ' + kb(Buffer.byteLength(three.js)));
 console.log('  loader         ' + kb(Buffer.byteLength(loaderJs)) + '（解构 ' + needs.length + ' 个符号）');
 console.log('  app            ' + kb(Buffer.byteLength(appJs)));
-console.log('dist/assets/     apache_v2.glb + skin_army.jpg + targets/' + _tgtN + ' glb + details/' + _detN + ' glb + audio/' + _audioN + ' wav + scenery/trees.webp');
+console.log('dist/assets/     apache_v2.glb + skin_army.jpg + targets/' + _tgtN + ' glb + details/' + _detN + ' glb + audio/' + _audioN + ' wav + sfx/' + _sfxN + ' mp3 + scenery/trees.webp');
