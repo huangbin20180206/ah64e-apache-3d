@@ -18,7 +18,7 @@ const out = M.ROUTES.map(r => {
     const p = M.routeSample(r, t), v = M.routeVel(r, t);
     maxSp = Math.max(maxSp, Math.hypot(v.vx, v.vz));
     minAlt = Math.min(minAlt, p.alt);
-    maxAbs = Math.max(maxAbs, Math.abs(p.x), Math.abs(p.z - (r.scene === 'town' ? 40 : 0)));
+    maxAbs = Math.max(maxAbs, Math.abs(p.x), Math.abs(p.z));   // 世界坐标（城镇航线在基地以北，见 test_routes 分档上限）
     if (r.id === 'canyon' && t >= 3 && t <= r.pts[r.pts.length - 3][0]) {
       let d = 1e9;
       for (let i = 1; i < M.CANYON_PATH.length; i++) d = Math.min(d, segDist(p.x, p.z, M.CANYON_PATH[i - 1], M.CANYON_PATH[i]));
