@@ -5,6 +5,7 @@
 // 拓扑检查里同级；文件名按字典序排在 16-targets.js 之前（"m" < "s"）。
 // 提供：targetMat / addBox / makeTank|Truck|BarrelTarget / TARGET_TYPES /
 //       TARGET_MODELS / loadTargetModels / applyModelToTarget / mergeTargetStatics
+//       makeWreck / wreckEmber / scorchTexture（P5-G1 真实残骸）
 // ============================================================
 
 // ---------- 靶标程序化建模 ----------
@@ -264,4 +265,118 @@ function mergeTargetStatics(t) {
     merged++;
   }
   return merged;
+}
+
+// ---------- P5-G1 真实残骸（2026-10-16）----------
+// 旧版残骸是 4 个随机黑方块。现在：沿用被毁车辆本身的模型几何（共享，不复制顶点），
+// 换成烧焦材质（保留原贴图细节、整体压暗、余烬自发光随燃烧时间熄灭），车体随机
+// 倾斜下沉；再散落几块扭曲碎片 + 径向渐变焦痕贴地。油桶炸开后留 2 只翻倒开口桶。
+// 残骸组 position = 爆点（燃烧烟火以此为中心）；几何标 noDispose，复位时不释放原车几何。
+let _scorchTex = null;
+function scorchTexture() {
+  if (_scorchTex) return _scorchTex;
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 4, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(8,7,6,0.95)'); gr.addColorStop(0.45, 'rgba(14,12,10,0.75)');
+  gr.addColorStop(0.8, 'rgba(30,26,20,0.25)'); gr.addColorStop(1, 'rgba(30,26,20,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  // 放射状溅痕（固定种子，不用 Math.random）
+  let s = 7;
+  const r1 = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  g.strokeStyle = 'rgba(10,9,8,0.5)';
+  for (let i = 0; i < 26; i++) {
+    const a = r1() * TAU, l0 = 18 + r1() * 14, l1 = l0 + 12 + r1() * 30;
+    g.lineWidth = 1 + r1() * 3;
+    g.beginPath(); g.moveTo(64 + Math.cos(a) * l0, 64 + Math.sin(a) * l0);
+    g.lineTo(64 + Math.cos(a) * l1, 64 + Math.sin(a) * l1); g.stroke();
+  }
+  _scorchTex = new THREE.CanvasTexture(c);
+  _scorchTex.colorSpace = THREE.SRGBColorSpace;
+  return _scorchTex;
+}
+function charMaterial(src) {
+  return new THREE.MeshStandardMaterial({
+    map: (src && src.map) || null, color: (src && src.map) ? 0x3a3936 : 0x252321, roughness: 1, metalness: 0.15,
+    emissive: 0xff4a12, emissiveIntensity: 0.0,
+  });
+}
+function makeWreck(t) {
+  const g = new THREE.Group();
+  t.group.updateMatrixWorld(true);
+  const wp = new THREE.Vector3().setFromMatrixPosition(t.group.matrixWorld);
+  g.position.copy(wp);
+  const mats = [];
+  const debrisMat = new THREE.MeshStandardMaterial({ color: 0x231f1b, roughness: 1, metalness: 0.3,
+    emissive: 0xff4a12, emissiveIntensity: 0, side: THREE.DoubleSide });
+  mats.push(debrisMat);
+  // 余烬碎片单独一份材质（红热），桶壳/车壳用暗材质
+  const emberMat = debrisMat.clone(); emberMat.userData.ember = true; mats.push(emberMat);
+  if (t.type === 'barrel') {
+    const geo = new THREE.CylinderGeometry(0.28, 0.28, 0.85, 12, 1, true);
+    for (let i = 0; i < 2; i++) {
+      const m = new THREE.Mesh(geo, debrisMat);
+      m.rotation.order = 'YXZ';
+      m.rotation.set(PI / 2, rnd(TAU), 0);         // 横躺 + 随机朝向
+      m.position.set((rnd() - 0.5) * 1.6, 0.27, (rnd() - 0.5) * 1.6);
+      m.scale.set(1, 1, 0.8 + rnd() * 0.25);    // 压瘪
+      g.add(m);
+    }
+  } else {
+    // 车体：原模型可见网格 → 烧焦壳（倾斜 + 下沉）
+    const hull = new THREE.Group();
+    const inv = new THREE.Matrix4().copy(t.group.matrixWorld).invert();
+    const cache = new Map();
+    t.group.traverse(o => {
+      if (!o.isMesh || !o.visible) return;
+      const srcMat = Array.isArray(o.material) ? o.material[0] : o.material;
+      let cm = cache.get(srcMat);
+      if (!cm) { cm = charMaterial(srcMat); cache.set(srcMat, cm); mats.push(cm); }
+      const m = new THREE.Mesh(o.geometry, cm);
+      m.userData.noDispose = true;               // 几何属于原车，复位后原车还要用
+      m.matrixAutoUpdate = false;
+      m.matrix.copy(inv).multiply(o.matrixWorld);
+      m.castShadow = true; m.receiveShadow = true;
+      hull.add(m);
+    });
+    hull.rotation.y = t.group.rotation.y;
+    hull.scale.copy(t.group.scale);
+    const tilt = new THREE.Group();
+    tilt.rotation.set((rnd() - 0.5) * 0.16, 0, (rnd() - 0.5) * 0.2);
+    tilt.position.y = -0.07;
+    tilt.add(hull);
+    g.add(tilt);
+  }
+  // 扭曲碎片
+  const chunkGeo = new THREE.IcosahedronGeometry(0.2, 0);
+  const n = t.type === 'tank' ? 6 : t.type === 'truck' ? 5 : 3;
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(chunkGeo, i % 2 ? emberMat : debrisMat);
+    const a = rnd(TAU), r = rnd(1.4, 3.2);
+    m.position.set(Math.cos(a) * r, 0.04, Math.sin(a) * r);
+    m.scale.set(rnd(0.6, 1.8), rnd(0.25, 0.5), rnd(0.5, 1.4));
+    m.rotation.set(rnd(0.5), rnd(TAU), rnd(0.5));
+    m.castShadow = false;
+    g.add(m);
+  }
+  // 焦痕
+  const sz = t.type === 'tank' ? 6.2 : t.type === 'truck' ? 5.4 : 4.6;
+  const scMat = new THREE.MeshBasicMaterial({ map: scorchTexture(), transparent: true, depthWrite: false,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  mats.push(scMat);
+  const sc = new THREE.Mesh(new THREE.PlaneGeometry(sz, sz), scMat);
+  sc.rotation.x = -PI / 2; sc.rotation.z = rnd(TAU);
+  sc.position.y = 0.02; sc.renderOrder = 2;
+  g.add(sc);
+  g.userData.charMats = mats;
+  g.userData.ember0 = t.type === 'barrel' ? 1.1 : 0.85;
+  return g;
+}
+// 余烬：燃烧剩余比例 → 自发光强度（越烧越暗，熄灭后归零）
+function wreckEmber(wreck, frac, flick) {
+  const ms = wreck.userData.charMats;
+  if (!ms) return;
+  const k = Math.max(0, frac) * (wreck.userData.ember0 || 0.8) * flick;
+  // 车壳只透一点暗红（整车发光像塑料），小碎片才是明显的红热余烬
+  for (const m of ms) if (m.emissive) m.emissiveIntensity = m.userData.ember ? k * 0.55 : 0;
 }
