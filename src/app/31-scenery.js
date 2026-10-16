@@ -72,7 +72,7 @@ const _scnWarm = new THREE.Color(1.12, 0.94, 0.80);
 function buildWorldScenery(W) {
   const scene = W.scene;
   const S = { hills: null, trees: null, shore: null, apron: null, lamps: null, _key: '',
-    blast: () => 0, updateTrees: () => {}, resetTrees: () => {} };   // 真实树线加载后替换
+    blast: () => 0, bulletHit: () => false, updateTrees: () => {}, resetTrees: () => {} };   // 真实树线加载后替换
 
   // ---- 远山 ----
   {
@@ -253,18 +253,20 @@ function buildWorldScenery(W) {
       gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
       g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
       const tx = new THREE.CanvasTexture(cv);
-      for (let i = 0; i < 64; i++) {
+      for (let i = 0; i < 96; i++) {
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, transparent: true, depthWrite: false, opacity: 0 }));
         sp.visible = false; sp.renderOrder = 6; scene.add(sp);
         _fx.push({ sp, t: 0, life: 1, s0: 1, s1: 2, rise: 1, base: 1 });
       }
     }
-    function _emit(x, y, z, fire) {
+    function _emit(x, y, z, fire, leaf) {
       for (const f of _fx) {
         if (f.sp.visible) continue;
-        f.sp.visible = true; f.sp.position.set(x, y, z); f.t = 0;
+        f.sp.visible = true; f.sp.position.set(x, y, z); f.t = 0; f.vx = f.vz = 0;
         const m = f.sp.material;
-        if (fire) { m.color.setHex(rnd() < 0.5 ? 0xff6a1c : 0xffa040); m.blending = THREE.AdditiveBlending; f.life = 0.5 + rnd() * 0.4; f.s0 = 1.0; f.s1 = 2.2; f.rise = 2.2; f.base = 1.0; }
+        if (leaf) { m.color.setHex(leaf); m.blending = THREE.NormalBlending; f.life = 1.6 + rnd() * 1.2; f.s0 = 0.4; f.s1 = 0.55; f.rise = -0.9 - rnd() * 0.6; f.base = 0.95;
+          f.vx = (rnd() - 0.5) * 1.6; f.vz = (rnd() - 0.5) * 1.6; }
+        else if (fire) { m.color.setHex(rnd() < 0.5 ? 0xff6a1c : 0xffa040); m.blending = THREE.AdditiveBlending; f.life = 0.5 + rnd() * 0.4; f.s0 = 1.0; f.s1 = 2.2; f.rise = 2.2; f.base = 1.0; }
         else { m.color.setHex(0x34302b); m.blending = THREE.NormalBlending; f.life = 4 + rnd() * 2; f.s0 = 1.4; f.s1 = 6.5; f.rise = 1.6; f.base = 0.7; }
         return;
       }
@@ -274,7 +276,8 @@ function buildWorldScenery(W) {
         if (!f.sp.visible) continue;
         f.t += dt; const k = f.t / f.life;
         if (k >= 1) { f.sp.visible = false; continue; }
-        f.sp.position.y += f.rise * dt;
+        f.sp.position.y += f.rise * dt; f.sp.position.x += f.vx * dt; f.sp.position.z += f.vz * dt;
+        if (f.sp.position.y < 0.05) f.sp.position.y = 0.05;
         f.sp.scale.setScalar(f.s0 + (f.s1 - f.s0) * k);
         f.sp.material.opacity = f.base * (k < 0.15 ? k / 0.15 : 1 - (k - 0.15) / 0.85);
       }
@@ -304,9 +307,47 @@ function buildWorldScenery(W) {
       }
       if (dirty) { geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true; }
     };
+    // ---- 机炮子弹打进树林：飞叶/树皮屑 + 小幅摇晃；同一棵树挨够子弹会被打断倒下 ----
+    // 空间网格（4u 一格）加速：子弹每帧分段判定，只查所在格及邻格
+    const _grid = new Map(), GS = 4;
+    trees.forEach((T, i) => {
+      T.hp = T.cell === 7 ? 6 : T.cell >= 4 ? 26 : 34;
+      const k = Math.floor(T.x / GS) + ',' + Math.floor(T.z / GS);
+      (_grid.get(k) || _grid.set(k, []).get(k)).push(i);
+    });
+    const LEAF = [0x3f5a2a, 0x56702f, 0x6b6a33, 0x4a3b28];
+    S.bulletHit = function (p, dir) {
+      if (!S.trees || !S.trees.visible || S.trees.isInstancedMesh) return false;
+      const r2 = p.x * p.x + p.z * p.z;
+      if (r2 < 80 * 80 || r2 > 176 * 176 || p.y > 32) return false;
+      const gx = Math.floor(p.x / GS), gz = Math.floor(p.z / GS);
+      for (let ix = gx - 1; ix <= gx + 1; ix++) for (let iz = gz - 1; iz <= gz + 1; iz++) {
+        const L = _grid.get(ix + ',' + iz);
+        if (!L) continue;
+        for (const i of L) {
+          const T = trees[i];
+          if (T.fall > 0.6) continue;
+          const y = p.y - GROUND_Y - T.yoff;
+          if (y < 0 || y > T.h) continue;
+          const d = Math.hypot(p.x - T.x, p.z - T.z), w = T.h * CELLS[T.cell][4] / 2;
+          const inCanopy = y > T.h * 0.3 && d < w * 0.55, inTrunk = d < 0.35;
+          if (!inCanopy && !inTrunk) continue;
+          for (let n = 0; n < 6; n++) _emit(p.x + (rnd() - 0.5) * 0.9, p.y + (rnd() - 0.5) * 0.6, p.z + (rnd() - 0.5) * 0.6, false, inTrunk && !inCanopy && n > 1 ? 0x6a5640 : LEAF[(rnd() * 4) | 0]);
+          T.hp--;
+          if (T.fall === 0) {
+            const l = Math.hypot(dir.x, dir.z) || 1; T.lx = dir.x / l; T.lz = dir.z / l;
+            if (T.hp <= 0) { T.fall = 0.001; T.fallV = 0.5; }
+            else { T.sway = Math.max(T.sway, T.cell === 7 ? 0.12 : 0.04); T.swayT = 0; }
+          }
+          _active.add(i);
+          return true;
+        }
+      }
+      return false;
+    };
     // 换场地/重开任务：树全部复原
     S.resetTrees = function () {
-      trees.forEach((T, i) => { T.fall = T.fallV = T.sway = T.fire = T.burn = T.char = 0; _writeTree(i); });
+      trees.forEach((T, i) => { T.fall = T.fallV = T.sway = T.fire = T.burn = T.char = 0; T.hp = T.cell === 7 ? 6 : T.cell >= 4 ? 26 : 34; _writeTree(i); });
       _active.clear();
       for (const f of _fx) f.sp.visible = false;
       geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true;
