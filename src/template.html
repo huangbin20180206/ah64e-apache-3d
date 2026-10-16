@@ -18,10 +18,14 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 
 /* ---------- 载入遮罩 ---------- */
 #loading{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:16px;background:#07090c;
+  align-items:center;justify-content:flex-end;gap:16px;padding-bottom:12vh;background:#07090c;
   transition:opacity .5s ease}
+/* Q1 载入封面：本机实拍黄昏剧照（assets/scenery/cover.webp，缺失时回落纯色底） */
+#loading{background:linear-gradient(180deg,rgba(7,9,12,.15) 0%,rgba(7,9,12,.25) 55%,rgba(7,9,12,.88) 100%),
+  url(assets/scenery/cover.webp) center 35%/cover no-repeat,#07090c}
 #loading.done{opacity:0;pointer-events:none}
-#load-title{font-size:13px;letter-spacing:.30em;color:var(--dim);text-transform:uppercase}
+#load-title{font-size:clamp(20px,4.2vw,34px);font-weight:600;letter-spacing:.24em;color:#f3ead8;text-transform:uppercase;text-shadow:0 2px 14px rgba(0,0,0,.6)}
+#load-sub{font-size:12px;letter-spacing:.3em;color:rgba(243,234,216,.72);margin-top:-8px}
 #load-bar{width:min(320px,62vw);height:2px;background:rgba(255,255,255,.10);overflow:hidden}
 #load-fill{height:100%;width:0%;background:var(--accent);transition:width .25s ease}
 #load-txt{font-family:var(--mono);font-size:11px;color:var(--dim);min-height:14px;
@@ -283,6 +287,19 @@ select{width:100%;padding:6px 8px;border:1px solid rgba(95,208,168,.30);border-r
    MutationObserver 同步，76-mobile.js state().fpMode 可遥测） */
 #panel:not(.hide) ~ #mstick{display:none!important}
 body.fp-mode #mstick{display:none!important}
+/* Q1 触屏浮动操作键（77-mobilefire）：右摇杆上方 3×3；第一人称下保留 */
+#mfire{display:none;position:fixed;right:10px;bottom:226px;z-index:21;
+  grid-template-columns:repeat(3,48px);gap:6px}
+#mfire button{width:48px;height:44px;border:1px solid rgba(95,208,168,.55);border-radius:10px;
+  background:rgba(8,14,11,.55);color:#cfe9dc;font-size:11px;padding:0;touch-action:none;
+  -webkit-user-select:none;user-select:none;backdrop-filter:blur(3px)}
+#mfire button.on{background:rgba(95,208,168,.30);border-color:var(--accent)}
+#mfire button.lit{color:#fff;border-color:#fff}
+#mf-gun,#mf-rk,#mf-hf{border-color:rgba(255,170,90,.7);color:#ffd9b0}
+@media (pointer:coarse){ #mfire{display:grid} }
+/* 横屏手机（矮屏）：挪到右摇杆左侧，避开顶部读数和底部机位条 */
+@media (max-height:520px){ #mfire{right:134px;bottom:104px;gap:5px} #mfire button{height:36px} }
+#panel:not(.hide) ~ #mfire{display:none!important}
 
 /* ---------- P14-B 模式/输入状态徽标 ---------- */
 #mode-chip{position:fixed;right:14px;top:92px;z-index:21;padding:4px 10px;
@@ -296,6 +313,10 @@ body.fp-mode #mstick{display:none!important}
   border:1px solid rgba(95,208,168,.35);border-radius:7px;
   background:rgba(8,14,11,.82);color:var(--accent);font-size:11.5px;
   opacity:0;transition:opacity .3s;pointer-events:none;letter-spacing:.03em}
+/* Q1 触屏：提示条居中放在两摇杆之间、机位条上方（原位置被左摇杆压住），长句换行 */
+@media (pointer:coarse){ #guide{left:50%;transform:translateX(-50%);bottom:58px;max-width:calc(100vw - 300px);text-align:center;line-height:1.5} }
+/* Q1 横屏手机：任务卡限高可滚动，不压住左摇杆 */
+@media (pointer:coarse) and (max-height:520px){ #mission{max-height:calc(100vh - 276px);overflow-y:auto} }
 
 /* ---------- 击杀信息流 / 命中标记 ---------- */
 #killfeed{position:fixed;right:14px;top:110px;z-index:22;display:flex;
@@ -588,6 +609,7 @@ body.photo-mode > *:not(canvas):not(#photo-exit):not(.route-bar):not(#tour-cap){
 
 <div id="loading" role="progressbar" aria-live="polite" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="载入进度">
   <div id="load-title">AH-64E Apache</div>
+  <div id="load-sub">阿帕奇 · 武装直升机</div>
   <div id="load-bar"><div id="load-fill"></div></div>
   <div id="load-txt">初始化…</div>
 </div>
@@ -895,6 +917,12 @@ body.photo-mode > *:not(canvas):not(#photo-exit):not(.route-bar):not(#tour-cap){
        aria-label="高度与转向摇杆：上下升降（聚焦时键盘上下方向键同效）、左右转向（键盘 A D 同效）">
     <div id="mstick-rk" aria-hidden="true"></div>
   </div>
+</div>
+<!-- Q1 触屏浮动操作键（77-mobilefire）：仅触屏显示，面板打开时让位 -->
+<div id="mfire" role="group" aria-label="触屏操作键">
+  <button id="mf-start">启旋</button><button id="mf-fly">起降</button><button id="mf-flir">热成像</button>
+  <button id="mf-gun">机炮</button><button id="mf-rk">火箭</button><button id="mf-hf">地狱火</button>
+  <button id="mf-hoist">绞车</button><button id="mf-chaff">干扰弹</button><button id="mf-flare">照明弹</button>
 </div>
 <div id="views"></div>
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
