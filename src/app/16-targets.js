@@ -69,7 +69,7 @@ class TargetRange {
     // AI 高模渐进替换（GLB 就位后换壳；程序化模型作为加载期兜底）
     loadTargetModels(this.scene).then(models => {
       for (const t of this.targets) {
-        if (models[t.type]) applyModelToTarget(t, models[t.type]);
+        if (models[targetModelKey(t)]) applyModelToTarget(t, models[targetModelKey(t)]);
       }
     });
   }
@@ -106,8 +106,10 @@ class TargetRange {
         } else if (type === 'tank' && si === 0) {
           mov = { kind: 'line', cx: group.position.x, cz: group.position.z, a: group.rotation.y, half: 2.4, v: 1.4, s: 0 };
         }
+        // 2026-10-18：坦克池奇数号换 BMP-2 步战车壳（只换外观与名称，逻辑仍是 tank）
+        const mdl = type === 'tank' && si % 2 === 1 ? 'ifv' : null;
         this.targets.push({
-          group, type, hp, hp0: hp, radius, label, mov,
+          group, type, mdl, hp, hp0: hp, radius, label: mdl === 'ifv' ? 'BMP-2 步战车' : label, mov,
           pos: group.position.clone(), alive: true,
           // B2 警报疏散：初始位姿快照（reset 时疏散车辆归位）
           home: { x: group.position.x, z: group.position.z, ry: group.rotation.y, mov },
