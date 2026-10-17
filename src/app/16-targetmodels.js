@@ -4,7 +4,7 @@
 // 2026-10-12 批 E 自 16-targets.js 拆出（纯搬移，行为不变）。同前缀 16-* 在
 // 拓扑检查里同级；文件名按字典序排在 16-targets.js 之前（"m" < "s"）。
 // 提供：targetMat / addBox / makeTank|Truck|BarrelTarget / TARGET_TYPES /
-//       TARGET_MODELS / loadTargetModels / applyModelToTarget / mergeTargetStatics
+//       TARGET_MODELS / targetModelKey / loadTargetModels / applyModelToTarget / mergeTargetStatics
 //       makeWreck / wreckEmber / scorchTexture（P5-G1 真实残骸）
 //       splitTurretGeo / wreckPop（Q3 坦克炮塔掀飞）
 // ============================================================
@@ -165,8 +165,16 @@ const TARGET_MODELS = {
   // 2.5m/3.5m≈0.714 → 车宽 1.55u×0.714≈1.11u≈2.5m
   truck: { url: 'assets/targets/truck.glb', yaw: 0,  len: 3.1, wNarrow: 2.5 / 3.5 },
   // T-80U（CC0）：模型长度/炮管沿自身 X 轴，yaw +90° 转到 +Z 前向（-90° 实测反向）
-  tank:  { url: 'assets/targets/tank.glb',  yaw: Math.PI / 2, len: 4.3 },
+  // 2026-10-18 修正：实测 tank.glb 车长沿模型自身 Z、炮管朝 +X 侧——旧 yaw=π/2 让坦克横着开
+  //（车身与履带印/行驶方向垂直）。改 0 后炮管朝 group +Z（车头前向，见 16-targets 动目标公式）。
+  tank:  { url: 'assets/targets/tank.glb',  yaw: 0, len: 4.3 },
+  // 2026-10-18 BMP-2 步战车（Sketchfab "IFV BMP-2 (DCS World)" by KojfDiscord，CC BY 4.0，
+  // 见 assets/targets/bmp2-LICENSE.txt）：坦克池的"变体壳"——t.mdl='ifv' 的坦克换此壳，
+  // 命中/血量/移动逻辑仍按 tank。真车长 6.72m≈2.96u。
+  ifv:   { url: 'assets/targets/bmp2.glb',  yaw: 0, len: 2.96 },   // 模型车头已朝 +Z（截图核验：后舱门朝车尾）
 };
+// 目标用哪个壳：变体优先（t.mdl），否则按类型
+function targetModelKey(t) { return t.mdl && TARGET_MODELS[t.mdl] ? t.mdl : t.type; }
 let _targetModelCache = null;
 function loadTargetModels(scene) {
   if (_targetModelCache) return _targetModelCache;
@@ -190,12 +198,13 @@ function loadTargetModels(scene) {
 function applyModelToTarget(t, model) {
   while (t.group.children.length) t.group.remove(t.group.children[0]);
   const inst = model.clone(true);
-  inst.rotation.y = TARGET_MODELS[t.type].yaw;
+  const key = targetModelKey(t);
+  inst.rotation.y = TARGET_MODELS[key].yaw;
   t.group.add(inst);
   // P31-A：激活 len——量 yaw 后水平长轴实际值，等比缩放到确定车长。
   // 等比（setScalar）保模型比例完整；缩放发生在合批烘焙之前，世界矩阵
   // 已含缩放，mergeTargetStatics 之后 draw/材质零变化。
-  const defLen = TARGET_MODELS[t.type].len;
+  const defLen = TARGET_MODELS[key].len;
   if (defLen) {
     // C006：车长测量必须**与 group 的场景朝向 yaw 无关**。旧实现直接量世界 AABB，
     // 而 build() 给每个 group 一个朝向来袭方向的 yaw（绕圈巡逻卡车 :688 每帧还改
@@ -225,7 +234,7 @@ function applyModelToTarget(t, model) {
   // 长轴测量读的是世界包围盒，先收窄会把"长轴"量成收窄后的值。
   // 非均匀缩放的着色影响：法线由 normalMatrix（inverse-transpose）处理，
   // 合批烘焙走 BufferGeometry.applyMatrix4 亦同样变换法线 ⇒ 光照正常。
-  const wNarrow = TARGET_MODELS[t.type].wNarrow;
+  const wNarrow = TARGET_MODELS[key].wNarrow;
   if (wNarrow) inst.scale.x *= wNarrow;
   // 观感提示：系数为"只压 X"的横向收窄，轮胎在侧视面（Y-Z）仍为正圆、
   // 仅胎宽变窄；若模型正面存在 X-Y 平面内的圆形件（圆形车灯/侧挂备胎）
