@@ -1,0 +1,5 @@
+mi24.glb — Mi-24"雌鹿"武装直升机模型
+原作："Mi-24 Hind"，作者 duanesmind
+链接：https://sketchfab.com/3d-models/004d68143e1a4df88e136dbc0a05f181
+许可：CC BY 4.0（知识共享 署名 4.0，https://creativecommons.org/licenses/by/4.0/）——使用须署名原作者。
+改动：贴图缩到 1024 并转 JPEG；meshopt 压缩（@gltf-transform 4）。游戏内按真实机身长缩放，旋翼/尾桨程序驱动旋转。
