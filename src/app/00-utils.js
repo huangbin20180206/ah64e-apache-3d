@@ -240,7 +240,16 @@ function mergeGeos(list) {
     for (const g of list) {
       const a = g.attributes[key];
       if (a.itemSize !== itemSize) { return null; }
-      arr.set(a.array, off);
+      // 2026-10-18：交错存储（Sketchfab 导出的 GLB 常见）/ 量化整数属性的 array 不是
+      // "紧排 Float32"，整块 set 会越界或读错 → 逐分量取值（getX..getW 自带反量化）
+      if (!a.isInterleavedBufferAttribute && !a.normalized && a.array.length === a.count * itemSize) {
+        arr.set(a.array, off);
+      } else {
+        const gs = [a.getX, a.getY, a.getZ, a.getW];
+        for (let i = 0; i < a.count; i++) {
+          for (let c = 0; c < itemSize; c++) arr[off + i * itemSize + c] = gs[c].call(a, i);
+        }
+      }
       off += a.count * itemSize;
     }
     out.setAttribute(key, new THREE.BufferAttribute(arr, itemSize));
