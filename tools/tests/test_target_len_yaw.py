@@ -17,7 +17,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pw_harness as H
 
-DEF_LEN = {'tank': 4.3, 'truck': 3.1}
+DEF_LEN = {'tank': 4.3, 'truck': 3.1, 'ifv': 2.96}   # 2026-10-18 ifv=BMP-2 变体壳（按 t.mdl 分组）
 
 MEASURE = r"""
 () => {
@@ -32,7 +32,7 @@ MEASURE = r"""
       const pos = o.geometry.attributes.position, a = pos.array;
       const m = ginv.clone().multiply(o.matrixWorld);
       for (let i = 0; i < pos.count; i++) {
-        v.set(a[i*3], a[i*3+1], a[i*3+2]).applyMatrix4(m);
+        v.fromBufferAttribute(pos, i).applyMatrix4(m);
         if (v.x < mn.x) mn.x = v.x; if (v.x > mx.x) mx.x = v.x;
         if (v.y < mn.y) mn.y = v.y; if (v.y > mx.y) mx.y = v.y;
         if (v.z < mn.z) mn.z = v.z; if (v.z > mx.z) mx.z = v.z;
@@ -40,7 +40,7 @@ MEASURE = r"""
     });
     const inst = t.group.children[0];
     const yaw = (t.group.rotation.y % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-    out.push({ type: t.type, yawDeg: yaw * 180 / Math.PI,
+    out.push({ type: t.mdl || t.type, yawDeg: yaw * 180 / Math.PI,
       scale: inst ? inst.scale.x : null,
       lx: mx.x - mn.x, lz: mx.z - mn.z,
       longAxis: Math.max(mx.x - mn.x, mx.z - mn.z) });
@@ -60,6 +60,9 @@ def run(pg):
     pg.wait_for_timeout(300)
     rows = pg.evaluate(MEASURE)
 
+    # 2026-10-18：BMP-2 变体壳只有 1 个基地实例，单独核车长
+    ifv = [r for r in rows if r['type'] == 'ifv']
+    assert ifv and abs(ifv[0]['longAxis'] - DEF_LEN['ifv']) < 0.02, ('A3: BMP-2 车长不等于 len', ifv)
     for typ in ('tank', 'truck'):
         sub = [r for r in rows if r['type'] == typ]
         assert len(sub) >= 2, ('A0: 该 type 实例不足，无法比对', typ, sub)
