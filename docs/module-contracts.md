@@ -615,6 +615,17 @@
    ]
   }
  },
+ "35-armorydata.js": {
+  "provides": [
+   "ARMORY_CATS",
+   "ARMORY_ITEMS",
+   "armoryNearest",
+   "armoryRel",
+   "armoryStep",
+   "armoryTarget"
+  ],
+  "depends": {}
+ },
  "40-post.js": {
   "provides": [
    "BLUR_W",
@@ -1417,6 +1428,25 @@
    ]
   }
  },
+ "71-armory.js": {
+  "provides": [],
+  "depends": {
+   "01-host.js": [
+    "HOST"
+   ],
+   "35-armorydata.js": [
+    "ARMORY_CATS",
+    "ARMORY_ITEMS",
+    "armoryNearest",
+    "armoryRel",
+    "armoryStep",
+    "armoryTarget"
+   ],
+   "70-app.js": [
+    "S"
+   ]
+  }
+ },
  "72-uibind.js": {
   "provides": [
    "actChaff",
@@ -2023,6 +2053,12 @@
 - **依赖**: 00-utils.js（clamp）；20-scene.js（ENV_PRESETS, sunVector）；15-terrain.js（DUNE_BASE, TERRAINS, desertEnvDim, terrainFog）
 - **调用时机**: 环境预设切换（P1-D 自 30-world 拆出）：applyPreset 由 72-uibind 环境切换与 70-app 场地切换调用；scene_fog 设场地雾基准。非 pad 场地雾色经 terrainFog 混入预设雾色（P5-B(A) 权重 0.6）、沙漠 duneFar 色基=沙漠 farTint×环境明度×0.78（P5-B(B)）。
 
+## 35-armorydata.js
+
+- **提供**: ARMORY_CATS, ARMORY_ITEMS, armoryStep, armoryRel, armoryNearest, armoryTarget
+- **依赖**: 无
+- **调用时机**: 纯数据 + 纯函数（装备图鉴 13 条：结构 8 + 武器 5；轮盘角度数学），由 71-armory 读取；tools/tests_pure/test_armory.py 直接加载测试。
+
 ## 40-post.js
 
 - **提供**: BLUR_W, Composer
@@ -2120,6 +2156,12 @@
 - **提供**: boot, finish, loadFill, prog
 - **依赖**: 00-utils.js（STATS, clamp, countScene, fmtK）；01-host.js（HOST, UI, toast）；05-config.js（AC, WATER_Y, qualityPreset）；16-targets.js（TargetRange）；16-town.js（TownDistrict）；16-valley.js（CanyonRun）；18-audio.js（RotorAudio）；19-reflect.js（WaterReflection）；20-scene.js（ENV_PRESETS）；24-navlights.js（NightLights）；26-airtargets.js（AirTargets）；28-washfx.js（WashFX）；32-envpreset.js（applyPreset）；46-fpview.js（FPView）；47-betty.js（betty）；48-rescue.js（Rescue）；50-controls.js（VIEWS）；60-model.js（Apache, makeRotorDisc）；62-detailparts.js（DetailParts）；65-weapons.js（WeaponRig）；70-app.js（S, W, _kills, air, apache, applyQuality, arcade, audio, campaign, canvas, damageSys, disc, discMat, dp, enemyAir, enemyVis, fp, hitMark, killFeed, music, narrative, nlights, orbit, refl, renderer, rescue, resources, rig, samvis, samwar, targets, updateTargetHUD, washfx, weather）；70-camera.js（buildViewBar）；70-combat.js（_dmgApply）；70-loop.js（loop）
 - **调用时机**: 载入与装配：prog 进度条、boot 载 GLB、finish 装配子系统并注册 HOST.rig；文件末尾调用 boot()——必须是 70-* 组按文件名排序的最后一个（boot 同步段要求 70-* 顶层 const 已初始化）。
+
+## 71-armory.js
+
+- **提供**: armOpen, armClose, armGo（经 HOST.armory 注册）
+- **依赖**: 01-host.js（HOST）；35-armorydata.js（ARMORY_*、armory*）；70-app.js（S）
+- **调用时机**: 装备图鉴全屏界面（纯 DOM + Canvas 2D）。入口：主菜单 #ln-armory / 按 3、展示「知识」页 #btn-armory、URL #armory（均在 70-appmode 经 HOST.armory.open）。打开期间置 S.armoryOpen=true，70-loop 跳过整帧；capture 阶段吞掉全部键盘，只认方向键/滚轮/Esc。DOM 与样式首次打开时动态创建。
 
 ## 72-uibind.js
 
