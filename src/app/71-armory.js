@@ -56,16 +56,21 @@ const ARM_CSS = `
   display:flex;flex-direction:column;gap:12px;min-width:0}
 #armory .arm-frame{position:relative;flex:0 0 auto;width:100%;aspect-ratio:16/10;max-height:58vh;overflow:hidden;background:#0a0f10;
   border:1px solid rgba(159,212,184,.22)}
-#armory .arm-frame img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0}
+#armory .arm-frame img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;
+  filter:var(--armg)}
+#armory{--armg:brightness(.8) contrast(1.12) saturate(.72)}  /* 统一调色：压暗、提对比、降饱和，白天空不再刺眼 */
 #armory .arm-frame img.cur{opacity:1;animation:armKen 14s ease-out both}
 #armory .arm-frame img.in{opacity:1;animation:armWipe .7s cubic-bezier(.2,.7,.2,1) both,armKen 14s ease-out both}
-@keyframes armWipe{from{clip-path:inset(0 100% 0 0);filter:brightness(1.8) saturate(.2)}to{clip-path:inset(0 0 0 0);filter:none}}
+@keyframes armWipe{from{clip-path:inset(0 100% 0 0);filter:brightness(1.8) saturate(.2)}to{clip-path:inset(0 0 0 0);filter:var(--armg)}}
 @keyframes armKen{from{transform:scale(1.06)}to{transform:scale(1)}}
 #armory .arm-scan{position:absolute;top:0;bottom:0;width:3px;left:-4px;background:#9fd4b8;box-shadow:0 0 18px 4px rgba(159,212,184,.55);opacity:0;pointer-events:none}
 #armory .arm-scan.go{animation:armScan .7s cubic-bezier(.2,.7,.2,1) both}
 @keyframes armScan{0%{left:0;opacity:1}90%{opacity:1}100%{left:100%;opacity:0}}
 #armory .arm-frame::after{content:'';position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(0deg,rgba(3,6,7,.88) 0%,rgba(3,6,7,0) 42%),
+             linear-gradient(180deg,rgba(3,6,7,.45) 0%,rgba(3,6,7,0) 32%),
+             radial-gradient(ellipse 75% 70% at 50% 45%,rgba(3,6,7,0) 55%,rgba(3,6,7,.7) 100%),
+             linear-gradient(rgba(18,52,60,.22),rgba(18,52,60,.22)),
              repeating-linear-gradient(0deg,rgba(0,0,0,.08) 0 1px,transparent 1px 3px)}
 #armory .arm-cn{position:absolute;width:18px;height:18px;border:2px solid #9fd4b8;z-index:2;pointer-events:none}
 #armory .arm-cn.a{left:8px;top:8px;border-right:0;border-bottom:0}
@@ -163,7 +168,7 @@ function _armLayout() {
   let cx, cy, R, base;
   if (v) { R = Math.min(W * 0.66, H * 1.15); cx = W / 2; cy = H + R * 0.2; base = -Math.PI / 2; }
   else { R = Math.min(H * 0.58, W * 1.05); cx = -R * 0.16; cy = H / 2; base = 0; }
-  ARM.geo = { W, H, cx, cy, R, base, v, dpr, ri: R * (v ? 0.66 : 0.5) };
+  ARM.geo = { W, H, cx, cy, R, base, v, dpr, ri: R * (v ? 0.72 : 0.55) };
   const hub = w.querySelector('.arm-hub');
   const hr = R * 0.34;
   // 轴心文字放在轴心圆露出部分的中间
@@ -201,7 +206,7 @@ function _armDraw() {
   }
   // 扇区：只画当前项和前后各 2 项（再往外淡出），每项一块环形扇区跟着轮盘转；
   // 越接近指针越亮，并整体向外凸出（rOut 变大 + 沿径向外移），选中项最明显
-  const VIS = 2, FADE = 0.6, rIn = R * 0.38;
+  const VIS = 2, FADE = 0.6, rIn = R * 0.52;
   const vis = [];
   for (let i = 0; i < ARM_N; i++) {
     const rel = armoryRel(i, ARM.rot, ARM_N), ar = Math.abs(rel);
@@ -212,23 +217,25 @@ function _armDraw() {
   for (const v of vis) {
     const c = ARMORY_ITEMS[v.i].cat === 'w' ? '240,180,90' : '159,212,184';
     const pop = R * 0.06 * v.near, ox = Math.cos(v.a) * pop, oy = Math.sin(v.a) * pop;
-    const rOut = R * (0.9 + 0.07 * v.near), half = step * 0.46;
+    const rOut = R * (0.86 + 0.07 * v.near), half = step * 0.42;
     ctx.beginPath();
     ctx.arc(cx + ox, cy + oy, rOut, v.a - half, v.a + half);
     ctx.arc(cx + ox, cy + oy, rIn, v.a + half, v.a - half, true);
     ctx.closePath();
     const sg = ctx.createRadialGradient(cx + ox, cy + oy, rIn, cx + ox, cy + oy, rOut);
-    sg.addColorStop(0, 'rgba(' + c + ',' + (0.02 + 0.06 * v.near) * v.f + ')');
-    sg.addColorStop(1, 'rgba(' + c + ',' + (0.05 + 0.26 * v.near) * v.f + ')');
+    sg.addColorStop(0, 'rgba(' + c + ',' + (0.01 + 0.04 * v.near) * v.f + ')');
+    sg.addColorStop(1, 'rgba(' + c + ',' + (0.03 + 0.17 * v.near) * v.f + ')');
     ctx.fillStyle = sg;
     ctx.fill();
     ctx.lineWidth = 1 + v.near;
     ctx.strokeStyle = 'rgba(' + c + ',' + (0.18 + 0.67 * v.near) * v.f + ')';
     ctx.stroke();
     // 外缘亮边
-    ctx.lineWidth = Math.max(2, R * 0.012) * (0.5 + v.near);
+    ctx.lineWidth = Math.max(2, R * 0.01) * (0.5 + v.near);
     ctx.strokeStyle = 'rgba(' + c + ',' + (0.3 + 0.7 * v.near) * v.f + ')';
+    ctx.shadowColor = 'rgba(' + c + ',.9)'; ctx.shadowBlur = 16 * v.near;   // 选中项外缘发光
     ctx.beginPath(); ctx.arc(cx + ox, cy + oy, rOut, v.a - half, v.a + half); ctx.stroke();
+    ctx.shadowBlur = 0;
   }
   // 内圈：虚线环（反向慢转）+ 实心轴心
   ctx.lineWidth = 1;
@@ -263,7 +270,7 @@ function _armDraw() {
     const pop = R * 0.06 * v.near;
     const x = cx + Math.cos(v.a) * (g.ri + pop), y = cy + Math.sin(v.a) * (g.ri + pop);
     const sc = (g.v ? 0.84 : 0.88) + 0.32 * v.near;
-    const op = (v.ar <= 1 ? 1 - 0.55 * v.ar : 0.45 - 0.2 * (v.ar - 1)) * v.f;
+    const op = (v.ar <= 1 ? 1 - 0.35 * v.ar : 0.65 - 0.2 * (v.ar - 1)) * v.f;
     d.style.opacity = String(Math.max(0, op));
     d.style.pointerEvents = op > 0.15 ? 'auto' : 'none';
     const rot = (v.a - base) * 180 / Math.PI;
