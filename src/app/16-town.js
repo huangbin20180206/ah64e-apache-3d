@@ -198,7 +198,9 @@ class TownDistrict {
     this.group = g;
     this.scene.add(g);
     // —— 伏兵车辆（复用 16-targets 的程序化模型 + GLB 换壳 + 合批）——
+    let tankN = 0;   // 2026-10-18：奇数号坦克换 BMP-2 壳（同 16-targets）
     for (const [type, hx, hz, ox, oz, cover] of TOWN_AMBUSH) {
+      const mdl = type === 'tank' && (tankN++) % 2 === 1 ? 'ifv' : null;
       const def = TARGET_TYPES[type];
       const { group, hp, radius, label } = def.make();
       group.position.set(C.x + hx, 0, C.z + hz);
@@ -211,7 +213,7 @@ class TownDistrict {
       const mov = peek ? { kind: 'peek', hx: C.x + hx, hz: C.z + hz, ox: C.x + ox, oz: C.z + oz,
         st: 'hide', t: 0, v: 2.4 } : null;
       const t = {
-        group, type, hp, hp0: hp, radius, label: '城镇伏兵·' + label, mov,
+        group, type, mdl, hp, hp0: hp, radius, label: '城镇伏兵·' + (mdl ? 'BMP-2 步战车' : label), mov,
         pos: group.position.clone(), alive: true, town: true, cover,
         hidden: true, _peekOut: false,
         home: { x: group.position.x, z: group.position.z, ry: group.rotation.y, mov },
@@ -221,7 +223,7 @@ class TownDistrict {
     }
     this._resetAmbush();
     loadTargetModels(this.scene).then(models => {
-      for (const t of this.ambush) if (models[t.type]) applyModelToTarget(t, models[t.type]);
+      for (const t of this.ambush) if (models[targetModelKey(t)]) applyModelToTarget(t, models[targetModelKey(t)]);
     });
     // 损伤烟：与 range 同款 sprite（range._tgtSmokes 每帧纯派生，激活时挂入）
     this._smokes = this.ambush.map(t => {
