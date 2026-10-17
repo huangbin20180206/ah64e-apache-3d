@@ -217,15 +217,23 @@ function appModeInit() {
       }
     });
   }
-  for (const c of document.querySelectorAll('#launcher .ln-card')) c.onclick = () => setAppMode(c.dataset.go);
+  // 第 3 张卡「图鉴」不是模式切换，是盖在当前画面上的全屏界面（71-armory，经 HOST.armory）
+  for (const c of document.querySelectorAll('#launcher .ln-card')) {
+    c.onclick = () => (c.dataset.go === 'armory' ? HOST.armory && HOST.armory.open() : setAppMode(c.dataset.go));
+  }
+  const ab = UI('btn-armory');
+  if (ab) ab.onclick = () => HOST.armory && HOST.armory.open();
   const home = UI('btn-home');
   if (home) home.onclick = () => setAppMode('menu');
-  // 主菜单快捷键：1 展示 / 2 游戏（capture 阶段拦截，避免 1/2 同时切机位）
+  // 主菜单快捷键：1 展示 / 2 游戏 / 3 图鉴（capture 阶段拦截，避免 1/2/3 同时切机位）
   addEventListener('keydown', e => {
     if (appState.mode !== 'menu') return;
     if (e.key === '1' || e.key === '2') {
       e.preventDefault(); e.stopImmediatePropagation();
       setAppMode(e.key === '1' ? 'show' : 'play');
+    } else if (e.key === '3') {
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (HOST.armory) HOST.armory.open();
     } else if (e.key === ' ' || /^[a-z]$/i.test(e.key)) {
       // 菜单期间吞掉驾驶/开火键，防止背景机体被误操作
       e.stopImmediatePropagation();
@@ -234,6 +242,7 @@ function appModeInit() {
   addEventListener('hashchange', () => {
     const parts = location.hash.replace(/^#/, '').split('/');
     const h = parts[0];
+    if (h === 'armory') { if (HOST.armory) HOST.armory.open(); return; }
     if (h === 'play' && parts[1] && appState.mode === 'play') { if (!(S._mission && S._mission.levelId === parts[1])) startLevel(parts[1]); }
     else if (h === 'show' || h === 'play') setAppMode(h, { fromHash: true, level: parts[1] });
     else if (appState.mode !== 'all') setAppMode('menu', { fromHash: true });
@@ -242,6 +251,7 @@ function appModeInit() {
   try { wd = !!navigator.webdriver; } catch (e) {}
   bindPlayUI();
   setAppMode(appModeFromUrl(location.search, location.hash, wd), { fromHash: true, level: location.hash.split('/')[1] || '' });
+  if (/^#armory/.test(location.hash) && HOST.armory) HOST.armory.open();
 }
 
 // 调试/测试出口（只读状态 + 同 UI 入口）
