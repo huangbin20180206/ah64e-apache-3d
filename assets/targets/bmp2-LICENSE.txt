@@ -1,0 +1,5 @@
+bmp2.glb — BMP-2 步兵战车模型
+原作："IFV BMP-2 (DCS World)"，作者 KojfDiscord
+链接：https://sketchfab.com/3d-models/e24d8506926d4169b540cca443a20303
+许可：CC BY 4.0（知识共享 署名 4.0，https://creativecommons.org/licenses/by/4.0/）——使用须署名原作者。
+改动：减面约 5.6 万 → 3.4 万三角面；贴图缩到 1024 并转 JPEG；meshopt 压缩（@gltf-transform 4）。游戏内按真实车长缩放。
