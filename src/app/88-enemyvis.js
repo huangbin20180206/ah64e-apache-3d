@@ -98,8 +98,30 @@ class EnemyVis {
       g.visible = false;
       g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
       scene.add(g);
-      this.units.push({ g, rotor, spin: i * 1.7 });
+      this.units.push({ g, rotor, tail: null, spin: i * 1.7 });
     }
+    // 2026-10-18：真实 Mi-24 模型换壳（Sketchfab "Mi-24 Hind" by duanesmind，CC BY 4.0，
+    // 见 assets/targets/mi24-LICENSE.txt）。加载完成前/失败时保留上面的程序化机体兜底。
+    // 机头 = 模型 +Z（与本文件朝向约定一致）；主旋翼 Top_Rotor、尾桨 Tail_Rotor 为独立节点。
+    new THREE.GLTFLoader().load('assets/targets/mi24.glb', (gltf) => {
+      const src = gltf.scene;
+      src.updateMatrixWorld(true);
+      const bodyNode = src.getObjectByName('Body_lambert1_0') || src;
+      const bb = new THREE.Box3().setFromObject(bodyNode, true);
+      const sz = bb.getSize(new THREE.Vector3());
+      const k = 7.7 / Math.max(sz.z, 1e-3);           // 机身长 17.5m ≈ 7.7u
+      const cx = (bb.min.x + bb.max.x) / 2, cy = (bb.min.y + bb.max.y) / 2, cz = (bb.min.z + bb.max.z) / 2;
+      for (const ud of this.units) {
+        const m = src.clone(true);
+        m.scale.setScalar(k);
+        m.position.set(-cx * k, -cy * k, -cz * k);    // 机身中心对齐 group 原点（与程序化机体一致）
+        m.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+        for (const c of ud.g.children) c.visible = false;   // 藏程序化机体+旋翼
+        ud.g.add(m);
+        ud.rotor = m.getObjectByName('Top_Rotor') || ud.rotor;
+        ud.tail = m.getObjectByName('Tail_Rotor');
+      }
+    }, undefined, () => {});
     // nearest/hitTest 桥接包装（持久对象——65/46 拿到 t.pos 直接可用）
     this.wraps = [0, 1].map(i => ({
       i, type: 'enemy', label: '敌方武装直升机',
@@ -175,6 +197,7 @@ class EnemyVis {
         ud.g.rotation.x = -Math.asin(Math.max(-1, Math.min(1, u.hy)));
         ud.spin += dt * 26;
         ud.rotor.rotation.y = ud.spin;
+        if (ud.tail) ud.tail.rotation.x = ud.spin * 1.6;
       } else if (!crashing) {
         ud.g.visible = false;
       }
