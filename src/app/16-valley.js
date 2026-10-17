@@ -165,7 +165,9 @@ class CanyonRun {
     this.mesh = mesh;
 
     // —— 谷底伏兵 ——
+    let tankN = 0;   // 2026-10-18：奇数号坦克换 BMP-2 壳（同 16-targets）
     for (const [type, f, off] of CANYON_UNITS) {
+      const mdl = type === 'tank' && (tankN++) % 2 === 1 ? 'ifv' : null;
       const p = canyonPointAt(f);
       const def = TARGET_TYPES[type];
       const { group, hp, radius, label } = def.make();
@@ -176,7 +178,7 @@ class CanyonRun {
       group.visible = false;
       this.scene.add(group);
       const t = {
-        group, type, hp, hp0: hp, radius, label: '峡谷伏兵·' + label, mov: null,
+        group, type, mdl, hp, hp0: hp, radius, label: '峡谷伏兵·' + (mdl ? 'BMP-2 步战车' : label), mov: null,
         pos: group.position.clone(), alive: true, canyon: true, hidden: true,
         home: { x, z, ry: group.rotation.y, mov: null },
       };
@@ -184,7 +186,7 @@ class CanyonRun {
       this.units.push(t);
     }
     loadTargetModels(this.scene).then(models => {
-      for (const t of this.units) if (models[t.type]) applyModelToTarget(t, models[t.type]);
+      for (const t of this.units) if (models[targetModelKey(t)]) applyModelToTarget(t, models[targetModelKey(t)]);
     });
     this._smokes = this.units.map(t => {
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({
