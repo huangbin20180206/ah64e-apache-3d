@@ -10,6 +10,8 @@ function loop() {
   requestAnimationFrame(loop);
   // 上下文丢失期间所有 GL 调用都是空转，跳过整帧（含 composer.render）
   if (_ctxLost) { clock.last = performance.now() / 1000; return; }
+  // 装备图鉴（71-armory）全屏打开时 3D 被完全盖住：整帧暂停，省电、不占显卡
+  if (S.armoryOpen) { clock.last = performance.now() / 1000; return; }
   const now = performance.now() / 1000;
   let dt = now - clock.last;
   clock.last = now;
