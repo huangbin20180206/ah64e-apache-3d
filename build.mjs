@@ -191,6 +191,11 @@ fs.mkdirSync(path.join(DIST, 'assets', 'scenery'), { recursive: true });
 for (const f of fs.readdirSync(path.join(ROOT, 'assets', 'scenery'))) {
   if (f.endsWith('.webp')) fs.copyFileSync(path.join(ROOT, 'assets', 'scenery', f), path.join(DIST, 'assets', 'scenery', f));
 }
+// 装备图鉴（71-armory）：Wikimedia Commons 照片 assets/armory/*.webp + LICENSE.txt
+fs.mkdirSync(path.join(DIST, 'assets', 'armory'), { recursive: true });
+for (const f of fs.readdirSync(path.join(ROOT, 'assets', 'armory'))) {
+  if (f.endsWith('.webp') || f.endsWith('.txt')) fs.copyFileSync(path.join(ROOT, 'assets', 'armory', f), path.join(DIST, 'assets', 'armory', f));
+}
 fs.mkdirSync(path.join(DIST, 'assets', 'details'), { recursive: true });
 let _detN = 0;
 for (const f of fs.readdirSync(path.join(ROOT, 'assets', 'details'))) {
