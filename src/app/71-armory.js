@@ -41,7 +41,7 @@ const ARM_CSS = `
 #armory .arm-wheel.drag{cursor:grabbing}
 #armory .arm-wheel canvas{position:absolute;inset:0;width:100%;height:100%}
 #armory .arm-item{position:absolute;left:0;top:0;display:flex;align-items:center;gap:8px;white-space:nowrap;
-  transform-origin:0 50%;cursor:pointer;color:#a9b8b0;font-size:14px;letter-spacing:.12em;will-change:transform,opacity}
+  transform-origin:0 0;cursor:pointer;color:#a9b8b0;font-size:14px;letter-spacing:.12em;will-change:transform,opacity}
 #armory .arm-item i{font-style:normal;font-family:var(--mono);font-size:10px;color:#6f8a7d;letter-spacing:.1em}
 #armory .arm-item.w i{color:#a8885a}
 #armory .arm-item.on{color:#fff;font-weight:700;text-shadow:0 0 12px rgba(159,212,184,.45)}
@@ -91,7 +91,7 @@ const ARM_CSS = `
 @media (max-width:1100px){#armory .arm-params{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* 竖屏：轮盘到底部露出上半圆，内容在上方 */
 #armory.v .arm-wheel{left:0;right:0;top:auto;bottom:0;width:auto;height:min(34vh,72vw)}
-#armory.v .arm-item{transform-origin:50% 50%;font-size:13px;flex-direction:column;gap:2px;letter-spacing:.06em}
+#armory.v .arm-item{transform-origin:0 0;font-size:13px;flex-direction:column;gap:2px;letter-spacing:.06em}
 #armory.v .arm-hint{display:none}
 #armory.v .arm-view{left:12px;right:12px;top:64px;bottom:calc(min(34vh,72vw) + 4px);gap:8px}
 #armory.v .arm-frame{max-height:32vh}
@@ -163,7 +163,7 @@ function _armLayout() {
   let cx, cy, R, base;
   if (v) { R = Math.min(W * 0.66, H * 1.15); cx = W / 2; cy = H + R * 0.2; base = -Math.PI / 2; }
   else { R = Math.min(H * 0.58, W * 1.05); cx = -R * 0.16; cy = H / 2; base = 0; }
-  ARM.geo = { W, H, cx, cy, R, base, v, dpr, ri: R * (v ? 0.78 : 0.66) };
+  ARM.geo = { W, H, cx, cy, R, base, v, dpr, ri: R * (v ? 0.66 : 0.5) };
   const hub = w.querySelector('.arm-hub');
   const hr = R * 0.34;
   // 轴心文字放在轴心圆露出部分的中间
@@ -199,19 +199,36 @@ function _armDraw() {
     ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
     ctx.stroke();
   }
-  // 分类色带（结构青 / 武器琥珀），每条目一段
-  const rb = R * 0.5;
-  ctx.lineWidth = Math.max(3, R * 0.022);
+  // 扇区：只画当前项和前后各 2 项（再往外淡出），每项一块环形扇区跟着轮盘转；
+  // 越接近指针越亮，并整体向外凸出（rOut 变大 + 沿径向外移），选中项最明显
+  const VIS = 2, FADE = 0.6, rIn = R * 0.38;
+  const vis = [];
   for (let i = 0; i < ARM_N; i++) {
-    const a = base + armoryRel(i, ARM.rot, ARM_N) * step;
-    const on = i === ARM.sel;
-    const c = ARMORY_ITEMS[i].cat === 'w' ? '240,180,90' : '159,212,184';
-    ctx.strokeStyle = 'rgba(' + c + ',' + (on ? 0.95 : 0.32) + ')';
-    ctx.beginPath(); ctx.arc(cx, cy, rb, a - step * 0.45, a + step * 0.45); ctx.stroke();
-    // 条目定位点
-    const rd = R * 0.86;
-    ctx.fillStyle = 'rgba(' + c + ',' + (on ? 1 : 0.55) + ')';
-    ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rd, cy + Math.sin(a) * rd, on ? 4 : 2.2, 0, Math.PI * 2); ctx.fill();
+    const rel = armoryRel(i, ARM.rot, ARM_N), ar = Math.abs(rel);
+    if (ar > VIS + FADE) continue;
+    vis.push({ i, rel, ar, a: base + rel * step, near: Math.max(0, 1 - ar), f: Math.min(1, (VIS + FADE - ar) / FADE) });
+  }
+  vis.sort((p, q) => q.ar - p.ar);          // 选中项最后画，压在邻居上面
+  for (const v of vis) {
+    const c = ARMORY_ITEMS[v.i].cat === 'w' ? '240,180,90' : '159,212,184';
+    const pop = R * 0.06 * v.near, ox = Math.cos(v.a) * pop, oy = Math.sin(v.a) * pop;
+    const rOut = R * (0.9 + 0.07 * v.near), half = step * 0.46;
+    ctx.beginPath();
+    ctx.arc(cx + ox, cy + oy, rOut, v.a - half, v.a + half);
+    ctx.arc(cx + ox, cy + oy, rIn, v.a + half, v.a - half, true);
+    ctx.closePath();
+    const sg = ctx.createRadialGradient(cx + ox, cy + oy, rIn, cx + ox, cy + oy, rOut);
+    sg.addColorStop(0, 'rgba(' + c + ',' + (0.02 + 0.06 * v.near) * v.f + ')');
+    sg.addColorStop(1, 'rgba(' + c + ',' + (0.05 + 0.26 * v.near) * v.f + ')');
+    ctx.fillStyle = sg;
+    ctx.fill();
+    ctx.lineWidth = 1 + v.near;
+    ctx.strokeStyle = 'rgba(' + c + ',' + (0.18 + 0.67 * v.near) * v.f + ')';
+    ctx.stroke();
+    // 外缘亮边
+    ctx.lineWidth = Math.max(2, R * 0.012) * (0.5 + v.near);
+    ctx.strokeStyle = 'rgba(' + c + ',' + (0.3 + 0.7 * v.near) * v.f + ')';
+    ctx.beginPath(); ctx.arc(cx + ox, cy + oy, rOut, v.a - half, v.a + half); ctx.stroke();
   }
   // 内圈：虚线环（反向慢转）+ 实心轴心
   ctx.lineWidth = 1;
@@ -228,31 +245,30 @@ function _armDraw() {
   ctx.strokeStyle = 'rgba(' + pc + ',.5)';
   ctx.beginPath(); ctx.moveTo(cx + ux * R * 0.34, cy + uy * R * 0.34); ctx.lineTo(cx + ux * R * 0.62, cy + uy * R * 0.62); ctx.stroke();
   ctx.fillStyle = 'rgb(' + pc + ')';
-  const tx = cx + ux * R * 1.0, ty = cy + uy * R * 1.0, px = -uy, py = ux;
+  const tx = cx + ux * R * 1.07, ty = cy + uy * R * 1.07, px = -uy, py = ux;
   ctx.beginPath();
   ctx.moveTo(tx - ux * 12 + px * 7, ty - uy * 12 + py * 7);
   ctx.lineTo(tx + ux * 2, ty + uy * 2);
   ctx.lineTo(tx - ux * 12 - px * 7, ty - uy * 12 - py * 7);
   ctx.closePath(); ctx.fill();
-  // 条目文字
+  // 条目文字：跟扇区一起转（横屏沿半径方向、竖屏沿切线方向），只显示可见的 5 项
   const items = ARM.el.querySelectorAll('.arm-item');
+  const on = {};
+  for (const v of vis) on[v.i] = v;
   for (let i = 0; i < ARM_N; i++) {
-    const rel = armoryRel(i, ARM.rot, ARM_N);
-    const a = base + rel * step;
-    const ang = Math.abs(rel * step);
-    const d = items[i];
-    const lim = Math.PI * (g.v ? 0.36 : 0.56);
-    if (ang > lim) { d.style.opacity = '0'; d.style.pointerEvents = 'none'; continue; }
-    const x = cx + Math.cos(a) * g.ri, y = cy + Math.sin(a) * g.ri;
-    const near = Math.max(0, 1 - Math.abs(rel));
-    const sc = 1 + near * (g.v ? 0.25 : 0.28);
-    d.style.opacity = String(Math.max(0.12, 1 - ang / lim) * (0.6 + 0.4 * near) + 0.0);
-    d.style.pointerEvents = 'auto';
-    d.style.transform = g.v
-      ? 'translate(' + x + 'px,' + y + 'px) translate(-50%,-50%) scale(' + sc + ')'
-      : 'translate(' + x + 'px,' + y + 'px) translateY(-50%) scale(' + sc + ')';
+    const d = items[i], v = on[i];
     d.classList.toggle('on', i === ARM.sel);
     d.setAttribute('aria-selected', i === ARM.sel ? 'true' : 'false');
+    if (!v) { d.style.opacity = '0'; d.style.pointerEvents = 'none'; continue; }
+    const pop = R * 0.06 * v.near;
+    const x = cx + Math.cos(v.a) * (g.ri + pop), y = cy + Math.sin(v.a) * (g.ri + pop);
+    const sc = (g.v ? 0.84 : 0.88) + 0.32 * v.near;
+    const op = (v.ar <= 1 ? 1 - 0.55 * v.ar : 0.45 - 0.2 * (v.ar - 1)) * v.f;
+    d.style.opacity = String(Math.max(0, op));
+    d.style.pointerEvents = op > 0.15 ? 'auto' : 'none';
+    const rot = (v.a - base) * 180 / Math.PI;
+    d.style.transform = 'translate(' + x + 'px,' + y + 'px) rotate(' + rot + 'deg) scale(' + sc + ')'
+      + (g.v ? ' translate(-50%,-50%)' : ' translateY(-50%)');
   }
 }
 
@@ -317,7 +333,7 @@ function _armTick(now) {
     ARM.vel *= Math.exp(-dt * 3.2);
     if (Math.abs(ARM.vel) < 1.2) ARM.target = Math.round(ARM.rot);
   } else {
-    const k = 1 - Math.exp(-dt * 11);
+    const k = 1 - Math.exp(-dt * 6.5);   // 吸附/切换稍慢一点，转动过程看得见
     ARM.rot += (ARM.target - ARM.rot) * k;
     if (Math.abs(ARM.target - ARM.rot) < 0.002) { ARM.rot = ARM.target; ARM.target = null; ARM.vel = 0; }
   }
