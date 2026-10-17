@@ -183,6 +183,7 @@
    "mergeTargetStatics",
    "scorchTexture",
    "targetMat",
+   "targetModelKey",
    "wreckEmber",
    "wreckPop"
   ],
@@ -221,6 +222,7 @@
     "loadTargetModels",
     "makeWreck",
     "mergeTargetStatics",
+    "targetModelKey",
     "wreckEmber",
     "wreckPop"
    ],
@@ -276,7 +278,8 @@
     "applyModelToTarget",
     "loadTargetModels",
     "mergeTargetStatics",
-    "targetMat"
+    "targetMat",
+    "targetModelKey"
    ],
    "05-config.js": [
     "BASE_C"
@@ -319,7 +322,8 @@
     "applyModelToTarget",
     "loadTargetModels",
     "mergeTargetStatics",
-    "targetMat"
+    "targetMat",
+    "targetModelKey"
    ]
   }
  },
