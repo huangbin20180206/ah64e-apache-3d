@@ -637,8 +637,15 @@ body.photo-mode > *:not(canvas):not(#photo-exit):not(.route-bar):not(#tour-cap){
       <span class="ln-desc" id="ln-play-desc">战役关卡 · 难度选择 · 评级与解锁</span>
       <span class="ln-go">出击 →</span>
     </button>
+    <button class="ln-card" id="ln-armory" data-go="armory">
+      <span class="ln-idx">03</span>
+      <span class="ln-name">图鉴</span>
+      <span class="ln-en">ARMORY</span>
+      <span class="ln-desc">结构与武器 · 真实照片 · 转盘浏览（不吃显卡）</span>
+      <span class="ln-go">打开 →</span>
+    </button>
   </div>
-  <div id="ln-foot">按 1 进入展示 · 按 2 进入游戏 · 任何时候点右上角 ⌂ 回到这里</div>
+  <div id="ln-foot">按 1 进入展示 · 按 2 进入游戏 · 按 3 打开图鉴 · 任何时候点右上角 ⌂ 回到这里</div>
 </div>
 
 <div id="top">
@@ -828,6 +835,7 @@ body.photo-mode > *:not(canvas):not(#photo-exit):not(.route-bar):not(#tour-cap){
 
   <div class="sec" data-tab="know">
     <h3>武器与机械</h3>
+    <div class="chip" id="btn-armory" role="button" tabindex="0" style="width:100%;margin-bottom:8px" title="全屏转盘浏览结构与武器的真实照片（Esc 关闭）">打开装备图鉴 · 全屏</div>
     <div class="know-tip">选一张卡，镜头会飞到对应部件，并给出参数和原理。</div>
     <div class="kh">系统知识 · 10</div>
     <div id="know-list"></div>
