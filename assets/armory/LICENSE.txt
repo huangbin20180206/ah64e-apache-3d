@@ -1,0 +1,18 @@
+装备图鉴照片（71-armory / 35-armorydata）来源：Wikimedia Commons。
+全部为公有领域（美国陆军官方照片）、CC0 或知识共享署名许可；已缩放裁切为 1600×1000 WebP。
+CC BY / CC BY-SA 照片的署名见下，也在图鉴界面每张图下方显示。
+
+rotor.webp — U.S. Army photo by Staff Sgt. Kris Bonet — Public domain — https://commons.wikimedia.org/wiki/File:Maintaining_lethality_(5045577).jpg
+tail.webp — U.S. Army photo by Staff Sgt. Dean Johnson — Public domain — https://commons.wikimedia.org/wiki/File:Post-Flight_AH-64_Apache_Inspection_(9477345).jpg
+engine.webp — U.S. Army photo by Georgios Moumoulidis — Public domain — https://commons.wikimedia.org/wiki/File:Engine_maintenance_on_the_AH-64_(5569020).jpg
+cockpit.webp — Ronnie Macdonald from Chelmsford and Largs, United Kingdom — CC BY 2.0 — https://commons.wikimedia.org/wiki/File:AH-64D_Apache_(19753255029).jpg
+radar.webp — U.S. Army 25CAB by Sgt. Olivia Cowart — Public domain — https://commons.wikimedia.org/wiki/File:25th_CAB_Repairs_Rotor_Head_of_AH-64_Apache_(9260405).jpg
+tads.webp — Master Sgt. Corine Lombardo — Public domain — https://commons.wikimedia.org/wiki/File:US_and_Japanese_aviation_refuelers_demonstrate_techniques_during_Orient_Shield_14_141028-Z-NU174-016.jpg
+wing.webp — FaceMePLS from The Hague, The Netherlands — CC BY 2.0 — https://commons.wikimedia.org/wiki/File:Boeing_Apache_AH-64D_(28538725695).jpg
+airframe.webp — U.S. Army photo by Sgt. Gianna Sulger — Public domain — https://commons.wikimedia.org/wiki/File:1st_Battalion,_57th_Air_Defense_Artillery_Regiment_Training_(8594015).jpg
+gun2.webp — 玄史生 — CC0 — https://commons.wikimedia.org/wiki/File:M230_Chain_Gun_Loaded_under_Head_of_ROCA_AH-64E_816_20140329.jpg
+hydra.webp — User:Dammit — CC BY-SA 2.5 nl — https://commons.wikimedia.org/wiki/File:Hydra_70_M261.jpeg
+hellfire.webp — Sgt. Jon Soles, MND-B PAO — Public domain — https://commons.wikimedia.org/wiki/File:US_Army_52453_CAMP_TAJI,_Iraq_-_Spc._Sean_McConnell_(left),_of_Columbus,_Ohio,_and_Spc._Scott_Shaver,_of_Austin,_Texas,_load_a_Hellfire_missile_onto_the_mounting_bracket_on_an_AH-64D_Apache_helicopter,_here,_Oct._1.jpg
+jagm3.webp — Tad Browning, U.S. Army Operational Test Command Public Affairs — Public domain — https://commons.wikimedia.org/wiki/File:US_Army_YPG_JAGM_Testing_with_AH-64.jpg
+flare.webp — U.S. Army — Public domain — https://commons.wikimedia.org/wiki/File:AH-64_firing_flare.jpg
+hero.webp — U.S. Army photo by Capt. Jesse Paulsboe — Public domain — https://commons.wikimedia.org/wiki/File:AH-64E_Apache-Guardian-0002.jpg
