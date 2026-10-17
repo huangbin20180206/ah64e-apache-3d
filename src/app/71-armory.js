@@ -346,6 +346,8 @@ function _armTick(now) {
   }
   _armSelUpdate();
   _armDraw();
+  // 快转到位（剩不到 0.12 格）就先换照片和正文，不等最后那段慢慢吸附
+  if (ARM.target !== null && !ARM.drag && Math.abs(ARM.target - ARM.rot) < 0.12) _armShow(ARM.sel);
   if (ARM.target === null && ARM.vel === 0) { _armShow(ARM.sel); return; }
   ARM.raf = requestAnimationFrame(_armTick);
 }
