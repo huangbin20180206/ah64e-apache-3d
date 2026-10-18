@@ -135,13 +135,25 @@ function finish() {
     killFeed(label);
     if (arcade && S._mission && S._mission.phase === 'active') arcade.onKill('infantry', S._mission);
   };
+  // 2026-10-18 ASSETS4 战场活物（27-life）：城镇平民（误伤扣分）+ 摩托侦察兵（计分）
+  life = new BattleLife(W.scene);
+  life.fx = rig;
+  life.onKill = (label, key) => {
+    killFeed(label);
+    if (arcade && S._mission && S._mission.phase === 'active') arcade.onKill(key, S._mission);
+  };
+  life.onCivilian = () => {
+    const m = S._mission;
+    if (arcade && m && m.phase === 'active') { arcade.addBonus(-CIV_PENALTY); m.civKills = (m.civKills || 0) + 1; }
+    toast('误伤平民！−' + CIV_PENALTY + ' 分');
+  };
   rig.onInfantryHit = (p) => {
-    const h = infantry.bulletHit(p);
+    const h = infantry.bulletHit(p) || life.bulletHit(p);
     const m = S._mission;
     if (h && m && !m.done) { const hb = m.hitsBy || (m.hitsBy = { 1: 0, 2: 0, 3: 0 }); hb[1]++; m.infHits = (m.infHits || 0) + 1; }   // P5-G4：步兵命中只进分武器统计，不改命中率口径
     return h;
   };
-  rig.onBlast = (x, y, z, t) => { scenery.blast(x, y, z, t); infantry.blast(x, y, z, t); };   // 爆炸波及远景树（31-scenery）+ 步兵
+  rig.onBlast = (x, y, z, t) => { scenery.blast(x, y, z, t); infantry.blast(x, y, z, t); life.blast(x, y, z, t); };   // 爆炸波及远景树（31-scenery）+ 步兵
   rig.onTreeHit = (p, d) => scenery.bulletHit(p, d);         // 机炮打树：飞叶/打断
   rig.onHitMark = () => hitMark();
   targets.onSfx = rig.onSfx;
