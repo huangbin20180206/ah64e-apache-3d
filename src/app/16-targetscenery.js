@@ -306,6 +306,7 @@ function buildRangeScenery(range, BC, layout) {
     g.add(road);
   }
   g.visible = range.enabled;
+  placeRangeProps(g, BC);   // 2026-10-18 ASSETS2：真模型布景道具（16-targetprops，异步挂入）
   range.scenery = g;
   range.scene.add(g);
 }
