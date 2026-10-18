@@ -1,7 +1,7 @@
 // ============================================================
 // 16-targetprops.js — 布景道具真模型（2026-10-18 ASSETS2）
 // 基地/城镇的不可破坏装饰件：储油罐、道闸检查站、油桶、弹药箱、加油站、
-// 沙漠村落、废弃轿车、旧货车。全部 Sketchfab CC BY 4.0（作者见 CREDITS.md）。
+// 沙漠村落、废弃轿车、旧货车、越野摩托。全部 Sketchfab CC BY 4.0（作者见 CREDITS.md）。
 // 只是背景装饰：不进 targets、不参与命中/伤害，弹药直接穿过。
 // 异步加载：GLB 到位后挂到传入的父组（基地挂 range.scenery、城镇挂 town.group），
 // 显隐跟随父组；加载失败静默跳过（场景照常，只是少几件道具）。
@@ -26,6 +26,9 @@ const PROP_DEFS = {
   house6:   { url: 'assets/targets/prop_village.glb', pick: 'Concrete_House_006', k: 1 / 2.27 },
   sedan:    { url: 'assets/targets/prop_sedanwreck.glb', len: 2.0 }, // 废弃轿车 ≈4.5m
   van:      { url: 'assets/targets/prop_van.glb', len: 2.15 },       // 旧厢式货车 ≈4.9m
+  // 越野摩托：文件里 7 辆一排（不同颜色），按节点名取两辆停在街边；车长 ≈2.1m
+  motoK:    { url: 'assets/targets/prop_moto.glb', pick: 'dirt_bike_black', len: 0.93 },
+  motoR:    { url: 'assets/targets/prop_moto.glb', pick: 'dirt_bike_red', len: 0.93 },
 };
 let _propCache = null;
 function _loadPropModels() {
@@ -106,5 +109,7 @@ function placeTownProps(parent, C) {
     ['sedan', C.x + 2.6, C.z - 9.6, 0.25],
     ['van', C.x - 2.7, C.z + 11.8, PI + 0.1],
     ['drums', C.x - 15.2, C.z + 1.8, 0.7],
+    ['motoK', C.x + 2.1, C.z + 2.4, 0.2],
+    ['motoR', C.x - 2.2, C.z - 2.9, 2.9],
   ]);
 }
