@@ -172,7 +172,16 @@ const TARGET_MODELS = {
   // 见 assets/targets/bmp2-LICENSE.txt）：坦克池的"变体壳"——t.mdl='ifv' 的坦克换此壳，
   // 命中/血量/移动逻辑仍按 tank。真车长 6.72m≈2.96u。
   ifv:   { url: 'assets/targets/bmp2.glb',  yaw: 0, len: 2.96 },   // 模型车头已朝 +Z（截图核验：后舱门朝车尾）
+  // 2026-10-18 ASSETS2：卡车池变体（CC BY 4.0，见 CREDITS.md）。车头均朝模型 +Z。
+  ural:  { url: 'assets/targets/ural.glb',  yaw: 0, len: 3.26 },   // Ural-4320 真车长 7.4m
+  fuel:  { url: 'assets/targets/fuel.glb',  yaw: 0, len: 4.2 },    // M978 HEMTT 油罐车（真车长 10.2m，略缩免挤占停车线）
+  // 坦克池第 3 变体：BTR-80 装甲输送车（42manako，CC BY 4.0）。原模型车头朝 +X → yaw -90° 转到 +Z
+  apc:   { url: 'assets/targets/btr80.glb', yaw: -Math.PI / 2, len: 3.37 },   // 真车长 7.65m
 };
+// 变体轮换：同类目标按序号轮流换壳（只换外观与名称，命中/血量/移动仍按 type）
+const TARGET_VARIANTS = { tank: [null, 'ifv', 'apc'], truck: [null, 'ural', 'fuel'] };
+const VARIANT_LABEL = { ifv: 'BMP-2 步战车', apc: 'BTR-80 装甲车', ural: '乌拉尔军卡', fuel: '油罐车' };
+function pickVariant(type, n) { const v = TARGET_VARIANTS[type]; return v ? v[n % v.length] : null; }
 // 目标用哪个壳：变体优先（t.mdl），否则按类型
 function targetModelKey(t) { return t.mdl && TARGET_MODELS[t.mdl] ? t.mdl : t.type; }
 let _targetModelCache = null;
