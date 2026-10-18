@@ -1,108 +1,79 @@
 // ============================================================
-// 27-infantry.js — 敌方步兵小队（P5-G2，2026-10-16）
+// 27-infantry.js — 敌方步兵小队（P5-G2，2026-10-16；2026-10-18 ASSETS4 换真人动画模型）
 // ============================================================
-// 用救援同款 CC0 真人士兵模型（assets/targets/survivor.glb）烘焙 6 种静态姿势：
-//   aim 举枪对空 / kneel 跪姿扛火箭筒 / runA·runB 奔跑两帧 / idle 持枪站立 / dead 倒地。
-// 每种姿势在加载时做一次 CPU 蒙皮（骨骼只在烘焙时用，运行时不再算顶点），
-// 步枪/火箭筒按烘焙后手的位置合进同一几何；每种姿势一个 InstancedMesh
-// （同姿势所有人一次绘制），全队 16 人最多 6 次绘制。
+// 模型：团结 AI 生成的两个带骨骼角色（AIGC，见 CREDITS.md）——
+//   assets/targets/soldier_rifle.glb 步枪兵（AK）/ soldier_rpg.glb 火箭筒兵（RPG-7 扛肩），
+//   各带 Idle / Walk / Run 三段循环动作。武器是模型自带的，不再程序化拼接。
+// 烘焙：加载时用 AnimationMixer 把动作采样成静态帧（站立 1 帧 + 走路 6 帧 + 奔跑 6 帧），
+//   每帧做一次 CPU 蒙皮（运行时不算骨骼——GPU 蒙皮在部分显卡/软件渲染下会丢失 WebGL 上下文），
+//   每种(兵种×帧)一个 InstancedMesh：同帧所有人一次绘制，空帧 count=0 不绘制。
+//   倒地 = 站立帧放倒（实例矩阵旋转），不占额外几何。bakeClipPoses 也给 27-life（平民）用。
 // 行为（仅游戏关卡、基地靶场启用、非训练/航线时出现）：
-//   · 平时持枪站岗；直升机进入 42u 内且离地 → 转身举枪，步枪曳光点射（低伤害）
-//   · RPG 兵跪姿瞄准，冷却 9–14 秒发射一枚火箭弹（带尾烟、可看见、可躲），近炸伤害
-//   · 附近爆炸 → 幸存者朝远离爆点方向奔跑 2.5–4 秒再恢复射击
+//   · 平时：哨兵持枪站岗；每队 2 名巡逻兵在 1.8u 长的岗线上来回走（走路动画，两端停 2–3 秒）
+//   · 直升机进入 42u 内且离地 → 转身面向直升机，步枪曳光点射（低伤害）
+//   · RPG 兵瞄准，冷却 9–14 秒发射一枚火箭弹（带尾烟、可看见、可躲），近炸伤害
+//   · 附近爆炸 → 幸存者朝远离爆点方向奔跑 2.5–4 秒（奔跑动画）再恢复射击
 //   · 机炮一发命中即倒地；爆炸半径内倒地；击毙计分（arcade 'infantry'）
 // 伤害走 16-targets 的既有受损链（_heliDmg / onHeliHit → 受击反馈/损伤系统）。
 // 依赖（运行时注入）：range = BaseRange（16-targets），fx = WeaponRig（65-weapons）
 // ============================================================
 
-const INF_H = 0.81;                 // 人高（与救援幸存者同比例，1u≈2.2m）
-const INF_POSES = ['idle', 'aim', 'kneel', 'runA', 'runB', 'dead'];
+const INF_H = 0.81;                 // 人高（1.78m，1u≈2.2m）
+const INF_WALK_N = 6, INF_RUN_N = 6;
+// 帧键：idle / w0..w5（走）/ r0..r5（跑）
+const INF_FRAMES = ['idle'].concat([...Array(INF_WALK_N)].map((_, i) => 'w' + i), [...Array(INF_RUN_N)].map((_, i) => 'r' + i));
 const _ifV = new THREE.Vector3(), _ifV2 = new THREE.Vector3(), _ifM = new THREE.Matrix4(),
   _ifQ = new THREE.Quaternion(), _ifS = new THREE.Vector3(), _ifE = new THREE.Euler();
 
-// 烘焙：gltf → { pose: BufferGeometry（含 groups：0 军装 / 1 武器）}
-function bakeInfantryPoses(gltf) {
-  const m = gltf.scene, B = {};
-  m.traverse(o => { if (o.isBone) B[o.name] = o; });
-  const need = ['Head', 'headfront', 'LeftHand', 'RightHand', 'LeftArm', 'LeftForeArm', 'RightArm', 'RightForeArm',
-    'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'RightUpLeg', 'RightLeg', 'RightFoot', 'RightShoulder'];
-  if (need.some(n => !B[n])) return null;
+// 动作采样烘焙：gltf（带 Idle/Walk/Run 动画的人形骨骼模型，正面 +Z、Y 上）→
+// { idle, w0.., r0.. : BufferGeometry, mat }。人高按 Idle 首帧缩放到 H；
+// 每帧扣掉髋骨水平位移（原地动作）、最低点贴 y=0。失败返回 null。
+function bakeClipPoses(gltf, H) {
+  const root = gltf.scene;
   let sm = null;
-  m.traverse(o => { if (o.isSkinnedMesh && !sm) sm = o; });
-  if (!sm) return null;
-  const wrap = new THREE.Group();
-  wrap.add(m);
-  m.updateMatrixWorld(true);
-  const wp = n => new THREE.Vector3().setFromMatrixPosition(B[n].matrixWorld);
-  const f = wp('headfront').sub(wp('Head'));
-  wrap.rotation.y = -Math.atan2(f.x, f.z);                 // 正面朝 +Z
-  wrap.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(wrap);
-  const sc = INF_H / Math.max(0.1, box.max.y - box.min.y);
-  wrap.scale.setScalar(sc);
-  wrap.position.y = -box.min.y * sc;
-  wrap.updateMatrixWorld(true);
-  const wInv = wrap.matrixWorld.clone().invert();
-  const loc = n => wp(n).applyMatrix4(wInv);
-  const R = Math.sign(loc('RightArm').x) || -1, L = -R;
-  const names = Object.keys(B);
-  const rest = names.map(n => B[n].quaternion.clone());
-  const wq = new THREE.Quaternion(), pq = new THREE.Quaternion(), bq = new THREE.Quaternion(), dq = new THREE.Quaternion();
-  const aim = (bn, cn, d) => {
-    const bone = B[bn];
-    wrap.updateMatrixWorld(true);
-    wrap.getWorldQuaternion(wq);
-    const cur = wp(cn).sub(wp(bn)).normalize();
-    const tgt = new THREE.Vector3(d[0], d[1], d[2]).normalize().applyQuaternion(wq);
-    dq.setFromUnitVectors(cur, tgt);
-    bone.getWorldQuaternion(bq);
-    bone.parent.getWorldQuaternion(pq);
-    bone.quaternion.copy(pq.invert().multiply(dq.multiply(bq)));
-    bone.updateMatrixWorld(true);
-  };
-  // 姿势表：[骨, 子骨, 方向]（方向在人物本地：+Z 前、+Y 上、R/L=右/左侧）
-  const legs = (lu, ll, ru, rl) => [['LeftUpLeg', 'LeftLeg', lu], ['LeftLeg', 'LeftFoot', ll],
-    ['RightUpLeg', 'RightLeg', ru], ['RightLeg', 'RightFoot', rl]];
-  const arms = (la, lf, ra, rf) => [['LeftArm', 'LeftForeArm', la], ['LeftForeArm', 'LeftHand', lf],
-    ['RightArm', 'RightForeArm', ra], ['RightForeArm', 'RightHand', rf]];
-  const stand = legs([L * 0.12, -1, 0.02], [L * 0.04, -1, -0.04], [R * 0.12, -1, 0.02], [R * 0.04, -1, -0.04]);
-  const POSE = {
-    idle: stand.concat(arms([L * 0.25, -0.9, 0.3], [R * 0.55, 0.15, 0.82], [R * 0.25, -0.95, 0.15], [L * 0.35, -0.2, 0.9])),
-    aim: legs([L * 0.2, -1, 0.15], [L * 0.05, -1, 0], [R * 0.15, -1, -0.2], [R * 0.05, -1, -0.05])
-      .concat(arms([L * 0.05, 0.25, 0.97], [R * 0.12, 0.42, 0.9], [R * 0.45, -0.1, 0.5], [L * 0.45, 0.42, 0.78])),
-    kneel: legs([L * 0.15, -0.12, 1], [L * 0.02, -1, 0.05], [R * 0.15, -1, 0.15], [R * 0.02, -0.08, -1])
-      .concat(arms([L * 0.15, -0.15, 0.97], [R * 0.25, 0.25, 0.93], [R * 0.55, -0.35, 0.3], [L * 0.2, 0.75, 0.6])),
-    runA: legs([L * 0.08, -0.8, 0.6], [L * 0.03, -0.95, -0.3], [R * 0.08, -0.88, -0.45], [R * 0.03, -0.55, -0.83])
-      .concat(arms([L * 0.3, -0.75, 0.45], [R * 0.6, 0.25, 0.75], [R * 0.3, -0.85, 0.2], [L * 0.5, 0.1, 0.85])),
-    runB: legs([L * 0.08, -0.88, -0.45], [L * 0.03, -0.55, -0.83], [R * 0.08, -0.8, 0.6], [R * 0.03, -0.95, -0.3])
-      .concat(arms([L * 0.3, -0.75, 0.45], [R * 0.6, 0.25, 0.75], [R * 0.3, -0.85, 0.2], [L * 0.5, 0.1, 0.85])),
-    dead: legs([L * 0.25, -1, 0.05], [L * 0.2, -1, 0], [R * 0.1, -1, 0.25], [R * 0.05, -1, 0.3])
-      .concat(arms([L * 0.9, 0.3, 0.1], [L * 0.6, 0.7, 0.2], [R * 0.95, -0.25, 0.1], [R * 0.7, -0.6, 0.2])),
-  };
-  // 蒙皮所需原始数据
+  root.traverse(o => { if (o.isSkinnedMesh && !sm) sm = o; });
+  if (!sm || !gltf.animations || !gltf.animations.length) return null;
+  const clip = nm => gltf.animations.find(a => a.name.toLowerCase() === nm) || null;
+  const cIdle = clip('idle'), cWalk = clip('walk') || cIdle, cRun = clip('run') || cWalk;
+  if (!cIdle) return null;
+  const mixer = new THREE.AnimationMixer(root);
+  const sk = sm.skeleton, hips = sk.bones.find(b => /hips/i.test(b.name)) || sk.bones[0];
   const sg = sm.geometry, pa = sg.attributes.position, na = sg.attributes.normal,
-    ja = sg.attributes.skinIndex, wa = sg.attributes.skinWeight, n = pa.count;
-  const sk = sm.skeleton, BM = sk.bones.map(() => new THREE.Matrix4());
-  const out = {};
-  const gunMat = (len, rad) => new THREE.CylinderGeometry(rad, rad, len, 6).rotateX(PI / 2);
-  for (const key of INF_POSES) {
-    names.forEach((nm, i) => B[nm].quaternion.copy(rest[i]));
-    for (const [b, c, d] of POSE[key]) aim(b, c, d);
-    wrap.updateMatrixWorld(true);
-    for (const b of sk.bones) b.updateMatrixWorld(true);
-    // 合成矩阵 → 人物本地（wrap 父空间 = 世界，wInv 抵消）
+    ja = sg.attributes.skinIndex, wa = sg.attributes.skinWeight, ua = sg.attributes.uv, n = pa.count;
+  const BM = sk.bones.map(() => new THREE.Matrix4()), rInv = new THREE.Matrix4(), hp = new THREE.Vector3();
+  const pose = (c, t) => {
+    mixer.stopAllAction();
+    const a = mixer.clipAction(c);
+    a.reset(); a.play(); a.time = t;
+    mixer.update(0);
+    root.updateMatrixWorld(true);
+    rInv.copy(root.matrixWorld).invert();
+    return hp.setFromMatrixPosition(hips.matrixWorld).applyMatrix4(rInv).clone();
+  };
+  const h0 = pose(cIdle, 0);
+  let sc = 1, UV = null;
+  if (ua) { UV = new Float32Array(n * 2); for (let i = 0; i < n; i++) { UV[i * 2] = ua.getX(i); UV[i * 2 + 1] = ua.getY(i); } }
+  const IDX = sg.index ? Uint32Array.from(sg.index.array) : null;
+  // 骨骼索引/权重解成平铺数组（兼容量化/交错属性；旧版 three 无 getComponent）
+  const JS = new Uint16Array(n * 4), WS = new Float32Array(n * 4);
+  for (let i = 0; i < n; i++) {
+    JS[i * 4] = ja.getX(i); JS[i * 4 + 1] = ja.getY(i); JS[i * 4 + 2] = ja.getZ(i); JS[i * 4 + 3] = ja.getW(i);
+    WS[i * 4] = wa.getX(i); WS[i * 4 + 1] = wa.getY(i); WS[i * 4 + 2] = wa.getZ(i); WS[i * 4 + 3] = wa.getW(i);
+  }
+  const skin = (c, t) => {
+    const hx = pose(c, t);
     for (let b = 0; b < sk.bones.length; b++) {
-      BM[b].multiplyMatrices(wInv, sk.bones[b].matrixWorld).multiply(sk.boneInverses[b]).multiply(sm.bindMatrix);
+      BM[b].multiplyMatrices(rInv, sk.bones[b].matrixWorld).multiply(sk.boneInverses[b]).multiply(sm.bindMatrix);
     }
     const P = new Float32Array(n * 3), N = new Float32Array(n * 3);
+    let minY = Infinity, maxY = -Infinity;
     for (let i = 0; i < n; i++) {
       const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i), nx = na.getX(i), ny = na.getY(i), nz = na.getZ(i);
       let ox = 0, oy = 0, oz = 0, qx = 0, qy = 0, qz = 0;
-      const js = [ja.getX(i), ja.getY(i), ja.getZ(i), ja.getW(i)], ws = [wa.getX(i), wa.getY(i), wa.getZ(i), wa.getW(i)];
       for (let j = 0; j < 4; j++) {
-        const w = ws[j];
+        const w = WS[i * 4 + j];
         if (w === 0) continue;
-        const e = BM[js[j]].elements;
+        const e = BM[JS[i * 4 + j]].elements;
         ox += w * (e[0] * x + e[4] * y + e[8] * z + e[12]);
         oy += w * (e[1] * x + e[5] * y + e[9] * z + e[13]);
         oz += w * (e[2] * x + e[6] * y + e[10] * z + e[14]);
@@ -111,60 +82,32 @@ function bakeInfantryPoses(gltf) {
         qz += w * (e[2] * nx + e[6] * ny + e[10] * nz);
       }
       const l = Math.hypot(qx, qy, qz) || 1;
-      P[i * 3] = ox; P[i * 3 + 1] = oy; P[i * 3 + 2] = oz;
+      P[i * 3] = ox - (hx.x - h0.x); P[i * 3 + 1] = oy; P[i * 3 + 2] = oz - (hx.z - h0.z);
       N[i * 3] = qx / l; N[i * 3 + 1] = qy / l; N[i * 3 + 2] = qz / l;
+      if (oy < minY) minY = oy; if (oy > maxY) maxY = oy;
     }
-    const body = new THREE.BufferGeometry();
-    body.setAttribute('position', new THREE.BufferAttribute(P, 3));
-    body.setAttribute('normal', new THREE.BufferAttribute(N, 3));
-    const UV = new Float32Array(n * 2), ua = sg.attributes.uv;   // 压缩/交错 UV 统一解成 Float32
-    if (ua) for (let i = 0; i < n; i++) { UV[i * 2] = ua.getX(i); UV[i * 2 + 1] = ua.getY(i); }
-    body.setAttribute('uv', new THREE.BufferAttribute(UV, 2));
-    if (sg.index) body.setIndex(new THREE.BufferAttribute(Uint32Array.from(sg.index.array), 1));
-    // 落地：最低点贴 y=0（跪姿/奔跑骨盆下沉）
-    body.computeBoundingBox();
-    body.translate(0, -body.boundingBox.min.y, 0);
-    const lift = -body.boundingBox.min.y;
-    // 武器：按手的位置摆
-    const rh = loc('RightHand'), lh = loc('LeftHand'), sh = loc('RightShoulder');
-    rh.y += lift; lh.y += lift; sh.y += lift;
-    let weap = null;
-    if (key === 'kneel') {
-      // 火箭筒：扛在右肩，指向前上方
-      const dir = new THREE.Vector3(0, 0.28, 1).normalize();
-      weap = gunMat(0.42, 0.028);
-      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
-      weap.applyQuaternion(q);
-      weap.translate(sh.x * 0.85, sh.y + 0.03, sh.z + 0.06);
-      const head = new THREE.ConeGeometry(0.045, 0.1, 6).rotateX(PI / 2).applyQuaternion(q);
-      const tip = dir.clone().multiplyScalar(0.25);
-      head.translate(sh.x * 0.85 + tip.x, sh.y + 0.03 + tip.y, sh.z + 0.06 + tip.z);
-      weap = mergeGeos([weap, head]);
-    } else if (key !== 'dead') {
-      // 步枪：从右手指向左手方向，前伸
-      const dir = lh.clone().sub(rh);
-      if (dir.lengthSq() < 1e-4) dir.set(0, 0, 1);
-      dir.normalize();
-      const len = 0.36;
-      weap = gunMat(len, 0.014);
-      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
-      weap.applyQuaternion(q);
-      const c = rh.clone().addScaledVector(dir, len * 0.4);
-      weap.translate(c.x, c.y, c.z);
+    return { P, N, minY, maxY };
+  };
+  const out = {};
+  const mk = (key, c, t) => {
+    const r = skin(c, t);
+    if (key === 'idle') sc = H / Math.max(1e-3, r.maxY - r.minY);
+    for (let i = 0; i < n; i++) {
+      r.P[i * 3] *= sc; r.P[i * 3 + 1] = (r.P[i * 3 + 1] - r.minY) * sc; r.P[i * 3 + 2] *= sc;
     }
-    let geo = body;
-    const bodyIdx = body.index ? body.index.count : 0;
-    if (weap && body.index) {
-      // 武器零 UV（纯色材质不用贴图）；合并后按索引区间分两组材质：0 军装 / 1 武器
-      const wu = new Float32Array(weap.attributes.position.count * 2);
-      weap.setAttribute('uv', new THREE.BufferAttribute(wu, 2));
-      const mg = mergeGeos([body, weap]);
-      if (mg) { geo = mg; geo.clearGroups(); geo.addGroup(0, bodyIdx, 0); geo.addGroup(bodyIdx, mg.index.count - bodyIdx, 1); }
-    }
-    if (!geo.groups.length) geo.addGroup(0, geo.index ? geo.index.count : geo.attributes.position.count, 0);
-    geo.computeBoundingSphere();
-    out[key] = { geo, mat: sm.material };
-  }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(r.P, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(r.N, 3));
+    if (UV) g.setAttribute('uv', new THREE.BufferAttribute(UV, 2));
+    if (IDX) g.setIndex(new THREE.BufferAttribute(IDX, 1));
+    g.computeBoundingSphere();
+    out[key] = g;
+  };
+  mk('idle', cIdle, 0);
+  for (let i = 0; i < INF_WALK_N; i++) mk('w' + i, cWalk, cWalk.duration * i / INF_WALK_N);
+  for (let i = 0; i < INF_RUN_N; i++) mk('r' + i, cRun, cRun.duration * i / INF_RUN_N);
+  mixer.stopAllAction();
+  out.mat = sm.material;
   return out;
 }
 
@@ -185,7 +128,11 @@ class Infantry {
     // 自动化测试（webdriver）默认不出现，保老测试不被步兵挡子弹/打伤；截图脚本可置 allow=true
     this.allow = !(typeof navigator !== 'undefined' && navigator.webdriver);
     this._layout();
-    new THREE.GLTFLoader().load('assets/targets/survivor.glb', (g) => this._build(g), undefined, () => {});
+    // 两个兵种模型都到位才建（任一失败 → 不出现步兵，场景照常）
+    const L = new THREE.GLTFLoader(), got = {};
+    const done = (k, g) => { got[k] = g; if ('s' in got && 'g' in got && got.s && got.g) this._build(got.s, got.g); };
+    L.load('assets/targets/soldier_rifle.glb', (g) => done('s', g), undefined, () => done('s', null));
+    L.load('assets/targets/soldier_rpg.glb', (g) => done('g', g), undefined, () => done('g', null));
   }
 
   // 3 个小队 × 4 人（每队 1 名 RPG 兵），位置相对基地中心 BASE_C，靠沙袋/工事
@@ -203,29 +150,31 @@ class Infantry {
         this.men.push({
           home: { x, z, ry: sq.face + (rnd() - 0.5) * 0.6 }, x, z, ry: 0,
           rpg: i === 3, alive: true, st: 'idle', t: 0, cd: rnd(2, 6), flee: 0, fx: 0, fz: 0, ph: rnd(TAU),
+          // 巡逻兵（每队第 2、3 人）：沿垂直于朝向的 1.8u 岗线来回走；pk=当前去往端点(0/1)，pw=端点停留
+          patrol: i === 1 || i === 2, pk: i & 1, pw: rnd(0.5, 2.5), walk: false,
         });
       });
     }
     this.reset();
   }
 
-  _build(gltf) {
-    let baked = null;
-    try { baked = bakeInfantryPoses(gltf); } catch (e) { baked = null; }
-    if (!baked) return;
-    // 敌军：军装整体压暗偏沙色（与救援的我方飞行员区分）
-    const src = baked.idle.mat;
-    const body = new THREE.MeshStandardMaterial({ map: src.map || null, color: 0xa8916a, roughness: 0.95, metalness: 0 });
-    const gun = new THREE.MeshStandardMaterial({ color: 0x1e1d1b, roughness: 0.6, metalness: 0.4 });
+  _build(gS, gG) {
+    let bs = null, bg = null;
+    try { bs = bakeClipPoses(gS, INF_H); bg = bakeClipPoses(gG, INF_H); } catch (e) { console.warn('[infantry] bake', e); bs = bg = null; }
+    if (!bs || !bg) return;
+    // 每种(兵种 s=步枪 / g=火箭筒 × 帧)一个 InstancedMesh；容量按该兵种人数
     this.meshes = {};
-    for (const k of INF_POSES) {
-      const im = new THREE.InstancedMesh(baked[k].geo, [body, gun], this.men.length);
-      im.count = 0;
-      im.frustumCulled = false;
-      im.castShadow = true;
-      im.visible = false;
-      this.scene.add(im);
-      this.meshes[k] = im;
+    const cap = { s: this.men.filter(p => !p.rpg).length, g: this.men.filter(p => p.rpg).length };
+    for (const [t, B] of [['s', bs], ['g', bg]]) {
+      for (const k of INF_FRAMES) {
+        const im = new THREE.InstancedMesh(B[k], B.mat, Math.max(1, cap[t]));
+        im.count = 0;
+        im.frustumCulled = false;
+        im.castShadow = true;
+        im.visible = false;
+        this.scene.add(im);
+        this.meshes[t + k] = im;
+      }
     }
     // 步枪曳光（细长发光条，8 枚池）
     const tg = new THREE.BoxGeometry(0.025, 0.025, 0.7);
@@ -252,7 +201,7 @@ class Infantry {
   reset() {
     for (const p of this.men) {
       p.x = p.home.x; p.z = p.home.z; p.ry = p.home.ry;
-      p.alive = true; p.st = 'idle'; p.t = 0; p.cd = rnd(3, 7); p.flee = 0;
+      p.alive = true; p.st = 'idle'; p.t = 0; p.cd = rnd(3, 7); p.flee = 0; p.walk = false;
     }
     for (const r of this._rpgs) r.g.visible = false;
     for (const t of this._tracers) t.m.visible = false;
@@ -334,8 +283,22 @@ class Infantry {
         }
       } else {
         p.st = 'idle';
-        let dd = p.home.ry - p.ry; dd = Math.atan2(Math.sin(dd), Math.cos(dd));
-        p.ry += dd * Math.min(1, dt * 1.5);
+        p.walk = false;
+        let face = p.home.ry;
+        if (p.patrol) {
+          // 岗线端点：home ± 0.9u（垂直于站岗朝向）。走到端点 → 停 2–3 秒朝外警戒 → 折返
+          const px = Math.cos(p.home.ry), pz = -Math.sin(p.home.ry), side = p.pk ? 0.9 : -0.9;
+          const tx = p.home.x + px * side, tz = p.home.z + pz * side;
+          const ex = tx - p.x, ez = tz - p.z, ed = Math.hypot(ex, ez);
+          if (ed > 0.04) {
+            const v = Math.min(ed, 0.55 * dt);       // 0.55u/s ≈ 1.2m/s 步行
+            p.x += ex / ed * v; p.z += ez / ed * v;
+            face = Math.atan2(ex, ez);
+            p.walk = true;
+          } else if ((p.pw -= dt) <= 0) { p.pk ^= 1; p.pw = rnd(2, 3); }
+        }
+        let dd = face - p.ry; dd = Math.atan2(Math.sin(dd), Math.cos(dd));
+        p.ry += dd * Math.min(1, dt * (p.walk ? 4 : 1.5));
       }
     }
     this._updateProjectiles(dt, H, env);
@@ -420,15 +383,19 @@ class Infantry {
 
   _draw() {
     const cnt = {};
-    for (const k of INF_POSES) cnt[k] = 0;
+    for (const k in this.meshes) cnt[k] = 0;
     for (const p of this.men) {
-      let k = p.st;
-      if (k === 'flee') k = (Math.floor(p.t * 7 + p.ph) & 1) ? 'runA' : 'runB';
+      // 帧选择：奔逃 → 跑步 6 帧（0.88s 一个循环）；巡逻走动 → 走路 6 帧（1.29s）；其余站立帧
+      let f = 'idle';
+      if (p.alive && p.st === 'flee') f = 'r' + (Math.floor(p.t / 0.88 * INF_RUN_N + p.ph * 3) % INF_RUN_N);
+      else if (p.alive && p.walk) f = 'w' + (Math.floor(p.t / 1.29 * INF_WALK_N + p.ph * 3) % INF_WALK_N);
+      const k = (p.rpg ? 'g' : 's') + f;
       const im = this.meshes[k];
-      if (k === 'dead') {
+      if (!p.alive) {
+        // 倒地：站立帧仰面放倒（绕 X 轴 -90°，头朝身后）
         _ifE.set(-PI / 2, p.ry, 0, 'YXZ');
         _ifQ.setFromEuler(_ifE);
-        _ifV.set(p.x, 0.06, p.z);
+        _ifV.set(p.x, 0.07, p.z);
       } else {
         _ifQ.setFromAxisAngle(_ifV2.set(0, 1, 0), p.ry);
         _ifV.set(p.x, 0, p.z);
@@ -437,7 +404,7 @@ class Infantry {
       _ifM.compose(_ifV, _ifQ, _ifS);
       im.setMatrixAt(cnt[k]++, _ifM);
     }
-    for (const k of INF_POSES) {
+    for (const k in this.meshes) {
       const im = this.meshes[k];
       im.count = cnt[k];
       im.instanceMatrix.needsUpdate = true;
