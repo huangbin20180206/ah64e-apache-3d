@@ -177,11 +177,17 @@ const TARGET_MODELS = {
   fuel:  { url: 'assets/targets/fuel.glb',  yaw: 0, len: 4.2 },    // M978 HEMTT 油罐车（真车长 10.2m，略缩免挤占停车线）
   // 坦克池第 3 变体：BTR-80 装甲输送车（42manako，CC BY 4.0）。原模型车头朝 +X → yaw -90° 转到 +Z
   apc:   { url: 'assets/targets/btr80.glb', yaw: -Math.PI / 2, len: 3.37 },   // 真车长 7.65m
+  // 2026-10-18 ASSETS4：武装皮卡（团结 AI 生成，AIGC；车斗 DShK 机枪，车头朝 +Z）。
+  // 只给"叛军"伏兵池（城镇/峡谷），基地正规军停放线不用。真车长 5.3m≈2.33u
+  // 生成模型偏宽（5.3m 长时宽 2.35m，真车 ≈1.9m）→ wNarrow 只压车宽（轮子圆在侧面，不变形）
+  technical: { url: 'assets/targets/technical.glb', yaw: 0, len: 2.33, wNarrow: 1.9 / 2.35 },
 };
 // 变体轮换：同类目标按序号轮流换壳（只换外观与名称，命中/血量/移动仍按 type）
 const TARGET_VARIANTS = { tank: [null, 'ifv', 'apc'], truck: [null, 'ural', 'fuel'] };
-const VARIANT_LABEL = { ifv: 'BMP-2 步战车', apc: 'BTR-80 装甲车', ural: '乌拉尔军卡', fuel: '油罐车' };
-function pickVariant(type, n) { const v = TARGET_VARIANTS[type]; return v ? v[n % v.length] : null; }
+// 叛军伏兵池（城镇 16-town / 峡谷 16-valley）：卡车优先换武装皮卡
+const INSURGENT_VARIANTS = { tank: [null, 'ifv', 'apc'], truck: ['technical', 'ural', 'technical'] };
+const VARIANT_LABEL = { ifv: 'BMP-2 步战车', apc: 'BTR-80 装甲车', ural: '乌拉尔军卡', fuel: '油罐车', technical: '武装皮卡' };
+function pickVariant(type, n, pool = TARGET_VARIANTS) { const v = pool[type]; return v ? v[n % v.length] : null; }
 // 目标用哪个壳：变体优先（t.mdl），否则按类型
 function targetModelKey(t) { return t.mdl && TARGET_MODELS[t.mdl] ? t.mdl : t.type; }
 let _targetModelCache = null;
