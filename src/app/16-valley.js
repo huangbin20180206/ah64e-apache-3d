@@ -165,9 +165,9 @@ class CanyonRun {
     this.mesh = mesh;
 
     // —— 谷底伏兵 ——
-    let tankN = 0;   // 2026-10-18：奇数号坦克换 BMP-2 壳（同 16-targets）
+    const varN = {};   // 2026-10-18：同类按序号轮换变体壳（同 16-targets）
     for (const [type, f, off] of CANYON_UNITS) {
-      const mdl = type === 'tank' && (tankN++) % 2 === 1 ? 'ifv' : null;
+      const mdl = pickVariant(type, (varN[type] = (varN[type] || 0) + 1) - 1);
       const p = canyonPointAt(f);
       const def = TARGET_TYPES[type];
       const { group, hp, radius, label } = def.make();
@@ -178,7 +178,7 @@ class CanyonRun {
       group.visible = false;
       this.scene.add(group);
       const t = {
-        group, type, mdl, hp, hp0: hp, radius, label: '峡谷伏兵·' + (mdl ? 'BMP-2 步战车' : label), mov: null,
+        group, type, mdl, hp, hp0: hp, radius, label: '峡谷伏兵·' + (mdl ? VARIANT_LABEL[mdl] : label), mov: null,
         pos: group.position.clone(), alive: true, canyon: true, hidden: true,
         home: { x, z, ry: group.rotation.y, mov: null },
       };
