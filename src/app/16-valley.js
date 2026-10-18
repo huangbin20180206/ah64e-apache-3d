@@ -167,7 +167,7 @@ class CanyonRun {
     // —— 谷底伏兵 ——
     const varN = {};   // 2026-10-18：同类按序号轮换变体壳（同 16-targets）
     for (const [type, f, off] of CANYON_UNITS) {
-      const mdl = pickVariant(type, (varN[type] = (varN[type] || 0) + 1) - 1);
+      const mdl = pickVariant(type, (varN[type] = (varN[type] || 0) + 1) - 1, INSURGENT_VARIANTS);
       const p = canyonPointAt(f);
       const def = TARGET_TYPES[type];
       const { group, hp, radius, label } = def.make();
