@@ -106,10 +106,10 @@ class TargetRange {
         } else if (type === 'tank' && si === 0) {
           mov = { kind: 'line', cx: group.position.x, cz: group.position.z, a: group.rotation.y, half: 2.4, v: 1.4, s: 0 };
         }
-        // 2026-10-18：坦克池奇数号换 BMP-2 步战车壳（只换外观与名称，逻辑仍是 tank）
-        const mdl = type === 'tank' && si % 2 === 1 ? 'ifv' : null;
+        // 2026-10-18：同类按序号轮换变体壳（16-targetmodels TARGET_VARIANTS；只换外观与名称）
+        const mdl = pickVariant(type, si);
         this.targets.push({
-          group, type, mdl, hp, hp0: hp, radius, label: mdl === 'ifv' ? 'BMP-2 步战车' : label, mov,
+          group, type, mdl, hp, hp0: hp, radius, label: mdl ? VARIANT_LABEL[mdl] : label, mov,
           pos: group.position.clone(), alive: true,
           // B2 警报疏散：初始位姿快照（reset 时疏散车辆归位）
           home: { x: group.position.x, z: group.position.z, ry: group.rotation.y, mov },
