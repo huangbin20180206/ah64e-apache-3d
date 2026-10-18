@@ -197,10 +197,11 @@ class TownDistrict {
     g.visible = false;
     this.group = g;
     this.scene.add(g);
+    placeTownProps(g, C);   // 2026-10-18 ASSETS2：加油站/村落/废车（16-targetprops，异步挂入）
     // —— 伏兵车辆（复用 16-targets 的程序化模型 + GLB 换壳 + 合批）——
-    let tankN = 0;   // 2026-10-18：奇数号坦克换 BMP-2 壳（同 16-targets）
+    const varN = {};   // 2026-10-18：同类按序号轮换变体壳（同 16-targets）
     for (const [type, hx, hz, ox, oz, cover] of TOWN_AMBUSH) {
-      const mdl = type === 'tank' && (tankN++) % 2 === 1 ? 'ifv' : null;
+      const mdl = pickVariant(type, (varN[type] = (varN[type] || 0) + 1) - 1);
       const def = TARGET_TYPES[type];
       const { group, hp, radius, label } = def.make();
       group.position.set(C.x + hx, 0, C.z + hz);
@@ -213,7 +214,7 @@ class TownDistrict {
       const mov = peek ? { kind: 'peek', hx: C.x + hx, hz: C.z + hz, ox: C.x + ox, oz: C.z + oz,
         st: 'hide', t: 0, v: 2.4 } : null;
       const t = {
-        group, type, mdl, hp, hp0: hp, radius, label: '城镇伏兵·' + (mdl ? 'BMP-2 步战车' : label), mov,
+        group, type, mdl, hp, hp0: hp, radius, label: '城镇伏兵·' + (mdl ? VARIANT_LABEL[mdl] : label), mov,
         pos: group.position.clone(), alive: true, town: true, cover,
         hidden: true, _peekOut: false,
         home: { x: group.position.x, z: group.position.z, ry: group.rotation.y, mov },
