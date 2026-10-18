@@ -176,11 +176,13 @@
  "16-targetmodels.js": {
   "provides": [
    "TARGET_TYPES",
+   "VARIANT_LABEL",
    "addBox",
    "applyModelToTarget",
    "loadTargetModels",
    "makeWreck",
    "mergeTargetStatics",
+   "pickVariant",
    "scorchTexture",
    "targetMat",
    "targetModelKey",
@@ -193,6 +195,20 @@
     "TAU",
     "mergeGeos",
     "rnd"
+   ]
+  }
+ },
+ "16-targetprops.js": {
+  "provides": [
+   "placeRangeProps",
+   "placeTownProps"
+  ],
+  "depends": {
+   "00-utils.js": [
+    "PI"
+   ],
+   "16-targetmodels.js": [
+    "mergeTargetStatics"
    ]
   }
  },
@@ -218,10 +234,12 @@
    ],
    "16-targetmodels.js": [
     "TARGET_TYPES",
+    "VARIANT_LABEL",
     "applyModelToTarget",
     "loadTargetModels",
     "makeWreck",
     "mergeTargetStatics",
+    "pickVariant",
     "targetModelKey",
     "wreckEmber",
     "wreckPop"
@@ -248,6 +266,9 @@
    ],
    "16-targetmodels.js": [
     "targetMat"
+   ],
+   "16-targetprops.js": [
+    "placeRangeProps"
    ]
   }
  },
@@ -273,16 +294,21 @@
     "mergeGeos",
     "rnd"
    ],
+   "05-config.js": [
+    "BASE_C"
+   ],
    "16-targetmodels.js": [
     "TARGET_TYPES",
+    "VARIANT_LABEL",
     "applyModelToTarget",
     "loadTargetModels",
     "mergeTargetStatics",
+    "pickVariant",
     "targetMat",
     "targetModelKey"
    ],
-   "05-config.js": [
-    "BASE_C"
+   "16-targetprops.js": [
+    "placeTownProps"
    ]
   }
  },
@@ -319,9 +345,11 @@
    ],
    "16-targetmodels.js": [
     "TARGET_TYPES",
+    "VARIANT_LABEL",
     "applyModelToTarget",
     "loadTargetModels",
     "mergeTargetStatics",
+    "pickVariant",
     "targetMat",
     "targetModelKey"
    ]
