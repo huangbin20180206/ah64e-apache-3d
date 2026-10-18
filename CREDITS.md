@@ -25,6 +25,22 @@
 | assets/targets/prop_moto.glb | [Mid poly dirt bike](https://sketchfab.com/3d-models/mid-poly-dirt-bike-3009c80ec6cc47fcaad27cf96f2a0822) | danilloribeiro | CC BY 4.0 |
 | assets/targets/survivor.glb | [Soldier](https://grab3d.com/models/characters/soldier/) | Grab3D | CC0（无需署名，仍致谢） |
 
+## AI 生成模型（AIGC）
+以下模型由作者用 **Unity 中国 团结 AI（Tuanjie AI Generator，底层 Rodin 出模 + UniRig 绑骨）** 生成，属于 AI 生成内容。
+依《Tuanjie Codely 服务条款》第 4、8.4 条：生成内容版权由使用者自行维护，对外发布需声明为 AI 生成（本节即声明）；
+文件内保留了平台写入的 AIGC 标识（asset.extras：author=unity / copyright=tjai），请勿删除。
+Hark 只做了贴图压缩（2048→1024/512）与缩放摆放，几何未改。
+
+| 文件 | 内容 |
+|---|---|
+| assets/targets/soldier_rifle.glb | 步枪兵（带骨骼 + Idle/Walk/Run） |
+| assets/targets/soldier_rpg.glb | 火箭筒兵（带骨骼 + Idle/Walk/Run） |
+| assets/targets/civilian.glb | 平民（带骨骼 + Idle/Walk/Run） |
+| assets/targets/technical.glb | 武装皮卡（DShK 机枪） |
+| assets/targets/moto_scout.glb | 越野摩托 + 骑手 |
+| assets/targets/warehouse.glb | 铁皮仓库 |
+| assets/targets/house_2f.glb | 两层民房 |
+
 ## 图片 / 贴图 / 音效
 - 装甲图鉴照片：Wikimedia Commons，逐张作者与许可见 assets/armory/LICENSE.txt（游戏内每张照片下方也有署名）。
 - 远景树木贴图：Poly Haven（CC0）。
