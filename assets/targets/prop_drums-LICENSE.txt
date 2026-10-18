@@ -1,0 +1,5 @@
+prop_drums.glb — 油桶模型
+原作："Oil Drums"，作者 Chamod1999 (Chamodp)
+链接：https://sketchfab.com/3d-models/oil-drums-b8fccbf7d949407e9ef32165e5bf3f18
+许可：CC BY 4.0（知识共享 署名 4.0，https://creativecommons.org/licenses/by/4.0/）——使用须署名原作者。
+改动：去重焊接、按需减面（meshoptimizer）；贴图缩小并转 JPEG（@gltf-transform 4）。游戏内按真实尺寸等比缩放。
