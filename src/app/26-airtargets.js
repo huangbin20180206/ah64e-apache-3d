@@ -191,12 +191,25 @@ class AirTargets {
     this.list.push(this._balloon([8.5, 10.5, 25]));
     this.list.push(this._plane([0, 14, 30]));
     // AI 高模替换靶机（GLB 就位前程序化模型兜底；动画/命中链路不变）
-    new THREE.GLTFLoader().load('assets/targets/plane.glb', (gltf) => {
+    // 2026-10-18 ASSETS2：靶机换"沙赫德-136"巡飞弹真模型（Sketchfab "Shahed 136" by faintastic18，
+    // CC BY 4.0，见 CREDITS.md）。原模型机头朝 +Z → 绕 Y 转 +90° 对齐本模块机头 +X；
+    // 按翼展外形等比缩到机身长 1.9u（与程序化靶机同量级，便于识别/命中），几何中心归零。
+    // 加载失败保留程序化靶机（plane.glb 不再加载）。
+    new THREE.GLTFLoader().load('assets/targets/shahed.glb', (gltf) => {
       const p = this.list.find(t => t.type === 'plane');
       if (!p) return;
       while (p.g.children.length) p.g.remove(p.g.children[0]);
-      gltf.scene.traverse(o => { if (o.isMesh) o.castShadow = true; });
-      p.g.add(gltf.scene);
+      const m = gltf.scene;
+      m.traverse(o => { if (o.isMesh) o.castShadow = true; });
+      const box = new THREE.Box3().setFromObject(m, true), sz = box.getSize(new THREE.Vector3());
+      const k = 1.9 / Math.max(sz.z, 1e-4), c = box.getCenter(new THREE.Vector3());
+      m.position.set(-c.x * k, -c.y * k, -c.z * k);
+      m.scale.setScalar(k);
+      const wrap = new THREE.Group();
+      wrap.rotation.y = PI / 2;
+      wrap.add(m);
+      p.g.add(wrap);
+      p.label = '沙赫德-136 无人机';
       mergeAirStatics(p.g, []);
     }, undefined, () => {});
   }
