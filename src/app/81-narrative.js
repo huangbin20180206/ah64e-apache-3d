@@ -159,6 +159,22 @@ class NarrativeFX {
     sam.rotation.y = 0.9;
     this.group.add(sam);
     this._samGroup = sam;                           // Phase 21：打击层引用
+    // 2026-10-18 ASSETS3：防空车换 SA-8"壁虎"真模型（Sketchfab "Osa-AKM SAM system"，CC BY 4.0，
+    // 见 CREDITS.md）。程序化车体/发射筒只隐藏不删除（名称、损伤下垂、击毁压扁等逻辑与测试仍挂在它们上）；
+    // 真模型挂在同一 sam 组里，压扁/隐藏随组。车头 = 模型 +Z（同程序化车体），车长 4.0u≈9.1m。
+    new THREE.GLTFLoader().load('assets/targets/osa.glb', (gltf) => {
+      const m = gltf.scene;
+      const bb = new THREE.Box3().setFromObject(m, true), sz = bb.getSize(new THREE.Vector3());
+      const k = 4.0 / Math.max(sz.z, 1e-4), c = bb.getCenter(new THREE.Vector3());
+      m.scale.setScalar(k);
+      m.position.set(-c.x * k, -bb.min.y * k, -c.z * k);
+      m.name = 'narrative-sam-osa';
+      // 原贴图是浅灰涂装，沙漠正午发白——整体压暗约三成更像落满尘土的旧车
+      m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; if (o.material.color) o.material.color.multiplyScalar(0.7); } });
+      body.visible = false;
+      erector.visible = false;
+      sam.add(m);
+    }, undefined, () => {});
 
     // 3) 弹药堆（2026-10-15 真实化）：三垛托盘弹药箱（单箱 ≈1.0m×0.6m×0.7m），
     //    垛高 2/3/1 层，中垛盖篷布。名称保持 ammo-crate-0..2（每垛 1 mesh）。
