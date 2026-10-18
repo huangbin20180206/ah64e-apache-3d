@@ -251,6 +251,47 @@ function applyModelToTarget(t, model) {
   // PERF-AUDIT C2：换壳后立即按材质合批（tank GLB 多原语收敛）；
   // 合并体打 noMerge 防重复合并，幂等
   mergeTargetStatics(t);
+  attachTurretPivot(t);
+}
+
+// ---------- 2026-10-18 ASSETS3：坦克炮塔跟踪 ----------
+// 原版 T-80U 壳（key='tank'，阈值按它实测）合批后，按 Q3 的连通块规则把炮塔件
+// （最低点 ≥ TURRET_MIN_Y）切成独立网格，挂进以 TURRET_PIVOT 为轴心的子组
+// t.turret；16-targets update 每帧把它转向直升机（看得见的"炮口跟着你转"）。
+// 只新建索引、共享顶点（同 splitTurretGeo）；残骸 makeWreck 读 matrixWorld，炮塔转角原样带入。
+function attachTurretPivot(t) {
+  if (t.turret || targetModelKey(t) !== 'tank') return;
+  const id = new THREE.Matrix4();
+  const pivot = new THREE.Group();
+  pivot.name = 'turret-pivot';
+  pivot.position.set(...TURRET_PIVOT);
+  const meshes = t.group.children.filter(o => o.isMesh && o.userData.noMerge);
+  for (const m of meshes) {
+    const parts = splitTurretGeo(m.geometry, id);
+    if (!parts.hi) continue;
+    const hm = new THREE.Mesh(parts.hi, m.material);
+    hm.position.set(-TURRET_PIVOT[0], -TURRET_PIVOT[1], -TURRET_PIVOT[2]);
+    hm.castShadow = true; hm.receiveShadow = true;
+    hm.userData.noMerge = true;
+    pivot.add(hm);
+    if (parts.lo) m.geometry = parts.lo; else t.group.remove(m);
+  }
+  if (!pivot.children.length) return;
+  t.group.add(pivot);
+  t.turret = pivot;
+}
+// 每帧：活着且直升机在 70u 内 → 炮塔以 0.9 rad/s 转向直升机；否则缓慢回正
+function aimTurret(t, heliPos, dt) {
+  const p = t.turret;
+  let want = 0;
+  if (t.alive && heliPos) {
+    const dx = heliPos.x - t.group.position.x, dz = heliPos.z - t.group.position.z;
+    if (dx * dx + dz * dz < 70 * 70) want = Math.atan2(dx, dz) - t.group.rotation.y;
+  }
+  let da = want - p.rotation.y;
+  da = Math.atan2(Math.sin(da), Math.cos(da));
+  const mx = (want ? 0.9 : 0.4) * dt;
+  p.rotation.y += Math.max(-mx, Math.min(mx, da));
 }
 
 // ---------- PERF-AUDIT C2：靶标静态几何按材质合批 ----------
