@@ -21,6 +21,8 @@
 | assets/targets/prop_village.glb | [Desert Mud Concrete House Lowpoly](https://sketchfab.com/3d-models/desert-mud-concrete-house-lowpoly-bd4917fa72c84e41aa1e5299871f1b2e) | 00amza | CC BY 4.0 |
 | assets/targets/prop_sedanwreck.glb | [Abandoned Generic Sedan 1 - Game Ready](https://sketchfab.com/3d-models/abandoned-generic-sedan-1-game-ready-6a2169dafc254f399387a679305bb1bf) | Rashad Ibrahimli | CC BY 4.0 |
 | assets/targets/prop_van.glb | [Marmon Herrington Delivery Van](https://sketchfab.com/3d-models/marmon-herrington-delivery-van-9afec7ad1f5c460a8828682cb1981e22) | Rashad Ibrahimli | CC BY 4.0 |
+| assets/targets/osa.glb | [Osa-AKM SAM system](https://sketchfab.com/3d-models/osa-akm-sam-system-485a4207e55545188e93bef5f1e2413f) | Jeyhun1985 | CC BY 4.0 |
+| assets/targets/prop_moto.glb | [Mid poly dirt bike](https://sketchfab.com/3d-models/mid-poly-dirt-bike-3009c80ec6cc47fcaad27cf96f2a0822) | danilloribeiro | CC BY 4.0 |
 | assets/targets/survivor.glb | [Soldier](https://grab3d.com/models/characters/soldier/) | Grab3D | CC0（无需署名，仍致谢） |
 
 ## 图片 / 贴图 / 音效
