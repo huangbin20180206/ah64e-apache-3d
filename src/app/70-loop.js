@@ -232,6 +232,14 @@ function _frame(dt, doRender) {
       IE.fire = IE.can && m.phase === 'active';
       IE.rate = cd ? cd.aaRate : 1; IE.dmg = cd ? cd.aaDmg : 1;
       infantry.update(IE);
+      // 2026-10-18 战场活物（27-life）：基地摩托与步兵同条件；城镇平民/摩托随城镇关
+      if (life) {
+        const LE = S._lifeEnv || (S._lifeEnv = { dt: 0, heli: null, alt: 0, base: false, town: false });
+        LE.dt = dt; LE.heli = IE.heli; LE.alt = IE.alt; LE.base = IE.can;
+        LE.town = !!(m && (m.phase === 'active' || m.phase === 'briefing') && targets && targets.enabled
+          && targets.town && targets.town.active);
+        life.update(LE);
+      }
     }
     // 机体指示灯：环境亮度淡入淡出 + 信标/频闪节拍（随引擎）
     if (nlights) nlights.searchTerrainMul = W.terrainKey === 'desert' ? 0.45 : 1;   // P4c 沙漠搜索灯过曝
