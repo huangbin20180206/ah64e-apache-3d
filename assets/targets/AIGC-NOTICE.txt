@@ -1,4 +1,6 @@
 soldier_rifle.glb, soldier_rpg.glb, civilian.glb, technical.glb, moto_scout.glb, warehouse.glb, house_2f.glb
+Batch 2 (2026-10-19): soldier_pkm.glb, soldier_officer.glb, civilian_woman.glb, civilian_old.glb, bm21_grad.glb, zsu234_shilka.glb, technical_zu23.glb, civ_sedan.glb, civ_minibus.glb, civ_cargo.glb, zu23_emplacement.glb, dshk_nest.glb, mortar_pit.glb, comms_tower.glb, mosque.glb, house_1f.glb, shop_row.glb, market_stall.glb, water_tower.glb, bunker.glb, palm_tree.glb, car_wreck.glb, container.glb, generator.glb, tent_military.glb
+  (batch 2 non-character models: triangle count reduced with meshoptimizer simplify, textures 1024/512 px)
 AI-generated content (AIGC): created 2026-10-18 with Unity China Tuanjie AI Generator (Rodin Gen-2.5 mesh, UniRig rigging).
 Per Tuanjie Codely Terms of Service (sections 4 and 8.4), copyright of generated content is maintained by the user; public posts must disclose AI generation.
 Platform AIGC marks kept in asset.extras (author=unity, copyright=tjai). Modifications by Hark: textures downscaled (1024 / 512 px JPEG); no geometry changes.
