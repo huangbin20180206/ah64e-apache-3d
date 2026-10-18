@@ -1,0 +1,5 @@
+prop_barrier.glb — 检查站道闸模型
+原作："Russian Military Barrier Checkpoint | Game ready"，作者 HORS (lollollolkekyzka)
+链接：https://sketchfab.com/3d-models/russian-military-barrier-checkpoint-game-ready-e6ee193466bc431c9eb0a67a708b6107
+许可：CC BY 4.0（知识共享 署名 4.0，https://creativecommons.org/licenses/by/4.0/）——使用须署名原作者。
+改动：去重焊接、按需减面（meshoptimizer）；贴图缩小并转 JPEG（@gltf-transform 4）。游戏内按真实尺寸等比缩放。
