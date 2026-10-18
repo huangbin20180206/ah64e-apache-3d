@@ -17,7 +17,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pw_harness as H
 
-DEF_LEN = {'tank': 4.3, 'truck': 3.1, 'ifv': 2.96}   # 2026-10-18 ifv=BMP-2 变体壳（按 t.mdl 分组）
+DEF_LEN = {'tank': 4.3, 'truck': 3.1, 'ifv': 2.96, 'ural': 3.26, 'fuel': 4.2, 'apc': 3.37}   # 2026-10-18 变体壳（按 t.mdl 分组）：ifv=BMP-2，ural/fuel=卡车池
 
 MEASURE = r"""
 () => {
@@ -63,7 +63,14 @@ def run(pg):
     # 2026-10-18：BMP-2 变体壳只有 1 个基地实例，单独核车长
     ifv = [r for r in rows if r['type'] == 'ifv']
     assert ifv and abs(ifv[0]['longAxis'] - DEF_LEN['ifv']) < 0.02, ('A3: BMP-2 车长不等于 len', ifv)
-    for typ in ('tank', 'truck'):
+    for vk in ('ural', 'fuel', 'apc'):
+        sub = [r for r in rows if r['type'] == vk]
+        assert sub and abs(sub[0]['longAxis'] - DEF_LEN[vk]) < 0.02, ('A3: 卡车变体车长不等于 len', vk, sub)
+    # 2026-10-18 ASSETS2：坦克池轮换 3 种壳后基地只剩 1 辆原版坦克——yaw 无关性改由
+    # 车长测量同一路径的卡车池（2 辆原版）承担；坦克只核车长=len。
+    tk = [r for r in rows if r['type'] == 'tank']
+    assert tk and all(abs(r['longAxis'] - DEF_LEN['tank']) < 2e-3 for r in tk), ('A2: 坦克车长不等于 len', tk)
+    for typ in ('truck',):
         sub = [r for r in rows if r['type'] == typ]
         assert len(sub) >= 2, ('A0: 该 type 实例不足，无法比对', typ, sub)
         yaws = [round(r['yawDeg'], 1) for r in sub]
