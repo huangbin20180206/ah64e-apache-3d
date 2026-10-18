@@ -1,0 +1,5 @@
+shahed.glb — 沙赫德-136 无人机模型
+原作："Shahed 136"，作者 faintastic18
+链接：https://sketchfab.com/3d-models/shahed-136-bc8754128c9d48c48baadeff1db8f0c7
+许可：CC BY 4.0（知识共享 署名 4.0，https://creativecommons.org/licenses/by/4.0/）——使用须署名原作者。
+改动：去重焊接、按需减面（meshoptimizer）；贴图缩小并转 JPEG（@gltf-transform 4）。游戏内按真实尺寸等比缩放。
