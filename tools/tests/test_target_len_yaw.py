@@ -23,6 +23,8 @@ MEASURE = r"""
 () => {
   const out = [];
   for (const t of window.__dbg.targets.targets) {
+    // 2026-10-18 ASSETS3：炮塔跟踪会转动炮塔子组（共享整车顶点属性）——量车长前回正
+    if (t.turret) t.turret.rotation.y = 0;
     t.group.updateMatrixWorld(true);
     const ginv = t.group.matrixWorld.clone().invert();
     const v = t.pos.clone();
