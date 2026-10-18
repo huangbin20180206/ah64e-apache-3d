@@ -178,6 +178,7 @@
    "TARGET_TYPES",
    "VARIANT_LABEL",
    "addBox",
+   "aimTurret",
    "applyModelToTarget",
    "loadTargetModels",
    "makeWreck",
@@ -235,6 +236,7 @@
    "16-targetmodels.js": [
     "TARGET_TYPES",
     "VARIANT_LABEL",
+    "aimTurret",
     "applyModelToTarget",
     "loadTargetModels",
     "makeWreck",
