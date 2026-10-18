@@ -34,7 +34,7 @@ const TOWN_BUILDINGS = [
   [10.5, -5.5, 4.0, 4.0, 5.8, 8, '水塔楼'],
   [-14.5, -5.5, 2.5, 3.0, 2.4, 3, '棚屋'],
   [-10.0, 5.0, 4.5, 5.0, 3.4, 5, '民居'],
-  [-4.2, 4.5, 4.0, 4.0, 2.8, 4, '民居'],
+  [-4.2, 4.5, 4.0, 4.0, 2.3, 4, '民居'],   // 2026-10-19 换一层院落房外壳（高 2.8→2.3 ≈5.2m，免外壳拉伸）
   [4.5, 5.0, 4.5, 4.0, 4.0, 6, '指挥所'],
   [10.0, 5.5, 4.5, 5.0, 3.0, 5, '民房'],   // 2026-10-18 换两层民房外壳（原"车库"）
   [14.5, 5.0, 2.5, 3.0, 2.4, 3, '棚屋'],
@@ -201,6 +201,8 @@ class TownDistrict {
     skinTownBuilding(this.buildings[2], 'warehouse', -PI / 2);
     skinTownBuilding(this.buildings[5], 'house2f', PI);
     skinTownBuilding(this.buildings[8], 'house2f', PI);
+    skinTownBuilding(this.buildings[3], 'watertower', 0);    // 2026-10-19 ASSETS5：水塔楼 → 混凝土高架水塔
+    skinTownBuilding(this.buildings[6], 'house1f', 0);       // 民居 → 一层院落房（院门朝北巷）
     placeTownProps(g, C);   // 2026-10-18 ASSETS2：加油站/村落/废车（16-targetprops，异步挂入）
     // —— 伏兵车辆（复用 16-targets 的程序化模型 + GLB 换壳 + 合批）——
     const varN = {};   // 2026-10-18：同类按序号轮换变体壳（同 16-targets）
