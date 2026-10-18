@@ -181,12 +181,21 @@ const TARGET_MODELS = {
   // 只给"叛军"伏兵池（城镇/峡谷），基地正规军停放线不用。真车长 5.3m≈2.33u
   // 生成模型偏宽（5.3m 长时宽 2.35m，真车 ≈1.9m）→ wNarrow 只压车宽（轮子圆在侧面，不变形）
   technical: { url: 'assets/targets/technical.glb', yaw: 0, len: 2.33, wNarrow: 1.9 / 2.35 },
+  // 2026-10-19 ASSETS5（团结 AI 生成，AIGC，车头 +Z）：叛军池新壳
+  // ZSU-23-4"石勒喀"自行高炮 真车长 6.5m≈2.86u（坦克池；炮塔切分同坦克 → 炮塔跟踪直升机）
+  zsu:   { url: 'assets/targets/zsu234_shilka.glb', yaw: 0, len: 2.86 },
+  // BM-21"冰雹"火箭炮 7.35m≈3.24u（卡车池）
+  bm21:  { url: 'assets/targets/bm21_grad.glb', yaw: 0, len: 3.24 },
+  // 武装皮卡第二款（车斗 ZU-23-2 双管高炮）5.2m≈2.29u（卡车池）
+  technical2: { url: 'assets/targets/technical_zu23.glb', yaw: 0, len: 2.29 },
 };
 // 变体轮换：同类目标按序号轮流换壳（只换外观与名称，命中/血量/移动仍按 type）
 const TARGET_VARIANTS = { tank: [null, 'ifv', 'apc'], truck: [null, 'ural', 'fuel'] };
 // 叛军伏兵池（城镇 16-town / 峡谷 16-valley）：卡车优先换武装皮卡
-const INSURGENT_VARIANTS = { tank: [null, 'ifv', 'apc'], truck: ['technical', 'ural', 'technical'] };
-const VARIANT_LABEL = { ifv: 'BMP-2 步战车', apc: 'BTR-80 装甲车', ural: '乌拉尔军卡', fuel: '油罐车', technical: '武装皮卡' };
+// 2026-10-19 ASSETS5：坦克首位换"石勒喀"高炮，卡车池加 BM-21 火箭炮 + 高炮皮卡（基地正规军池不变）
+const INSURGENT_VARIANTS = { tank: ['zsu', 'ifv', 'apc'], truck: ['technical', 'bm21', 'technical2'] };
+const VARIANT_LABEL = { ifv: 'BMP-2 步战车', apc: 'BTR-80 装甲车', ural: '乌拉尔军卡', fuel: '油罐车', technical: '武装皮卡',
+  zsu: '石勒喀高炮', bm21: 'BM-21 火箭炮', technical2: '高炮皮卡' };
 function pickVariant(type, n, pool = TARGET_VARIANTS) { const v = pool[type]; return v ? v[n % v.length] : null; }
 // 目标用哪个壳：变体优先（t.mdl），否则按类型
 function targetModelKey(t) { return t.mdl && TARGET_MODELS[t.mdl] ? t.mdl : t.type; }
