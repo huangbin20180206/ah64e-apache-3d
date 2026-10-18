@@ -36,7 +36,7 @@ const TOWN_BUILDINGS = [
   [-10.0, 5.0, 4.5, 5.0, 3.4, 5, '民居'],
   [-4.2, 4.5, 4.0, 4.0, 2.8, 4, '民居'],
   [4.5, 5.0, 4.5, 4.0, 4.0, 6, '指挥所'],
-  [10.0, 5.5, 4.5, 5.0, 3.0, 5, '车库'],
+  [10.0, 5.5, 4.5, 5.0, 3.0, 5, '民房'],   // 2026-10-18 换两层民房外壳（原"车库"）
   [14.5, 5.0, 2.5, 3.0, 2.4, 3, '棚屋'],
 ];
 // 伏兵：[type, hx, hz(藏身点), ox, oz(街口探头点), 掩体楼索引]；ox==null = 静止伏兵
@@ -197,11 +197,15 @@ class TownDistrict {
     g.visible = false;
     this.group = g;
     this.scene.add(g);
+    // 2026-10-18 ASSETS4：三栋楼换真模型外壳（门/阳台朝街）：仓库门朝主街(西)，两栋民房朝横街(南)
+    skinTownBuilding(this.buildings[2], 'warehouse', -PI / 2);
+    skinTownBuilding(this.buildings[5], 'house2f', PI);
+    skinTownBuilding(this.buildings[8], 'house2f', PI);
     placeTownProps(g, C);   // 2026-10-18 ASSETS2：加油站/村落/废车（16-targetprops，异步挂入）
     // —— 伏兵车辆（复用 16-targets 的程序化模型 + GLB 换壳 + 合批）——
     const varN = {};   // 2026-10-18：同类按序号轮换变体壳（同 16-targets）
     for (const [type, hx, hz, ox, oz, cover] of TOWN_AMBUSH) {
-      const mdl = pickVariant(type, (varN[type] = (varN[type] || 0) + 1) - 1);
+      const mdl = pickVariant(type, (varN[type] = (varN[type] || 0) + 1) - 1, INSURGENT_VARIANTS);
       const def = TARGET_TYPES[type];
       const { group, hp, radius, label } = def.make();
       group.position.set(C.x + hx, 0, C.z + hz);
@@ -285,6 +289,7 @@ class TownDistrict {
       b.group.position.y = 0;
       b.group.rotation.set(0, 0, 0);
       b.mat.color.setHex(b.tint);
+      if (b.skinMats) for (const m of b.skinMats) m.color.setScalar(1);
       if (b.rubble) { this.scene.remove(b.rubble); disposeObject3D(b.rubble); b.rubble = null; }
     }
     this._resetAmbush();
@@ -410,7 +415,10 @@ class TownDistrict {
       if (!b.alive) continue;
       // 半毁：墙面变暗 + 屋顶冒黑烟
       if (b.hp < b.hp0 * 0.5) {
-        if (!b._dmgLook) { b._dmgLook = true; b.mat.color.setHex(b.tint).multiplyScalar(0.62); }
+        if (!b._dmgLook) {
+          b._dmgLook = true; b.mat.color.setHex(b.tint).multiplyScalar(0.62);
+          if (b.skinMats) for (const m of b.skinMats) m.color.setScalar(0.62);
+        }
         if (fx && (b._smk -= dt) <= 0 && freePuffs() >= 24) {
           b._smk = 0.45; free--;
           fx._puff(b.x + (rnd() - 0.5) * b.w * 0.5, b.h + 0.4, b.z + (rnd() - 0.5) * b.d * 0.5,
