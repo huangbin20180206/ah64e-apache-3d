@@ -56,6 +56,7 @@ const TARGET_SCORES = {
   // Phase 21：敌方基地设施（高价值，介于载具与敌机之间；雷达联动 SEAD 压制）
   radar: 200, sam: 250, ammo: 120,
   infantry: 50,   // P5-G2 敌方步兵（RPG 兵同分）
+  moto: 120,      // 2026-10-18 摩托侦察兵（快、难打）
 };
 
 // 成就定义（10 项）。击杀类（first_blood/combo5/wipeout/ace/sead）经 _grantImmediate
