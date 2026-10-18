@@ -1,0 +1,5 @@
+osa.glb — SA-8"壁虎"防空导弹车模型
+原作："Osa-AKM SAM system"，作者 Jeyhun1985
+链接：https://sketchfab.com/3d-models/osa-akm-sam-system-485a4207e55545188e93bef5f1e2413f
+许可：CC BY 4.0（知识共享 署名 4.0，https://creativecommons.org/licenses/by/4.0/）——使用须署名原作者。
+改动：去重焊接、减面（meshoptimizer，osa 原 42 万面减到约 4.6 万面）；贴图缩小并转 JPEG（@gltf-transform 4）。游戏内按真实尺寸等比缩放。
