@@ -124,7 +124,8 @@ function buildRangeScenery(range, BC, layout) {
     K.box(0.02, 0.55, 0.60, 0x2c3022, cx + 1.81, 0.30, cz);   // 门帘
     K.box(0.30, 0.50, 0.30, 0x3a3f2e, cx - 1.2, 0.25, cz - 1.25);   // 发电机/箱
   };
-  tent(BC.x - 21, BC.z + 12); tent(BC.x - 15.5, BC.z + 12); tent(BC.x - 10, BC.z + 12);
+  // 2026-10-19 ASSETS5：帐篷改真模型（16-targetprops placeRangeProps 'tent'），程序化版本停用（保留函数作兜底参考）
+  void tent;
   // 指挥所：两只 20 尺集装箱（6.1m≈2.7u）并排 + 沙袋 + 天线
   K.box(2.68, 1.13, 1.07, 0x5b6147, BC.x + 7.0, 0.565, BC.z + 11.6);
   K.box(2.68, 1.13, 1.07, 0x666b52, BC.x + 7.0, 0.565, BC.z + 12.8);
