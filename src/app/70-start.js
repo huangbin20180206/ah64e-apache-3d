@@ -142,10 +142,10 @@ function finish() {
     killFeed(label);
     if (arcade && S._mission && S._mission.phase === 'active') arcade.onKill(key, S._mission);
   };
-  life.onCivilian = () => {
+  life.onCivilian = (what) => {
     const m = S._mission;
     if (arcade && m && m.phase === 'active') { arcade.addBonus(-CIV_PENALTY); m.civKills = (m.civKills || 0) + 1; }
-    toast('误伤平民！−' + CIV_PENALTY + ' 分');
+    toast('误伤' + (what || '平民') + '！−' + CIV_PENALTY + ' 分');
   };
   rig.onInfantryHit = (p) => {
     const h = infantry.bulletHit(p) || life.bulletHit(p);
