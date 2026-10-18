@@ -2,7 +2,8 @@
 // 27-infantry.js — 敌方步兵小队（P5-G2，2026-10-16；2026-10-18 ASSETS4 换真人动画模型）
 // ============================================================
 // 模型：团结 AI 生成的两个带骨骼角色（AIGC，见 CREDITS.md）——
-//   assets/targets/soldier_rifle.glb 步枪兵（AK）/ soldier_rpg.glb 火箭筒兵（RPG-7 扛肩），
+//   assets/targets/soldier_rifle.glb 步枪兵（AK）/ soldier_rpg.glb 火箭筒兵（RPG-7 扛肩）/
+//   soldier_pkm.glb 机枪手（PKM，3 发连射）/ soldier_officer.glb 指挥官（ASSETS5），
 //   各带 Idle / Walk / Run 三段循环动作。武器是模型自带的，不再程序化拼接。
 // 烘焙：加载时用 AnimationMixer 把动作采样成静态帧（站立 1 帧 + 走路 6 帧 + 奔跑 6 帧），
 //   每帧做一次 CPU 蒙皮（运行时不算骨骼——GPU 蒙皮在部分显卡/软件渲染下会丢失 WebGL 上下文），
@@ -21,6 +22,10 @@
 const INF_H = 0.81;                 // 人高（1.78m，1u≈2.2m）
 const INF_WALK_N = 6, INF_RUN_N = 6;
 // 帧键：idle / w0..w5（走）/ r0..r5（跑）
+// ASSETS5（2026-10-19）：四个兵种。每队 = 队长（1 队指挥官、其余机枪手）+ 2 名巡逻步枪兵 + 1 名火箭筒兵
+const INF_KINDS = ['s', 'g', 'm', 'o'];
+const INF_URL = { s: 'assets/targets/soldier_rifle.glb', g: 'assets/targets/soldier_rpg.glb', m: 'assets/targets/soldier_pkm.glb', o: 'assets/targets/soldier_officer.glb' };
+const INF_LABEL = { s: '步兵', g: '火箭筒兵', m: '机枪手', o: '指挥官' };
 const INF_FRAMES = ['idle'].concat([...Array(INF_WALK_N)].map((_, i) => 'w' + i), [...Array(INF_RUN_N)].map((_, i) => 'r' + i));
 const _ifV = new THREE.Vector3(), _ifV2 = new THREE.Vector3(), _ifM = new THREE.Matrix4(),
   _ifQ = new THREE.Quaternion(), _ifS = new THREE.Vector3(), _ifE = new THREE.Euler();
@@ -128,11 +133,10 @@ class Infantry {
     // 自动化测试（webdriver）默认不出现，保老测试不被步兵挡子弹/打伤；截图脚本可置 allow=true
     this.allow = !(typeof navigator !== 'undefined' && navigator.webdriver);
     this._layout();
-    // 两个兵种模型都到位才建（任一失败 → 不出现步兵，场景照常）
+    // 兵种模型：s=步枪 g=火箭筒（必需，任一失败 → 不出现步兵）；m=机枪手 o=指挥官（ASSETS5，可缺省→用步枪兵外观）
     const L = new THREE.GLTFLoader(), got = {};
-    const done = (k, g) => { got[k] = g; if ('s' in got && 'g' in got && got.s && got.g) this._build(got.s, got.g); };
-    L.load('assets/targets/soldier_rifle.glb', (g) => done('s', g), undefined, () => done('s', null));
-    L.load('assets/targets/soldier_rpg.glb', (g) => done('g', g), undefined, () => done('g', null));
+    const done = (k, g) => { got[k] = g; if (INF_KINDS.every(q => q in got) && got.s && got.g) this._build(got); };
+    for (const k of INF_KINDS) L.load(INF_URL[k], (g) => done(k, g), undefined, () => done(k, null));
   }
 
   // 3 个小队 × 4 人（每队 1 名 RPG 兵），位置相对基地中心 BASE_C，靠沙袋/工事
@@ -144,30 +148,34 @@ class Infantry {
       { c: [-19, -6], face: PI * 1.15 },     // 西侧雷达站外
     ];
     const offs = [[0, 0], [1.2, 0.5], [-1.1, 0.7], [0.3, 1.5]];
-    for (const sq of squads) {
+    squads.forEach((sq, qi) => {
       offs.forEach(([ox, oz], i) => {
         const x = BC.x + sq.c[0] + ox, z = BC.z + sq.c[1] + oz;
         this.men.push({
           home: { x, z, ry: sq.face + (rnd() - 0.5) * 0.6 }, x, z, ry: 0,
-          rpg: i === 3, alive: true, st: 'idle', t: 0, cd: rnd(2, 6), flee: 0, fx: 0, fz: 0, ph: rnd(TAU),
+          rpg: i === 3, k: i === 3 ? 'g' : i === 0 ? (qi === 0 ? 'o' : 'm') : 's', burst: 0, alive: true, st: 'idle', t: 0, cd: rnd(2, 6), flee: 0, fx: 0, fz: 0, ph: rnd(TAU),
           // 巡逻兵（每队第 2、3 人）：沿垂直于朝向的 1.8u 岗线来回走；pk=当前去往端点(0/1)，pw=端点停留
           patrol: i === 1 || i === 2, pk: i & 1, pw: rnd(0.5, 2.5), walk: false,
         });
       });
-    }
+    });
     this.reset();
   }
 
-  _build(gS, gG) {
-    let bs = null, bg = null;
-    try { bs = bakeClipPoses(gS, INF_H); bg = bakeClipPoses(gG, INF_H); } catch (e) { console.warn('[infantry] bake', e); bs = bg = null; }
-    if (!bs || !bg) return;
-    // 每种(兵种 s=步枪 / g=火箭筒 × 帧)一个 InstancedMesh；容量按该兵种人数
+  _build(got) {
+    const B = {};
+    try { for (const k of INF_KINDS) if (got[k]) B[k] = bakeClipPoses(got[k], INF_H); } catch (e) { console.warn('[infantry] bake', e); return; }
+    if (!B.s || !B.g) return;
+    // 可缺省兵种模型没到 → 该兵种用步枪兵外观
+    for (const p of this.men) if (!B[p.k]) p.k = 's';
+    // 每种(兵种 × 帧)一个 InstancedMesh；容量按该兵种人数
     this.meshes = {};
-    const cap = { s: this.men.filter(p => !p.rpg).length, g: this.men.filter(p => p.rpg).length };
-    for (const [t, B] of [['s', bs], ['g', bg]]) {
+    const cap = {};
+    for (const p of this.men) cap[p.k] = (cap[p.k] || 0) + 1;
+    for (const t of Object.keys(cap)) {
+      const Bt = B[t];
       for (const k of INF_FRAMES) {
-        const im = new THREE.InstancedMesh(B[k], B.mat, Math.max(1, cap[t]));
+        const im = new THREE.InstancedMesh(Bt[k], Bt.mat, Math.max(1, cap[t]));
         im.count = 0;
         im.frustumCulled = false;
         im.castShadow = true;
@@ -201,7 +209,7 @@ class Infantry {
   reset() {
     for (const p of this.men) {
       p.x = p.home.x; p.z = p.home.z; p.ry = p.home.ry;
-      p.alive = true; p.st = 'idle'; p.t = 0; p.cd = rnd(3, 7); p.flee = 0; p.walk = false;
+      p.alive = true; p.st = 'idle'; p.t = 0; p.cd = rnd(3, 7); p.flee = 0; p.walk = false; p.burst = 0;
     }
     for (const r of this._rpgs) r.g.visible = false;
     for (const t of this._tracers) t.m.visible = false;
@@ -244,7 +252,7 @@ class Infantry {
       this.fx._puff(p.x, 0.15, p.z, { color: 0x9a8f7c, s0: 0.15, s1: 0.6, life: 0.5, base: 0.4, rise: 0.2 });
     }
     this.kills++;
-    if (this.onKill) this.onKill(p.rpg ? '火箭筒兵' : '步兵');
+    if (this.onKill) this.onKill(INF_LABEL[p.k] || '步兵');
   }
 
   // 每帧：env = { dt, heli: Vector3, alt, can: 是否允许出现, fire: 是否允许开火, rate, dmg }
@@ -279,7 +287,12 @@ class Infantry {
         p.cd -= dt * (env.rate || 1);
         if (p.cd <= 0) {
           if (p.rpg) { this._fireRpg(p, H, env); p.cd = rnd(9, 14); }
-          else { this._fireRifle(p, H, env, dist); p.cd = rnd(1.6, 3.2); }
+          else if (p.k === 'm') {
+            // 机枪手：3 发连射（间隔 0.12s），打完一串停 2.4–3.6s
+            this._fireRifle(p, H, env, dist);
+            if (p.burst <= 0) p.burst = 3;
+            p.burst--; p.cd = p.burst > 0 ? 0.12 : rnd(2.4, 3.6);
+          } else { this._fireRifle(p, H, env, dist); p.cd = p.k === 'o' ? rnd(2.6, 4) : rnd(1.6, 3.2); }
         }
       } else {
         p.st = 'idle';
@@ -389,7 +402,7 @@ class Infantry {
       let f = 'idle';
       if (p.alive && p.st === 'flee') f = 'r' + (Math.floor(p.t / 0.88 * INF_RUN_N + p.ph * 3) % INF_RUN_N);
       else if (p.alive && p.walk) f = 'w' + (Math.floor(p.t / 1.29 * INF_WALK_N + p.ph * 3) % INF_WALK_N);
-      const k = (p.rpg ? 'g' : 's') + f;
+      const k = p.k + f;
       const im = this.meshes[k];
       if (!p.alive) {
         // 倒地：站立帧仰面放倒（绕 X 轴 -90°，头朝身后）
