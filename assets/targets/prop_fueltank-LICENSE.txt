@@ -1,0 +1,5 @@
+prop_fueltank.glb — 储油罐模型
+原作："Rusted Tank storage"，作者 Mkc (ixMkc1)
+链接：https://sketchfab.com/3d-models/rusted-tank-storage-57be2eaf4d6b4d2980bcee4ccb35f780
+许可：CC BY 4.0（知识共享 署名 4.0，https://creativecommons.org/licenses/by/4.0/）——使用须署名原作者。
+改动：去重焊接、按需减面（meshoptimizer）；贴图缩小并转 JPEG（@gltf-transform 4）。游戏内按真实尺寸等比缩放。
