@@ -175,6 +175,7 @@
  },
  "16-targetmodels.js": {
   "provides": [
+   "INSURGENT_VARIANTS",
    "TARGET_TYPES",
    "VARIANT_LABEL",
    "addBox",
@@ -202,7 +203,8 @@
  "16-targetprops.js": {
   "provides": [
    "placeRangeProps",
-   "placeTownProps"
+   "placeTownProps",
+   "skinTownBuilding"
   ],
   "depends": {
    "00-utils.js": [
@@ -300,6 +302,7 @@
     "BASE_C"
    ],
    "16-targetmodels.js": [
+    "INSURGENT_VARIANTS",
     "TARGET_TYPES",
     "VARIANT_LABEL",
     "applyModelToTarget",
@@ -310,7 +313,8 @@
     "targetModelKey"
    ],
    "16-targetprops.js": [
-    "placeTownProps"
+    "placeTownProps",
+    "skinTownBuilding"
    ]
   }
  },
@@ -346,6 +350,7 @@
     "smoothstep"
    ],
    "16-targetmodels.js": [
+    "INSURGENT_VARIANTS",
     "TARGET_TYPES",
     "VARIANT_LABEL",
     "applyModelToTarget",
@@ -500,7 +505,11 @@
  },
  "27-infantry.js": {
   "provides": [
-   "Infantry"
+   "INF_FRAMES",
+   "INF_RUN_N",
+   "INF_WALK_N",
+   "Infantry",
+   "bakeClipPoses"
   ],
   "depends": {
    "00-utils.js": [
@@ -511,6 +520,31 @@
    ],
    "05-config.js": [
     "BASE_C"
+   ]
+  }
+ },
+ "27-life.js": {
+  "provides": [
+   "BattleLife",
+   "CIV_PENALTY"
+  ],
+  "depends": {
+   "00-utils.js": [
+    "PI",
+    "TAU",
+    "rnd"
+   ],
+   "05-config.js": [
+    "BASE_C"
+   ],
+   "16-town.js": [
+    "TOWN_CENTER"
+   ],
+   "27-infantry.js": [
+    "INF_FRAMES",
+    "INF_RUN_N",
+    "INF_WALK_N",
+    "bakeClipPoses"
    ]
   }
  },
@@ -859,6 +893,7 @@
    "hitMark",
    "infantry",
    "killFeed",
+   "life",
    "music",
    "narrative",
    "nlights",
@@ -1145,6 +1180,7 @@
     "fp",
     "infantry",
     "killFeed",
+    "life",
     "music",
     "narrative",
     "nlights",
@@ -1229,6 +1265,9 @@
    "16-valley.js": [
     "CANYON_HOVER"
    ],
+   "27-life.js": [
+    "CIV_PENALTY"
+   ],
    "45-flight.js": [
     "FLY"
    ],
@@ -1250,6 +1289,7 @@
     "enemyVis",
     "fp",
     "infantry",
+    "life",
     "music",
     "narrative",
     "progress",
@@ -1379,6 +1419,10 @@
    "27-infantry.js": [
     "Infantry"
    ],
+   "27-life.js": [
+    "BattleLife",
+    "CIV_PENALTY"
+   ],
    "28-washfx.js": [
     "WashFX"
    ],
@@ -1429,6 +1473,7 @@
     "hitMark",
     "infantry",
     "killFeed",
+    "life",
     "music",
     "narrative",
     "nlights",
@@ -1532,6 +1577,7 @@
     "enemyVis",
     "fp",
     "infantry",
+    "life",
     "music",
     "narrative",
     "nlights",
