@@ -1,0 +1,5 @@
+prop_moto.glb — 越野摩托模型
+原作："Mid poly dirt bike"，作者 danilloribeiro
+链接：https://sketchfab.com/3d-models/mid-poly-dirt-bike-3009c80ec6cc47fcaad27cf96f2a0822
+许可：CC BY 4.0（知识共享 署名 4.0，https://creativecommons.org/licenses/by/4.0/）——使用须署名原作者。
+改动：去重焊接、减面（meshoptimizer，osa 原 42 万面减到约 4.6 万面）；贴图缩小并转 JPEG（@gltf-transform 4）。游戏内按真实尺寸等比缩放。
