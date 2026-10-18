@@ -529,7 +529,7 @@ function completeMission() {
 // ---- P5-G4 战报（2026-10-16）：结算面板末尾追加——分武器命中、击毁明细、中弹次数、
 // 最高连击、得分来源、个人最佳对比。只读展示，不改评级与既有得分公式。
 const _KILL_NAMES = { tank: '坦克', truck: '卡车', barrel: '油桶', drone: '无人机', balloon: '热气球', plane: '靶机',
-  enemy: '敌直升机', radar: '雷达', sam: '防空导弹车', ammo: '弹药库', infantry: '步兵' };
+  enemy: '敌直升机', radar: '雷达', sam: '防空导弹车', ammo: '弹药库', infantry: '步兵', moto: '摩托侦察兵' };
 function _appendDebrief(m, prevBest) {
   const body = UI('mission-body');
   if (!body || !rig) return;
@@ -542,7 +542,8 @@ function _appendDebrief(m, prevBest) {
   const kills = Object.entries(st.killsBy).map(([k, n]) => (_KILL_NAMES[k] || k) + ' ×' + n).join(' · ') || '无';
   const as = arcade ? arcade.state() : null;
   const score = arcade ? arcade.score : 0;
-  const src = arcade ? '击毁 ' + st.killScore + ' · 结算 ' + (m._settleBonus || 0) + (m._infBonus ? ' · 步兵全歼 ' + m._infBonus : '') : '—';
+  const src = arcade ? '击毁 ' + st.killScore + ' · 结算 ' + (m._settleBonus || 0) + (m._infBonus ? ' · 步兵全歼 ' + m._infBonus : '') +
+    (m.civKills ? ' · 误伤平民 −' + m.civKills * CIV_PENALTY : '') : '—';
   let pb = '';
   if (prevBest != null) {
     pb = score > prevBest
@@ -629,7 +630,8 @@ function startMission(variant, levelIdx, levelId) {
   if (scenery) scenery.resetTrees();   // 上一关被炸倒/烧焦的树复原
   if (rig && rig.clearImpacts) rig.clearImpacts();   // P5-G1 清弹坑/爆闪
   if (air) air.reset();
-  if (infantry) infantry.reset();   // P5-G2 步兵归位复活
+  if (infantry) infantry.reset();
+  if (life) life.reset();             // 2026-10-18 平民/摩托归位   // P5-G2 步兵归位复活
   resetNightOps();                  // P5-G3 照明弹补满
   if (samwar) samwar.reset();   // Phase 19：新任务清 SAM 状态（干扰弹补满/导弹清空/相位复位）
   if (damageSys) damageSys.reset();   // Phase 19：新任务清机务损伤（系统归零/卡壳过热处置全清）
