@@ -103,23 +103,33 @@ class EnemyVis {
     // 2026-10-18：真实 Mi-24 模型换壳（Sketchfab "Mi-24 Hind" by duanesmind，CC BY 4.0，
     // 见 assets/targets/mi24-LICENSE.txt）。加载完成前/失败时保留上面的程序化机体兜底。
     // 机头 = 模型 +Z（与本文件朝向约定一致）；主旋翼 Top_Rotor、尾桨 Tail_Rotor 为独立节点。
-    new THREE.GLTFLoader().load('assets/targets/mi24.glb', (gltf) => {
+    // 2026-10-18 ASSETS2：2 号机换 Mi-8 运输/武装直升机（Sketchfab "Russian Transport Heli" by
+    // jeandiz，CC BY 4.0，见 CREDITS.md）——两架敌机外形不同更好认。Mi-8 内部节点带 -90°X 父旋转，
+    // 主旋翼 Rotor_Hub 绕自身 Z 转（spinAxis 'z'），尾桨 rotor_q 绕 X 转；机身长 18.2m≈8.0u。
+    const shells = [
+      { url: 'assets/targets/mi24.glb', body: 'Body_lambert1_0', len: 7.7, rotor: 'Top_Rotor', tail: 'Tail_Rotor', axis: 'y', units: [0] },
+      { url: 'assets/targets/mi8.glb', body: 'body', len: 8.0, rotor: 'Rotor_Hub', tail: 'rotor_q', axis: 'z', units: [1] },
+    ];
+    for (const sh of shells) new THREE.GLTFLoader().load(sh.url, (gltf) => {
       const src = gltf.scene;
       src.updateMatrixWorld(true);
-      const bodyNode = src.getObjectByName('Body_lambert1_0') || src;
+      const bodyNode = src.getObjectByName(sh.body) || src;
       const bb = new THREE.Box3().setFromObject(bodyNode, true);
       const sz = bb.getSize(new THREE.Vector3());
-      const k = 7.7 / Math.max(sz.z, 1e-3);           // 机身长 17.5m ≈ 7.7u
+      const k = sh.len / Math.max(sz.z, 1e-3);
       const cx = (bb.min.x + bb.max.x) / 2, cy = (bb.min.y + bb.max.y) / 2, cz = (bb.min.z + bb.max.z) / 2;
-      for (const ud of this.units) {
+      for (const ui of sh.units) {
+        const ud = this.units[ui];
+        if (!ud) continue;
         const m = src.clone(true);
         m.scale.setScalar(k);
         m.position.set(-cx * k, -cy * k, -cz * k);    // 机身中心对齐 group 原点（与程序化机体一致）
         m.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
         for (const c of ud.g.children) c.visible = false;   // 藏程序化机体+旋翼
         ud.g.add(m);
-        ud.rotor = m.getObjectByName('Top_Rotor') || ud.rotor;
-        ud.tail = m.getObjectByName('Tail_Rotor');
+        ud.rotor = m.getObjectByName(sh.rotor) || ud.rotor;
+        ud.tail = m.getObjectByName(sh.tail);
+        ud.axis = sh.axis;
       }
     }, undefined, () => {});
     // nearest/hitTest 桥接包装（持久对象——65/46 拿到 t.pos 直接可用）
@@ -196,7 +206,7 @@ class EnemyVis {
         ud.g.rotation.y = Math.atan2(u.hx, u.hz);
         ud.g.rotation.x = -Math.asin(Math.max(-1, Math.min(1, u.hy)));
         ud.spin += dt * 26;
-        ud.rotor.rotation.y = ud.spin;
+        if (ud.axis === 'z') ud.rotor.rotation.z = ud.spin; else ud.rotor.rotation.y = ud.spin;
         if (ud.tail) ud.tail.rotation.x = ud.spin * 1.6;
       } else if (!crashing) {
         ud.g.visible = false;
