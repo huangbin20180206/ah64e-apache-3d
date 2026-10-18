@@ -29,7 +29,7 @@
 以下模型由作者用 **Unity 中国 团结 AI（Tuanjie AI Generator，底层 Rodin 出模 + UniRig 绑骨）** 生成，属于 AI 生成内容。
 依《Tuanjie Codely 服务条款》第 4、8.4 条：生成内容版权由使用者自行维护，对外发布需声明为 AI 生成（本节即声明）；
 文件内保留了平台写入的 AIGC 标识（asset.extras：author=unity / copyright=tjai），请勿删除。
-Hark 只做了贴图压缩（2048→1024/512）与缩放摆放，几何未改。
+Hark 只做了贴图压缩（2048→1024/512）与缩放摆放；第二批非角色模型另做了减面（保外形）。
 
 | 文件 | 内容 |
 |---|---|
@@ -38,6 +38,31 @@ Hark 只做了贴图压缩（2048→1024/512）与缩放摆放，几何未改。
 | assets/targets/civilian.glb | 平民（带骨骼 + Idle/Walk/Run） |
 | assets/targets/technical.glb | 武装皮卡（DShK 机枪） |
 | assets/targets/moto_scout.glb | 越野摩托 + 骑手 |
+| assets/targets/soldier_pkm.glb | PKM 机枪手（带骨骼）（第二批 2026-10-19） |
+| assets/targets/soldier_officer.glb | 指挥官（带骨骼）（第二批 2026-10-19） |
+| assets/targets/civilian_woman.glb | 黑袍女性平民（带骨骼）（第二批 2026-10-19） |
+| assets/targets/civilian_old.glb | 拄拐老人（带骨骼）（第二批 2026-10-19） |
+| assets/targets/bm21_grad.glb | BM-21 火箭炮（第二批 2026-10-19） |
+| assets/targets/zsu234_shilka.glb | ZSU-23-4 石勒喀高炮（第二批 2026-10-19） |
+| assets/targets/technical_zu23.glb | ZU-23 高炮皮卡（第二批 2026-10-19） |
+| assets/targets/civ_sedan.glb | 民用旧轿车（第二批 2026-10-19） |
+| assets/targets/civ_minibus.glb | 民用小巴（第二批 2026-10-19） |
+| assets/targets/civ_cargo.glb | 民用货车（第二批 2026-10-19） |
+| assets/targets/zu23_emplacement.glb | ZU-23 高炮阵地（第二批 2026-10-19） |
+| assets/targets/dshk_nest.glb | DShK 机枪掩体（第二批 2026-10-19） |
+| assets/targets/mortar_pit.glb | 迫击炮阵地（第二批 2026-10-19） |
+| assets/targets/comms_tower.glb | 通信铁塔（第二批 2026-10-19） |
+| assets/targets/mosque.glb | 小清真寺（第二批 2026-10-19） |
+| assets/targets/house_1f.glb | 一层院落房（第二批 2026-10-19） |
+| assets/targets/shop_row.glb | 三间铺面（第二批 2026-10-19） |
+| assets/targets/market_stall.glb | 集市摊（第二批 2026-10-19） |
+| assets/targets/water_tower.glb | 高架水塔（第二批 2026-10-19） |
+| assets/targets/bunker.glb | 碉堡（第二批 2026-10-19） |
+| assets/targets/palm_tree.glb | 椰枣树（第二批 2026-10-19） |
+| assets/targets/car_wreck.glb | 烧毁轿车（第二批 2026-10-19） |
+| assets/targets/container.glb | 集装箱（第二批 2026-10-19） |
+| assets/targets/generator.glb | 发电机（第二批 2026-10-19） |
+| assets/targets/tent_military.glb | 军用帐篷（第二批 2026-10-19） |
 | assets/targets/warehouse.glb | 铁皮仓库 |
 | assets/targets/house_2f.glb | 两层民房 |
 
