@@ -1,0 +1,5 @@
+prop_ammo.glb — 弹药箱模型
+原作："Ammo crate. Wear and tear"，作者 sergei pavlov
+链接：https://sketchfab.com/3d-models/ammo-crate-wear-and-tear-92b57e3e4de646b8b31e5415163b3fb0
+许可：CC BY 4.0（知识共享 署名 4.0，https://creativecommons.org/licenses/by/4.0/）——使用须署名原作者。
+改动：去重焊接、按需减面（meshoptimizer）；贴图缩小并转 JPEG（@gltf-transform 4）。游戏内按真实尺寸等比缩放。
