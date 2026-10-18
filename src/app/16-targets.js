@@ -304,6 +304,7 @@ class TargetRange {
     // B2：解除警报，疏散车辆回到原车位（原巡逻目标保留各自巡逻定义）
     this._alert = false; this._alertT = null;
     for (const t of this.targets) {
+      if (t.turret) t.turret.rotation.y = 0;   // ASSETS3 炮塔回正
       if (!t.home) continue;
       t.mov = t.home.mov;
       if (!t.mov) {
@@ -391,6 +392,8 @@ class TargetRange {
     // 敌方反击（P2-1）：基地轻武器间歇还击（曳光+散布），命中累积机体损伤。
     // 开火条件：靶场启用 + 机体离地（alt>2，地面停放不交战）+ 距基地 8~55u。
     const aaActive = this.enabled && !this.passive && heliPos && heliPos.y > 2 && this.baseCenter;
+    // 2026-10-18 ASSETS3：炮塔跟踪直升机（16-targetmodels aimTurret；无 rnd，不影响种子序列）
+    for (const t of this.targets) if (t.turret && t.group.visible) aimTurret(t, heliPos, dt);
     const bd = aaActive ? Math.hypot(heliPos.x - this.baseCenter.x, heliPos.z - this.baseCenter.z) : 0;
     // 玩法批 D：峡谷里离基地远（>55u），改由峡谷伏兵开火——只有 30u 内看得见你的车
     const inCanyon = aaActive && this.canyon && this.canyon.active && this.canyon.inZone(heliPos);
