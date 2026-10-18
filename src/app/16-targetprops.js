@@ -29,6 +29,10 @@ const PROP_DEFS = {
   // 越野摩托：文件里 7 辆一排（不同颜色），按节点名取两辆停在街边；车长 ≈2.1m
   motoK:    { url: 'assets/targets/prop_moto.glb', pick: 'dirt_bike_black', len: 0.93 },
   motoR:    { url: 'assets/targets/prop_moto.glb', pick: 'dirt_bike_red', len: 0.93 },
+  // 2026-10-18 ASSETS4（团结 AI 生成，AIGC，见 CREDITS.md）：城镇可摧毁楼的外壳——
+  // 不走 placeProps，由 skinTownBuilding 套到 16-town 的程序化楼上（命中盒/塌方不变）
+  warehouse: { url: 'assets/targets/warehouse.glb' },   // 铁皮仓库（卷帘门朝模型 +Z）
+  house2f:   { url: 'assets/targets/house_2f.glb' },    // 两层民房（阳台/外楼梯朝模型 +Z）
 };
 let _propCache = null;
 function _loadPropModels() {
@@ -79,6 +83,38 @@ function placeProps(parent, list) {
       mergeTargetStatics({ group: g });
     });
   }
+}
+
+// 城镇楼换真模型外壳（2026-10-18 ASSETS4）：b = 16-town 的 building 记录。
+// 模型旋转 ry 后，按包围盒分轴缩放到楼的 w×h×d（≤ ±12% 形变），挂进 b.group
+// （塌方下沉/倾斜自动跟随），隐藏程序化墙体与屋顶；材质克隆一份进 b.skinMats，
+// 半毁变暗/重置还原由 16-town 同步。加载失败 → 保持程序化楼。
+function skinTownBuilding(b, key, ry) {
+  _loadPropModels()[key].then((src) => {
+    if (!src || !b.group) return;
+    const inst = src.clone(true);
+    const pivot = new THREE.Group();
+    pivot.add(inst);
+    pivot.rotation.y = ry;
+    pivot.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(pivot, true), sz = box.getSize(new THREE.Vector3());
+    const c = box.getCenter(new THREE.Vector3());
+    const holder = new THREE.Group();
+    holder.add(pivot);
+    pivot.position.set(-c.x, -box.min.y, -c.z);
+    holder.scale.set(b.w / Math.max(sz.x, 1e-4), b.h / Math.max(sz.y, 1e-4), b.d / Math.max(sz.z, 1e-4));
+    b.skinMats = [];
+    holder.traverse(o => {
+      if (!o.isMesh) return;
+      o.castShadow = true; o.receiveShadow = true;
+      o.material = o.material.clone();
+      b.skinMats.push(o.material);
+    });
+    for (const ch of b.group.children) ch.visible = false;   // 程序化墙体 + 屋顶
+    b.group.add(holder);
+    b.skin = holder;
+    if (b._dmgLook) for (const m of b.skinMats) m.color.setScalar(0.62);
+  });
 }
 
 // 基地（BC=基地中心）：油料区储油罐 + 油桶、营区弹药箱、进场土路道闸检查站
