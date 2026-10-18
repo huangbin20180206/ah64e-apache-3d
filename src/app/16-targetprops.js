@@ -33,6 +33,22 @@ const PROP_DEFS = {
   // 不走 placeProps，由 skinTownBuilding 套到 16-town 的程序化楼上（命中盒/塌方不变）
   warehouse: { url: 'assets/targets/warehouse.glb' },   // 铁皮仓库（卷帘门朝模型 +Z）
   house2f:   { url: 'assets/targets/house_2f.glb' },    // 两层民房（阳台/外楼梯朝模型 +Z）
+  // 2026-10-19 ASSETS5（团结 AI 生成，AIGC）：真实尺寸 ÷2.27 → len（水平最长边）或 h（高）
+  house1f:   { url: 'assets/targets/house_1f.glb' },      // 一层平顶院落房（skin 用，院门朝 +Z）
+  watertower:{ url: 'assets/targets/water_tower.glb' },   // 混凝土高架水塔（skin 用）
+  mosque:    { url: 'assets/targets/mosque.glb', len: 6.3 },          // 小清真寺 14m（门朝 +Z）
+  shoprow:   { url: 'assets/targets/shop_row.glb', len: 5.3 },        // 三间临街铺面 12m（铺面朝 +X）
+  stall:     { url: 'assets/targets/market_stall.glb', len: 1.3 },    // 集市果蔬摊 2.9m
+  palm:      { url: 'assets/targets/palm_tree.glb', h: 4.0 },         // 椰枣树 9m
+  tent:      { url: 'assets/targets/tent_military.glb', len: 2.64 },  // 军用帐篷 6m（门帘朝 +Z）
+  generator: { url: 'assets/targets/generator.glb', len: 0.97 },      // 柴油发电机 + 油桶 2.2m
+  container: { url: 'assets/targets/container.glb', len: 2.67 },      // 集装箱（按 20 尺 6.06m 摆）
+  zu23:      { url: 'assets/targets/zu23_emplacement.glb', len: 1.71 },   // ZU-23-2 高炮阵地 3.9m（炮口朝 +Z）
+  dshk:      { url: 'assets/targets/dshk_nest.glb', len: 1.3 },       // DShK 重机枪掩体 3m
+  mortar:    { url: 'assets/targets/mortar_pit.glb', len: 1.06 },     // 82mm 迫击炮阵地 2.4m
+  bunker:    { url: 'assets/targets/bunker.glb', h: 1.1 },            // 混凝土碉堡 2.5m 高（射击孔朝 +Z）
+  wreck:     { url: 'assets/targets/car_wreck.glb', len: 1.94 },      // 烧毁轿车 4.4m
+  commtower: { url: 'assets/targets/comms_tower.glb', h: 11.0 },      // 通信铁塔 25m
 };
 let _propCache = null;
 function _loadPropModels() {
@@ -129,6 +145,23 @@ function placeRangeProps(parent, BC) {
     ['ammo', BC.x + 9.4, BC.z + 11.0, 1.5],
     ['barrier', BC.x, BC.z - 21.0, 0],           // 土路南段（沿 z 走向）横拦
     ['booth', BC.x + 2.1, BC.z - 21.6, -PI / 2],
+    // 2026-10-19 ASSETS5：营区真帐篷（替换 16-targetscenery 程序化帐篷，长边沿 x、门朝东）+ 发电机
+    ['tent', BC.x - 21, BC.z + 12, PI / 2],
+    ['tent', BC.x - 15.5, BC.z + 12, PI / 2],
+    ['tent', BC.x - 10, BC.z + 12, PI / 2],
+    ['generator', BC.x - 18.3, BC.z + 9.6, 0.3],
+    // 防御工事：南门两侧重机枪掩体、门外碉堡、东侧高炮阵地、西侧迫击炮阵地（均朝南来袭方向）
+    ['dshk', BC.x - 5.2, BC.z - 14.2, PI],
+    ['dshk', BC.x + 5.2, BC.z - 14.2, PI],
+    ['bunker', BC.x - 6.0, BC.z - 19.2, PI],
+    ['zu23', BC.x + 21.2, BC.z + 2.2, PI * 0.9],
+    ['mortar', BC.x - 22.0, BC.z + 4.0, PI],
+    ['container', BC.x + 22.6, BC.z + 7.2, 0],
+    // 墙外：西侧通信铁塔、进场土路边烧毁轿车、门口椰枣树
+    ['commtower', BC.x - 30.0, BC.z + 4.0, 0.4],
+    ['wreck', BC.x - 20.0, BC.z - 30.6, 0.35],
+    ['palm', BC.x - 4.4, BC.z - 18.0, 0],
+    ['palm', BC.x + 4.6, BC.z - 18.4, 1.7],
   ]);
 }
 
@@ -147,5 +180,17 @@ function placeTownProps(parent, C) {
     ['drums', C.x - 15.2, C.z + 1.8, 0.7],
     ['motoK', C.x + 2.1, C.z + 2.4, 0.2],
     ['motoR', C.x - 2.2, C.z - 2.9, 2.9],
+    // 2026-10-19 ASSETS5：北巷以北的清真寺（地标，门朝南）、三间铺面（铺面朝南）、集市摊、椰枣树、废车
+    ['mosque', C.x - 7.0, C.z + 15.6, PI],
+    ['shoprow', C.x + 8.0, C.z + 14.4, PI / 2],
+    ['stall', C.x - 13.6, C.z + 12.4, PI],
+    ['stall', C.x - 11.8, C.z + 12.5, PI + 0.15],
+    ['stall', C.x + 13.4, C.z + 12.3, PI - 0.1],
+    ['container', C.x + 15.8, C.z - 9.0, 0.3],
+    ['wreck', C.x - 17.6, C.z - 2.6, 1.2],
+    ['palm', C.x - 16.5, C.z + 13.5, 0], ['palm', C.x + 16.8, C.z + 13.8, 2.0],
+    ['palm', C.x - 19.0, C.z - 8.5, 1.0], ['palm', C.x + 19.2, C.z - 8.2, 3.0],
+    ['palm', C.x + 25.6, C.z - 4.2, 0.5], ['palm', C.x + 25.8, C.z + 5.4, 2.4],
+    ['palm', C.x - 2.6, C.z + 19.6, 1.3], ['palm', C.x + 3.4, C.z + 18.8, 4.0],
   ]);
 }
