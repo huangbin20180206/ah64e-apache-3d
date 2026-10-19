@@ -990,7 +990,11 @@
    "setView"
   ],
   "depends": {
+   "00-utils.js": [
+    "PI"
+   ],
    "01-host.js": [
+    "HOST",
     "UI"
    ],
    "45-flight.js": [
@@ -1346,6 +1350,9 @@
     "targets",
     "updateTargetHUD",
     "washfx"
+   ],
+   "70-camera.js": [
+    "setView"
    ],
    "70-nightops.js": [
     "resetNightOps"
