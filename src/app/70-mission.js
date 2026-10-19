@@ -411,6 +411,7 @@ function completeMission() {
   if (m.variant === 'train_flight' && !(course && course.done)) return;
   if (m.variant === 'train_rescue' && (!rescue || rescue.state !== 'delivered')) return;
   m.done = true; m.phase = 'done'; m.frozen = true;
+  radioSay('done');   // E2 无线电
   const el = S.time - m.t0;
   const shots = (m.gun0 - rig.gunAmmo) + (m.rk0 - rig.rocketAmmo) + (m.hf0 - rig.hfAmmo);
   // P3：非战斗训练关（首飞/救援）没开火 → 命中率按 100% 计，评级只看用时
@@ -483,6 +484,7 @@ function completeMission() {
     m._infBonus = 0;
     if (infantry && infantry.active && infantry.men.length && infantry.aliveCount() === 0) {
       m._infBonus = arcade.addBonus(150 * arcade.coeffs(m).scoreMul);
+      radioSay('inf');
     }
     m._settleBonus = bonus;
     UI('mission-body').insertAdjacentHTML('beforeend',
@@ -573,6 +575,7 @@ function failMission(reason) {
   const m = S._mission;
   if (!m || m.frozen) return;
   m.done = true; m.phase = 'failed'; m.frozen = true; m.failedReason = reason;
+  radioSay('fail');   // E2 无线电
   const el = S.time - m.t0;
   UI('mission-title').textContent = '任务失败';
   // P8：失败归因可解释——damage=机体损伤过重强制返航；timeout=超时未全歼。
@@ -707,6 +710,7 @@ function beginMission() {
   const m = S._mission;
   if (!m || m.phase !== 'briefing') return;
   m.phase = 'active';
+  radioSay('start');   // E2 无线电开场
   if (m.t0 == null) m.t0 = S.time;
   if (m.gun0 == null) { m.gun0 = rig ? rig.gunAmmo : 0; m.rk0 = rig ? rig.rocketAmmo : 0; m.hf0 = rig ? rig.hfAmmo : 0; }
   // 任务进行中靶场必须启用（直接设状态源；不依赖 72-uibind 闭包内的 syncTargetsVis）
