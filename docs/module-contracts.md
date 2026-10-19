@@ -850,6 +850,7 @@
     "PI",
     "TAU",
     "canvas2d",
+    "mulberry32",
     "rnd",
     "tex"
    ],
@@ -1065,7 +1066,8 @@
   ],
   "depends": {
    "00-utils.js": [
-    "clamp"
+    "clamp",
+    "lerp"
    ],
    "01-host.js": [
     "HOST",
@@ -1096,15 +1098,15 @@
    "70-appmode.js": [
     "appState"
    ],
+   "70-killcam.js": [
+    "KC"
+   ],
    "70-labels.js": [
     "_v"
    ],
    "70-mission.js": [
     "TRAIN_NUM",
     "TRAIN_STEPS"
-   ],
-   "70-killcam.js": [
-    "KC"
    ]
   }
  },
