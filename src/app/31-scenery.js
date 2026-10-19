@@ -456,13 +456,15 @@ function buildWorldScenery(W) {
     const YEL = [0.85, 0.68, 0.12], OLIVE = [0.30, 0.33, 0.22];
     // 机库：西北（-38, 20），门朝 +x
     const hx = -38, hz = 20;
-    parts.push({ geo: _scnBox(12, 6, 16, hx, 3, hz), col: GRAY });
+    // polish3：机库/油车先用方块占位（fb），真模型（铁皮仓库 + M978 油罐车 GLB）加载完就替换
+    const fb = [];
+    fb.push({ geo: _scnBox(12, 6, 16, hx, 3, hz), col: GRAY });
     // 半圆柱拱顶：θ∈[-90°,90°] 的半圈在 +z 侧，绕 X 转 -90° 后朝上，轴沿 z
     const rf = new THREE.CylinderGeometry(6, 6, 16, 14, 1, false, -Math.PI / 2, Math.PI);
     rf.rotateX(-Math.PI / 2);
     rf.translate(hx, 6, hz);
-    parts.push({ geo: rf, col: ROOF });
-    parts.push({ geo: _scnBox(0.2, 5.2, 11, hx + 6.05, 2.6, hz), col: DARK });       // 大门
+    fb.push({ geo: rf, col: ROOF });
+    fb.push({ geo: _scnBox(0.2, 5.2, 11, hx + 6.05, 2.6, hz), col: DARK });       // 大门
     // 滑行线：停机坪边缘 → 机库门
     const line = (x0, z0, x1, z1) => {
       const L = Math.hypot(x1 - x0, z1 - z0), a = Math.atan2(x1 - x0, z1 - z0);
@@ -482,13 +484,13 @@ function buildWorldScenery(W) {
     // 油车（东南 23, -17）：驾驶室 + 罐体 + 车轮
     const tx = 23, tz = -17, ta = 0.7;
     const tr = (g) => { g.rotateY(ta); g.translate(tx, 0, tz); return g; };
-    parts.push({ geo: tr(_scnBox(1.9, 1.5, 1.6, 0, 1.15, 2.1)), col: OLIVE });
+    fb.push({ geo: tr(_scnBox(1.9, 1.5, 1.6, 0, 1.15, 2.1)), col: OLIVE });
     const tank = new THREE.CylinderGeometry(0.9, 0.9, 4.0, 12); tank.rotateX(Math.PI / 2); tank.translate(0, 1.35, -0.6);
-    parts.push({ geo: tr(tank), col: [0.55, 0.57, 0.50] });
-    parts.push({ geo: tr(_scnBox(2.0, 0.3, 6.0, 0, 0.45, 0.3)), col: DARK });
+    fb.push({ geo: tr(tank), col: [0.55, 0.57, 0.50] });
+    fb.push({ geo: tr(_scnBox(2.0, 0.3, 6.0, 0, 0.45, 0.3)), col: DARK });
     for (const [wx, wz] of [[-0.95, 2.0], [0.95, 2.0], [-0.95, -1.6], [0.95, -1.6]]) {
       const w = new THREE.CylinderGeometry(0.42, 0.42, 0.3, 10); w.rotateZ(Math.PI / 2); w.translate(wx, 0.42, wz);
-      parts.push({ geo: tr(w), col: [0.08, 0.08, 0.08] });
+      fb.push({ geo: tr(w), col: [0.08, 0.08, 0.08] });
     }
     // 系留点 ×6（坪内 r=11，暗色圆环桩）
     for (let i = 0; i < 6; i++) {
@@ -501,6 +503,32 @@ function buildWorldScenery(W) {
     S.apron.position.y = GROUND_Y;
     S.apron.receiveShadow = true;
     scene.add(S.apron);
+    const fbm = new THREE.Mesh(scnMerge(fb), m);
+    fbm.name = 'scn-apron-fb';
+    S.apron.add(fbm);
+    // 真模型：铁皮仓库当机库（卷帘门朝模型 +Z → 转 90° 朝停机坪 +x，宽 16 沿 z），
+    // M978 HEMTT 油罐车（真车长 10.2m ≈ 4.3u，车头朝模型 +Z，沿原引导线角度 0.7）
+    const real = new THREE.Group();
+    real.name = 'scn-apron-real';
+    S.apron.add(real);
+    let got = 0;
+    const fit = (url, ry, size, axis, x, z, done) => new THREE.GLTFLoader().load(url, (gl) => {
+      const o = gl.scene;
+      o.traverse(q => { if (q.isMesh) { q.castShadow = true; q.receiveShadow = true; } });
+      const b = new THREE.Box3().setFromObject(o, true), sz = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+      const k = size / Math.max(axis === 'x' ? sz.x : sz.z, 1e-4);
+      o.scale.multiplyScalar(k);
+      o.position.set((o.position.x - c.x) * k, (o.position.y - b.min.y) * k, (o.position.z - c.z) * k);
+      const g = new THREE.Group(); g.add(o); g.rotation.y = ry; g.position.set(x, 0, z);
+      real.add(g);
+      if (done) done(g, sz.clone().multiplyScalar(k));
+      if (++got === 2) fbm.visible = false;
+    }, undefined, () => {});
+    // 仓库原贴图是锈透的民用铁皮棚，放在军用停机坪旁不合理 → 材质乘一层军用灰绿，锈迹变成旧漆斑
+    fit('assets/targets/warehouse.glb', Math.PI / 2, 16, 'x', hx, hz, (g) => g.traverse(q => {
+      if (q.isMesh) { q.material = q.material.clone(); q.material.color.setRGB(0.6, 0.66, 0.6); }
+    }));
+    fit('assets/targets/fuel.glb', ta, 4.3, 'z', tx, tz);
     const lm = new THREE.MeshBasicMaterial({ color: 0x8a8f94 });
     S.lamps = new THREE.Mesh(scnMerge(lampGeos), lm);
     S.lamps.name = 'scn-lamps';
