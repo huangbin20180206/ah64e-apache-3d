@@ -70,5 +70,6 @@ Hark 只做了贴图压缩（2048→1024/512）与缩放摆放；第二批非角
 - 装甲图鉴照片：Wikimedia Commons，逐张作者与许可见 assets/armory/LICENSE.txt（游戏内每张照片下方也有署名）。
 - 远景树木贴图：Poly Haven（CC0）。
 - 音效：Red Library（CC0），见 assets/audio/sfx。
+- 无线电中文喊话：AI 合成语音（Microsoft Edge 神经语音 云健/云希），台词原创，经无线电效果处理；非真人录音，说明见 assets/audio/radio/NOTE.txt。
 
 每个模型文件旁边的 `*-LICENSE.txt` 写有完整出处、许可和改动说明。
