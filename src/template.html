@@ -154,7 +154,9 @@ select{width:100%;padding:6px 8px;border:1px solid rgba(95,208,168,.30);border-r
   background:linear-gradient(180deg,rgba(11,16,14,.90),var(--panel));
   clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,10px 100%,0 calc(100% - 10px));
   font-family:var(--mono);font-size:11px;color:var(--fg);line-height:1.7;
-  opacity:0;pointer-events:none;transition:opacity .4s}
+  opacity:0;pointer-events:none;transition:opacity .4s;
+  max-height:calc(100vh - 160px);overflow-y:auto;scrollbar-width:thin}   /* game3：结算战报过长时不压住底部提示条/工具栏 */
+#mission.fin{pointer-events:auto;max-height:calc(100vh - 250px)}   /* game3：结算后允许滚轮看完整战报 */
 #mission.show{opacity:1;pointer-events:none}   /* P4-B：任务面板是纯只读展示，不拦截画布触控 */
 /* Phase 11 C1：简报阶段允许交互（变体 chip 选择）；active/结算阶段恢复纯只读 */
 #mission.briefing{pointer-events:auto}
