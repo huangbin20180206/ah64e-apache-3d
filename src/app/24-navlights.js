@@ -203,12 +203,16 @@ class NightLights {
     const I = this.I;
     this.g.visible = I > 0.02;
 
-    // 搜索灯：恒可见只调强度（0 强度不触发重编译）；停放也亮（地面有光池）
+    // 搜索灯：恒可见只调强度（0 强度不触发重编译）；冷机停放关、旋翼转起来/离地才亮（polish3）
     // P4c：沙地反照率高，黄昏/清晨天光仍亮——原 3000cd 在沙漠打出过曝光斑。
     // 按场地/时段压低（searchMul 由 70-loop 每帧写入场地；夜间草地/停机坪不变）
     const tMul = this.searchTerrainMul != null ? this.searchTerrainMul : 1;
     const eMul = this.envKey === 'night' ? 1 : 0.55;
-    this.search.intensity = this.searchBase * Math.max(0, (I - 0.02) / 0.98) * (tMul < 1 ? tMul * eMul : tMul);
+    // polish3：近景审查——冷机停在地面时搜索灯离地只有 0.4u，斜照出机头前一条纯白"彗星"光斑（压亮度也还是硬边白块），
+    // 真机冷机停放也不开搜索灯 → 只有离地或旋翼转起来（searchOn 由 70-loop 每帧写）才渐亮
+    const on = this.searchOn === false ? 0 : 1;
+    this._sOn = this._sOn == null ? on : this._sOn + (on - this._sOn) * Math.min(1, dt * 2);
+    this.search.intensity = this.searchBase * Math.max(0, (I - 0.02) / 0.98) * (tMul < 1 ? tMul * eMul : tMul) * this._sOn;
 
     // 仪表绿光：随整体亮度淡入淡出（Sprite 与原机共享材质，倒影自动跟随）
     if (this.dashMat) this.dashMat.opacity = 0.42 * I;
