@@ -14204,12 +14204,16 @@ class NightLights {
     const I = this.I;
     this.g.visible = I > 0.02;
 
-    // 搜索灯：恒可见只调强度（0 强度不触发重编译）；停放也亮（地面有光池）
+    // 搜索灯：恒可见只调强度（0 强度不触发重编译）；冷机停放关、旋翼转起来/离地才亮（polish3）
     // P4c：沙地反照率高，黄昏/清晨天光仍亮——原 3000cd 在沙漠打出过曝光斑。
     // 按场地/时段压低（searchMul 由 70-loop 每帧写入场地；夜间草地/停机坪不变）
     const tMul = this.searchTerrainMul != null ? this.searchTerrainMul : 1;
     const eMul = this.envKey === 'night' ? 1 : 0.55;
-    this.search.intensity = this.searchBase * Math.max(0, (I - 0.02) / 0.98) * (tMul < 1 ? tMul * eMul : tMul);
+    // polish3：近景审查——冷机停在地面时搜索灯离地只有 0.4u，斜照出机头前一条纯白"彗星"光斑（压亮度也还是硬边白块），
+    // 真机冷机停放也不开搜索灯 → 只有离地或旋翼转起来（searchOn 由 70-loop 每帧写）才渐亮
+    const on = this.searchOn === false ? 0 : 1;
+    this._sOn = this._sOn == null ? on : this._sOn + (on - this._sOn) * Math.min(1, dt * 2);
+    this.search.intensity = this.searchBase * Math.max(0, (I - 0.02) / 0.98) * (tMul < 1 ? tMul * eMul : tMul) * this._sOn;
 
     // 仪表绿光：随整体亮度淡入淡出（Sprite 与原机共享材质，倒影自动跟随）
     if (this.dashMat) this.dashMat.opacity = 0.42 * I;
@@ -19391,7 +19395,7 @@ const VIEWS = [
   { key: '4', name: '顶视', target: [0, 1.0, 0.1], theta: 0.30, phi: 0.14, dist: 13.6, fov: 34 },
   { key: '5', name: '尾后', target: [0, 1.30, -3.0], theta: PI, phi: 1.36, dist: 8.6, fov: 34 },
   { key: '6', name: '座舱', target: [0, 1.35, 2.55], theta: 0.95, phi: 1.34, dist: 3.5, fov: 40 },
-  { key: '7', name: '机炮', target: [0.05, 0.45, 3.25], theta: 0.62, phi: 1.30, dist: 2.7, fov: 42 },
+  { key: '7', name: '机炮', target: [0.05, 0.55, 3.15], theta: 0.55, phi: 1.50, dist: 2.2, fov: 40 },   // polish3：压低到炮口水平视线，炮管衬在亮地面上（原俯视一半画面是地砖）
   { key: '8', name: '桨毂', target: [0, 2.30, 1.56], theta: 1.05, phi: 1.02, dist: 3.2, fov: 38 },
   { key: '9', name: '龙弓雷达', target: [0, 2.75, 1.56], theta: 2.30, phi: 1.10, dist: 2.6, fov: 36 },
   { key: '0', name: '尾桨', target: [0.36, 2.30, -3.62], theta: 1.62, phi: 1.24, dist: 3.0, fov: 38 },
@@ -22652,7 +22656,7 @@ function _frame(dt, doRender) {
       W.duneFar.material.color.setHex(DUNE_BASE).multiplyScalar(desertEnvDim(P) * 0.78);
       if (S.env === 'dusk' || S.env === 'dawn') W.duneFar.material.color.multiply(_scnWarm);
     }
-    if (nlights) nlights.update(dt, S.time, s);
+    if (nlights) { nlights.searchOn = FLY.state !== 'ground' || (S.spin || 0) > 0.15; nlights.update(dt, S.time, s); }   // polish3：冷机停放不开搜索灯
     // 湖面倒影：镜像整机逐帧同步姿态（仅湖面场地启用）
     if (refl) refl.update(apache.root, S.time);
     // 程序化旋翼音效（转速+下洗驱动音量/音高）
@@ -25696,8 +25700,27 @@ function tourStart() {
   tour.on = true; tour.paused = false; tour.t = 0; tour.idx = 0; tour.steps = tourSteps(); tour.last = performance.now();
   tour.btn.textContent = '■'; tour.btn.classList.add('on');
   if (tour.xbtn) tour.xbtn.style.display = 'inline-block';   // 显式出口常驻
+  cineChrome(true);
   syncTourCtl();
   tour.raf = requestAnimationFrame(tourTick);
+}
+
+// polish3：航线/导览是电影画幅，右侧面板、左下参数框、操作提示、机位条、顶栏会挡住直升机 →
+// 播放期间收起，结束时按进入前状态恢复面板（75-routes 共用）
+const _cine = { css: null, pnHid: undefined };
+function cineChrome(on) {
+  if (!_cine.css) {
+    _cine.css = document.createElement('style');
+    _cine.css.textContent = 'body.route-mode #specs,body.route-mode #guide,body.route-mode #views,' +
+      'body.route-mode #top{opacity:0!important;pointer-events:none!important;transition:opacity .4s}';
+    document.head.appendChild(_cine.css);
+  }
+  if (document.body.classList.contains('route-mode') === !!on) return;
+  document.body.classList.toggle('route-mode', !!on);
+  const pn = document.getElementById('panel');
+  if (!pn) return;
+  if (on) { _cine.pnHid = pn.classList.contains('hide'); pn.classList.add('hide'); }
+  else if (_cine.pnHid === false) { pn.classList.remove('hide'); _cine.pnHid = undefined; }
 }
 
 function tourStop(quiet) {
@@ -25707,6 +25730,7 @@ function tourStop(quiet) {
   cancelAnimationFrame(tour.raf);
   tour.btn.textContent = '▶'; tour.btn.classList.remove('on');
   if (tour.xbtn) tour.xbtn.style.display = 'none';
+  cineChrome(false);
   syncTourCtl();
   if (!quiet && tour.cap) tour.cap.style.opacity = '0';
 }
@@ -25848,19 +25872,7 @@ function routeBars(on) {
     route.bars = [mk('top'), mk('bottom')];
   }
   for (const b of route.bars) b.style.height = on ? '7vh' : '0';
-  // polish3：航线是电影画幅，右侧面板/左下参数框/操作提示/机位条会挡住直升机 → 播放期间收起，退出时恢复
-  if (!route.css) {
-    route.css = document.createElement('style');
-    route.css.textContent = 'body.route-mode #specs,body.route-mode #guide,body.route-mode #views,' +
-      'body.route-mode #top{opacity:0!important;pointer-events:none!important;transition:opacity .4s}';
-    document.head.appendChild(route.css);
-  }
-  document.body.classList.toggle('route-mode', on);
-  const pn = document.getElementById('panel');
-  if (pn) {
-    if (on) { route._pnHid = pn.classList.contains('hide'); pn.classList.add('hide'); }
-    else if (route._pnHid === false) { pn.classList.remove('hide'); route._pnHid = undefined; }
-  }
+  cineChrome(on);   // polish3：电影画幅期间收起面板/HUD（74-tour 共用）
 }
 
 function routeStart(id) {
@@ -30342,7 +30354,7 @@ HOST.makeProgress = (opts) => new ProgressModule(opts);
 </script>
 
 <script>
-;(function(){ try { var __b = window.__BUILD_ID = window.__BUILD_ID || {}; __b.git_sha = "unknown"; __b.bundle_sha256 = '2caeca959f6a15dc0badd56e04d88b771622c8377b53e9eb09b37c599ce53516'; } catch(e){} })();
+;(function(){ try { var __b = window.__BUILD_ID = window.__BUILD_ID || {}; __b.git_sha = "unknown"; __b.bundle_sha256 = '6f4f89059f660421db07e42e92719e063143bec3d1c6bda6e7f5a74d7a926443'; } catch(e){} })();
 </script>
 </body>
 </html>
