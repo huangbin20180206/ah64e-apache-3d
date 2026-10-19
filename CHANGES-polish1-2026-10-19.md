@@ -55,3 +55,11 @@
 - 导览"下一段 ⏭"图标在部分系统字体缺字（显示方框）→ 改为"下一段 »"。
 - 复查通过：导览各段（夜灯/沙漠/启旋/起飞/湖面/着舰/分解/结束）、退出导览后面板与状态恢复、摄影模式进出、昼/黄昏/夜/影棚切换（1280×720、1366×768）。
 - 检查：tests_pure 91 passed；topology selftest 8/8；check_dom_ids 通过。
+
+## game1（2026-10-19，游戏线 PC 复查第一批：第三人称镜头）
+状态：代码已入 src / 构建通过（Exit 0，dist/index.html 2062 KB）
+- 70-camera setView：游戏模式下机位 1 改为"作战视角"（机尾后上方 21u、略广角、目标点前移 7u），前方战场和敌人进画面；展示模式英雄视角不变。原 12.6u 长焦近景在战斗中机身占满屏幕、看不到敌人。
+- 70-loop：第三人称下用方向键平移机体时相机跟随（与原有高度跟随同理，保留拖拽偏移；单帧位移 >20u 视为复位不跟）。原来几秒就飞出画面。
+- 70-mission beginMission：游戏模式开打时自动切到作战视角（FPV / 过场持有镜头时不动）。
+- docs/module-contracts.md 同步新依赖（HOST、PI、setView）。
+- 检查：check_topology 违规 0；tests_pure 91 passed；selftest 8/8；check_dom_ids 通过；截图 2-1 起飞/开火/前飞（cmp/vis/gl_pc.py）无报错。
