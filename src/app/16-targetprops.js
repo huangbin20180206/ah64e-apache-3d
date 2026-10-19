@@ -39,7 +39,9 @@ const PROP_DEFS = {
   mosque:    { url: 'assets/targets/mosque.glb', len: 6.3 },          // 小清真寺 14m（门朝 +Z）
   shoprow:   { url: 'assets/targets/shop_row.glb', len: 5.3 },        // 三间临街铺面 12m（铺面朝 +X）
   stall:     { url: 'assets/targets/market_stall.glb', len: 1.3 },    // 集市果蔬摊 2.9m
-  palm:      { url: 'assets/targets/palm_tree_v2.glb', h: 3.6 },      // 椰枣树 8.2m（ASSETS6 换镂空细叶版）
+  // 椰枣树 8.2m（ASSETS6 换镂空细叶版）。cutout：叶片改"镂空裁切"不走半透明排序（远近叠放不再闪），
+  // 叶色压成带灰土的橄榄绿（原贴图偏鲜绿，和沙漠色调不搭）
+  palm:      { url: 'assets/targets/palm_tree_v2.glb', h: 3.6, cutout: [0.74, 0.72, 0.56] },
   tent:      { url: 'assets/targets/tent_military.glb', len: 2.64 },  // 军用帐篷 6m（门帘朝 +Z）
   generator: { url: 'assets/targets/generator.glb', len: 0.97 },      // 柴油发电机 + 油桶 2.2m
   container: { url: 'assets/targets/container.glb', len: 2.67 },      // 集装箱（按 20 尺 6.06m 摆）
@@ -66,9 +68,21 @@ const PROP_ANIM = {
 const _paQ = new THREE.Quaternion(), _paX = new THREE.Vector3(1, 0, 0), _paY = new THREE.Vector3(0, 1, 0);
 function _rigPropAnim(inst, kind) {
   const names = Object.values(PROP_ANIM[kind])[0];
-  const a = inst.getObjectByName(names[0]), b = inst.getObjectByName(names[1]);
+  let a = inst.getObjectByName(names[0]), b = inst.getObjectByName(names[1]);
   if (!a || !b) return;
   if (kind === 'scan') a.attach(b);                 // 炮管跟着上座转
+  if (kind === 'pump') {
+    // 生成模型的曲柄节点原点不在配重转轴上（偏到上方 ~3m，转起来会甩飞）→ 套一层转轴组，
+    // 轴心放在配重包围盒中心（只绕自己转）；游梁原点在支点上，可直接转
+    inst.updateMatrixWorld(true);
+    const c = new THREE.Box3().setFromObject(b).getCenter(new THREE.Vector3());
+    const pv = new THREE.Group();
+    b.parent.add(pv);
+    pv.position.copy(b.parent.worldToLocal(c));
+    pv.updateMatrixWorld(true);
+    pv.attach(b);
+    b = pv;
+  }
   for (const n of [a, b]) { n.userData.q0 = n.quaternion.clone(); n.traverse(o => { if (o.isMesh) o.userData.noMerge = true; }); }
   const ph = (inst.id % 7) * 0.9;
   let last = -1;
@@ -132,6 +146,11 @@ function placeProps(parent, list) {
         if (!o.isMesh) return;
         o.castShadow = true; o.receiveShadow = true;
         if (def.opaque) { o.material = o.material.clone(); o.material.transparent = false; o.material.alphaTest = 0; o.material.opacity = 1; }
+        if (def.cutout && o.material.transparent) {
+          const m = o.material.userData.cut || (o.material.userData.cut = o.material.clone());
+          m.transparent = false; m.alphaTest = 0.5; m.depthWrite = true; m.color.setRGB(...def.cutout); m.side = THREE.DoubleSide;
+          o.material = m;
+        }
       });
       parent.add(g);
       g.updateMatrixWorld(true);
