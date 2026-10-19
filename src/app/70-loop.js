@@ -36,6 +36,35 @@ function stepFrames(sec, h = 1 / 30, until = null) {
   return t;
 }
 
+// polish3c：展示模式右侧面板展开时，画面中心落在面板下面——小窗口（1024 宽）直升机尾桨被面板盖住。
+// 面板打开时把镜头画面整体左移半个面板宽（相机视口偏移，不动相机本身；拾取/标签投影用同一投影矩阵，自动一致）。
+// 只在展示模式 + 环绕镜头生效：游戏模式准星在屏幕正中、第一人称/航线/导览都不动。
+const _PS = { x: 0, w: 0, h: 0 };
+function _panelShift(dt) {
+  let want = 0;
+  const w = innerWidth, h = innerHeight;
+  if (S.app === 'show' && !(fp && fp.active) && w > 600 && !document.body.classList.contains('route-mode')) {
+    let L = 0, R = w;
+    const pn = document.getElementById('panel');
+    if (pn && !pn.classList.contains('hide')) {
+      const r = pn.getBoundingClientRect();
+      if (r.width > 0 && r.left > w * 0.4) R = r.left;
+    }
+    // 知识卡停靠左侧时（模板 #label-info.kc 规则），画面中心落在卡片右缘与面板左缘之间
+    const kc = document.getElementById('label-info');
+    if (kc && kc.classList.contains('kc') && kc.style.display !== 'none') {
+      const r = kc.getBoundingClientRect();
+      if (r.width > 0 && r.left < w * 0.2 && r.right < w * 0.5) L = r.right;
+    }
+    want = Math.round(w / 2 - (L + R) / 2);
+  }
+  const nx = Math.abs(want - _PS.x) < 0.5 ? want : _PS.x + (want - _PS.x) * Math.min(1, dt * 6);
+  if (Math.abs(nx - _PS.x) < 0.01 && w === _PS.w && h === _PS.h) return;
+  _PS.x = nx; _PS.w = w; _PS.h = h;
+  if (Math.abs(nx) < 0.5) W.camera.clearViewOffset();
+  else W.camera.setViewOffset(w, h, nx, 0, w, h);
+}
+
 function _frame(dt, doRender) {
   const rawDt = dt;                 // 慢动作会缩放 dt，白闪/震屏衰减用原始值
   // E1（2026-10-19）：慢动作真正作用于整帧模拟。此前 timeScale 在帧末才乘到 dt，
@@ -305,6 +334,7 @@ function _frame(dt, doRender) {
   // 第一人称：相机由 FPView 驱动（机头姿态即视线），环绕控制器让位
   if (fp && fp.active) fp.update(dt);
   else orbit.update(dt);
+  _panelShift(rawDt);
   killcamUpdate(rawDt);
   radioTick(rawDt);       // E2 无线电字幕/静音/锁定检测（70-radio.js）   // E1 击毁特写：覆盖本帧相机（70-killcam.js）
   W.skyMat.uniforms.uTime.value = S.time;
