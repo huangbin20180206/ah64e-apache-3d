@@ -288,7 +288,8 @@ class TargetRange {
       this._fuelBooms.push({ t: 0.5, x: p.x, y: 0.8, z: p.z });
     }
     // 残骸燃烧时长：油桶（燃料）最久 > 卡车 > 装甲车
-    t.burn = t.type === 'barrel' ? 16 : t.type === 'truck' ? 9 : 5;
+    // E3（2026-10-19）：燃烧拉长到半分钟上下（原 5~16s 太快熄），前 60% 明火黑烟、后段灰烟阴燃
+    t.burn = t.type === 'barrel' ? 30 : t.type === 'truck' ? 26 : 22;
     t._smk = 0;
     // P5-G1 真实残骸：原车烧焦壳 + 碎片 + 焦痕（16-targetmodels makeWreck）
     const wreck = makeWreck(t);
@@ -578,13 +579,19 @@ class TargetRange {
       wreckEmber(t.wreck, t.burn > 0 ? t.burn / (t.burn0 || 5) : 0, 0.8 + rnd() * 0.4);
       t._smk -= dt;
       if (t._smk > 0) continue;
-      t._smk = 0.24;
       const wp = t.wreck.position;
-      // 黑烟柱（残骸中心）
-      fx._puff(wp.x + (rnd() - 0.5) * 0.6, 0.5, wp.z + (rnd() - 0.5) * 0.6,
-        { color: 0x2b2620, s0: 0.35, s1: 1.6, life: 1.3, base: 0.42, rise: 0.9 });
-      // 火舌（燃烧未熄时随机窜出）
-      if (t.burn > 1 && rnd() < 0.6) {
+      const flaming = t.burn > (t.burn0 || 22) * 0.4;
+      t._smk = flaming ? 0.26 : 0.5;
+      // E3 烟柱：明火期浓黑、粗、升得高（约 8~10 米）；阴燃期灰白、细、淡
+      if (flaming) {
+        fx._puff(wp.x + (rnd() - 0.5) * 0.6, 0.6, wp.z + (rnd() - 0.5) * 0.6,
+          { color: 0x221e1a, s0: 0.8, s1: 4.6, life: 3.0, base: 0.85, rise: 1.5, lin: true });
+      } else {
+        fx._puff(wp.x + (rnd() - 0.5) * 0.5, 0.4, wp.z + (rnd() - 0.5) * 0.5,
+          { color: 0x5a554e, s0: 0.5, s1: 3.2, life: 2.6, base: 0.45, rise: 1.1, lin: true });
+      }
+      // 火舌（明火期随机窜出）
+      if (flaming && rnd() < 0.7) {
         fx._puff(wp.x + (rnd() - 0.5) * 0.9, 0.3, wp.z + (rnd() - 0.5) * 0.9,
           { color: 0xff8a3c, s0: 0.14, s1: 0.55, life: 0.22, base: 0.6, add: true });
       }
