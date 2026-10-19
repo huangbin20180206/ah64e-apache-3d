@@ -35,6 +35,22 @@ const SMOKE_TINT = { day: [1, 1, 1], afternoon: [1, 0.96, 0.9], dawn: [0.92, 0.8
   dusk: [0.9, 0.68, 0.5], night: [0.24, 0.26, 0.32], studio: [1, 1, 1] };
 const _SMOKE_C = new THREE.Color();
 
+// E3：团状烟贴图——固定种子的多个软圆叠加（不用 Math.random，不占视觉 PRNG 流）
+function makeSmokeTex() {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const r = mulberry32(0x5A0E3);
+  for (let i = 0; i < 14; i++) {
+    const a = r() * TAU, d = r() * 26, x = 64 + Math.cos(a) * d, y = 64 + Math.sin(a) * d, R = 26 + r() * 22;
+    const gr = g.createRadialGradient(x, y, 0, x, y, R);
+    gr.addColorStop(0, 'rgba(255,255,255,0.6)'); gr.addColorStop(0.6, 'rgba(255,255,255,0.3)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 class WeaponRig {
   constructor(scene, apache) {
     this.apache = apache;
@@ -54,6 +70,7 @@ class WeaponRig {
     this._gt = 0;                  // 机炮发射计时
     this._kick = 0;                // 炮管后坐量
     this.glow = makeGlowTex();
+    this.smokeTex = makeSmokeTex();   // E3 浓烟柱专用：宽而软的团状烟（glow 贴图核心太集中，暗烟几乎看不见）
     this.targets = null;           // TargetRange 引用（app 注入，null=无靶场）
 
     // 炮口（机体局部坐标；机头朝 +Z，模型 1u ≈ 2m）
@@ -112,7 +129,8 @@ class WeaponRig {
     // ---- 烟尘池（尾烟 / 加力焰 / 起飞扬尘）----
     this.puffs = [];
     const pg = new THREE.PlaneGeometry(1, 1);
-    for (let i = 0; i < 48; i++) {
+    // E3：48→112，残骸烟柱燃烧拉长后不挤占爆炸/尾烟粒子
+    for (let i = 0; i < 112; i++) {
       const m = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({
         map: this.glow, color: 0x8b949c, transparent: true, opacity: 0,
         depthWrite: false, blending: THREE.NormalBlending }));
@@ -207,6 +225,8 @@ class WeaponRig {
       p.base = opt.base ?? 0.5;
       p.life0 = p.life = opt.life ?? 0.5;
       p.s0 = opt.s0 ?? 0.2; p.s1 = opt.s1 ?? 0.9; p.rise = opt.rise ?? 0.4;
+      p.lin = !!opt.lin;
+      p.m.material.map = p.lin ? this.smokeTex : this.glow;   // E3：烟柱用线性淡出（默认平方淡出太快，浓烟看不见）
       p.m.material.color.setHex(opt.color ?? 0x8b949c);
       // Q3 烟尘受环境光：烟/尘是不发光的材质，黄昏偏暖、夜里压暗，
       // 不再在夜空里发灰白光（火光/闪光这类叠加发光的不受影响）
@@ -960,7 +980,7 @@ class WeaponRig {
       p.m.position.y += p.rise * dt;
       const s = p.s0 + (p.s1 - p.s0) * (1 - k);
       p.m.scale.setScalar(s);
-      p.m.material.opacity = p.base * k * k;
+      p.m.material.opacity = p.base * (p.lin ? k * Math.min(1, (1 - k) * 6) : k * k);   // lin：先快速浮现再线性淡出
       p.m.quaternion.copy(cam.quaternion);
     }
   }
