@@ -180,10 +180,14 @@ const TARGET_MODELS = {
   // 2026-10-18 ASSETS4：武装皮卡（团结 AI 生成，AIGC；车斗 DShK 机枪，车头朝 +Z）。
   // 只给"叛军"伏兵池（城镇/峡谷），基地正规军停放线不用。真车长 5.3m≈2.33u
   // 生成模型偏宽（5.3m 长时宽 2.35m，真车 ≈1.9m）→ wNarrow 只压车宽（轮子圆在侧面，不变形）
-  technical: { url: 'assets/targets/technical.glb', yaw: 0, len: 2.33, wNarrow: 1.9 / 2.35 },
+  // ASSETS6：换成拆件版（mount 底座回转 + gun DShK 俯仰，节点名见 parts）
+  technical: { url: 'assets/targets/technical.glb', yaw: 0, len: 2.33, wNarrow: 1.9 / 2.35,
+    parts: { yaw: 'mount', pitch: 'gun', attach: [['gun', 'mount']], maxEl: 1.1 } },
   // 2026-10-19 ASSETS5（团结 AI 生成，AIGC，车头 +Z）：叛军池新壳
   // ZSU-23-4"石勒喀"自行高炮 真车长 6.5m≈2.86u（坦克池；炮塔切分同坦克 → 炮塔跟踪直升机）
-  zsu:   { url: 'assets/targets/zsu234_shilka.glb', yaw: 0, len: 2.86 },
+  // ASSETS6：换成拆件版——turret 回转、guns 四联炮管俯仰（最大约 75°）、radar 雷达盘常转
+  zsu:   { url: 'assets/targets/zsu234_shilka.glb', yaw: 0, len: 2.86,
+    parts: { yaw: 'turret', pitch: 'guns', spin: 'radar', attach: [['guns', 'turret'], ['radar', 'turret']], maxEl: 1.3 } },
   // BM-21"冰雹"火箭炮 7.35m≈3.24u（卡车池）
   bm21:  { url: 'assets/targets/bm21_grad.glb', yaw: 0, len: 3.24 },
   // 武装皮卡第二款（车斗 ZU-23-2 双管高炮）5.2m≈2.29u（卡车池）
@@ -265,8 +269,28 @@ function applyModelToTarget(t, model) {
   // 会被压成椭圆——交付前已按俯视+斜视截图核验（见 C004 回执）。
   // PERF-AUDIT C2：换壳后立即按材质合批（tank GLB 多原语收敛）；
   // 合并体打 noMerge 防重复合并，幂等
+  if (TARGET_MODELS[key].parts) rigTargetParts(t, inst, TARGET_MODELS[key].parts);
   mergeTargetStatics(t);
   attachTurretPivot(t);
+}
+
+// ---------- 2026-10-19 ASSETS6：拆件车辆（团结 AI 拆件 GLB，节点原点在各自转轴）----------
+// 按节点名找活动件：attach 把子件挂到回转件下（保世界位姿），活动件网格标 noMerge 不进合批；
+// t.turret = 回转件（aimTurret 转向直升机），t.gunP = 俯仰件，t.radar = 常转件。静止位姿存 userData。
+function rigTargetParts(t, inst, P) {
+  t.group.updateMatrixWorld(true);
+  const find = nm => inst.getObjectByName(nm);
+  for (const [c, par] of (P.attach || [])) { const a = find(c), b = find(par); if (a && b) b.attach(a); }
+  const yaw = P.yaw && find(P.yaw), pitch = P.pitch && find(P.pitch), spin = P.spin && find(P.spin);
+  // 活动件原本挂在车体网格节点下；车体会被合批移除（连同子节点），所以先挪到 inst 根下（保世界位姿）
+  for (const n of [yaw, pitch, spin]) if (n && n.parent && n.parent !== yaw && n.parent !== inst) inst.attach(n);
+  for (const n of [yaw, pitch, spin]) if (n) {
+    n.traverse(o => { if (o.isMesh) o.userData.noMerge = true; });
+    n.userData.r0 = n.rotation.clone();
+  }
+  if (yaw) { t.turret = yaw; t.turretMaxEl = P.maxEl || 0; }
+  if (pitch) t.gunP = pitch;
+  if (spin) t.radar = spin;
 }
 
 // ---------- 2026-10-18 ASSETS3：坦克炮塔跟踪 ----------
@@ -298,15 +322,28 @@ function attachTurretPivot(t) {
 // 每帧：活着且直升机在 70u 内 → 炮塔以 0.9 rad/s 转向直升机；否则缓慢回正
 function aimTurret(t, heliPos, dt) {
   const p = t.turret;
-  let want = 0;
+  const y0 = p.userData.r0 ? p.userData.r0.y : 0;   // ASSETS6 拆件节点的静止角
+  let want = 0, el = 0, track = false;
   if (t.alive && heliPos) {
-    const dx = heliPos.x - t.group.position.x, dz = heliPos.z - t.group.position.z;
-    if (dx * dx + dz * dz < 70 * 70) want = Math.atan2(dx, dz) - t.group.rotation.y;
+    const dx = heliPos.x - t.group.position.x, dz = heliPos.z - t.group.position.z, d2 = dx * dx + dz * dz;
+    if (d2 < 70 * 70) {
+      track = true;
+      want = Math.atan2(dx, dz) - t.group.rotation.y;
+      el = Math.atan2(heliPos.y - t.group.position.y - 1.0, Math.sqrt(d2));
+    }
   }
-  let da = want - p.rotation.y;
+  let da = want - (p.rotation.y - y0);
   da = Math.atan2(Math.sin(da), Math.cos(da));
-  const mx = (want ? 0.9 : 0.4) * dt;
+  const mx = (track ? 0.9 : 0.4) * dt;
   p.rotation.y += Math.max(-mx, Math.min(mx, da));
+  // 俯仰件：抬到直升机仰角（0..maxEl），绕本地 X 负方向为抬头
+  const g = t.gunP;
+  if (g && g.userData.r0) {
+    const wantX = g.userData.r0.x - (track ? Math.max(0, Math.min(t.turretMaxEl || 1, el)) : 0);
+    const dx = wantX - g.rotation.x, m2 = 0.7 * dt;
+    g.rotation.x += Math.max(-m2, Math.min(m2, dx));
+  }
+  if (t.radar && t.alive) t.radar.rotation.y += dt * 2.2;   // 雷达盘常转（约 3 秒一圈）
 }
 
 // ---------- PERF-AUDIT C2：靶标静态几何按材质合批 ----------
