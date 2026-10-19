@@ -295,35 +295,41 @@ function buildWorld(renderer) {
     const g = new THREE.Group();
     const conc = new THREE.MeshStandardMaterial({ color: 0x45585d, roughness: 0.94, metalness: 0.22 });
     const floatMat = new THREE.MeshStandardMaterial({ color: 0x1d3037, roughness: 0.76, metalness: 0.48 });
-    const deck = new THREE.Mesh(new THREE.CylinderGeometry(6.8, 6.9, 0.14, 48, 1, true), conc);
-    deck.position.y = -0.07;
+    // 2026-10-19 PC 复查：原甲板与水面齐平且中心挖空，截图里像一张浮在水上的玻璃圆片，
+    // 且直升机停在"洞"上不合理。改为实心甲板 + 0.5u 干舷（WATER_Y 同步下沉到 -0.5），
+    // 侧壁伸入水下，读起来是一座有厚度的浮台。
+    const deck = new THREE.Mesh(new THREE.CylinderGeometry(6.8, 6.95, 0.75, 48, 1, true), conc);
+    deck.position.y = -0.36;
     deck.receiveShadow = true;
     g.add(deck);
-    // 甲板中心留空：水面在平台内部可见，避免一块实心圆台把湖面遮住。
-    const deckInner = new THREE.Mesh(new THREE.RingGeometry(1.7, 6.82, 48), conc);
-    deckInner.rotation.x = -PI / 2;
-    deckInner.position.y = 0.005;
-    deckInner.receiveShadow = true;
-    g.add(deckInner);
+    const deckTop = new THREE.Mesh(new THREE.CircleGeometry(6.82, 48), conc);
+    deckTop.rotation.x = -PI / 2;
+    deckTop.position.y = 0.005;
+    deckTop.receiveShadow = true;
+    g.add(deckTop);
+    // 甲板边缘警示环（黄色防滑漆），给出尺度和边界
+    const edge = new THREE.Mesh(new THREE.RingGeometry(6.35, 6.6, 48), new THREE.MeshStandardMaterial({ color: 0x9a8a3a, roughness: 0.9 }));
+    edge.rotation.x = -PI / 2;
+    edge.position.y = 0.012;
+    g.add(edge);
     // 中心 H 标使用暗灰防滑漆，不再用白色高亮材质
     // 平台只承担停机逻辑，标识不做高亮白块；水面反射和边缘泡沫负责尺度感。
-    const hMat = new THREE.MeshStandardMaterial({ color: 0x536468, roughness: 0.88, metalness: 0.16 });
-    for (const hx of [-1.1, 1.1]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.28, 1.6, 0.12), hMat);
-      leg.rotation.x = -PI / 2;
-      leg.position.set(hx, 0.02, 0);
+    const hMat = new THREE.MeshStandardMaterial({ color: 0x8a9699, roughness: 0.88, metalness: 0.16 });
+    // H 标是甲板上的一层漆（贴地薄片），不是凸起的木条；尺寸按真实停机坪比例放大
+    for (const hx of [-1.25, 1.25]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.012, 3.6), hMat);
+      leg.position.set(hx, 0.012, 0);
       g.add(leg);
     }
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.12, 0.28), hMat);
-    bar.rotation.x = -PI / 2;
-    bar.position.y = 0.02;
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.012, 0.5), hMat);
+    bar.position.y = 0.012;
     g.add(bar);
     // 四角浮筒（封闭圆柱横置）
     for (const [fx, fz] of [[-4.6, -4.6], [4.6, -4.6], [-4.6, 4.6], [4.6, 4.6]]) {
       const f = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 4.6, 12), floatMat);
       f.rotation.z = PI / 2;
       f.rotation.y = Math.atan2(fx, fz);
-      f.position.set(fx * 0.92, -0.55, fz * 0.92);
+      f.position.set(fx * 0.92, -0.62, fz * 0.92);
       g.add(f);
     }
     // 浮筒之间的钢制连接梁：平台有结构重量，不是漂在水面的一张圆片
