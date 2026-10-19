@@ -101,8 +101,27 @@ function tourStart() {
   tour.on = true; tour.paused = false; tour.t = 0; tour.idx = 0; tour.steps = tourSteps(); tour.last = performance.now();
   tour.btn.textContent = '■'; tour.btn.classList.add('on');
   if (tour.xbtn) tour.xbtn.style.display = 'inline-block';   // 显式出口常驻
+  cineChrome(true);
   syncTourCtl();
   tour.raf = requestAnimationFrame(tourTick);
+}
+
+// polish3：航线/导览是电影画幅，右侧面板、左下参数框、操作提示、机位条、顶栏会挡住直升机 →
+// 播放期间收起，结束时按进入前状态恢复面板（75-routes 共用）
+const _cine = { css: null, pnHid: undefined };
+function cineChrome(on) {
+  if (!_cine.css) {
+    _cine.css = document.createElement('style');
+    _cine.css.textContent = 'body.route-mode #specs,body.route-mode #guide,body.route-mode #views,' +
+      'body.route-mode #top{opacity:0!important;pointer-events:none!important;transition:opacity .4s}';
+    document.head.appendChild(_cine.css);
+  }
+  if (document.body.classList.contains('route-mode') === !!on) return;
+  document.body.classList.toggle('route-mode', !!on);
+  const pn = document.getElementById('panel');
+  if (!pn) return;
+  if (on) { _cine.pnHid = pn.classList.contains('hide'); pn.classList.add('hide'); }
+  else if (_cine.pnHid === false) { pn.classList.remove('hide'); _cine.pnHid = undefined; }
 }
 
 function tourStop(quiet) {
@@ -112,6 +131,7 @@ function tourStop(quiet) {
   cancelAnimationFrame(tour.raf);
   tour.btn.textContent = '▶'; tour.btn.classList.remove('on');
   if (tour.xbtn) tour.xbtn.style.display = 'none';
+  cineChrome(false);
   syncTourCtl();
   if (!quiet && tour.cap) tour.cap.style.opacity = '0';
 }
