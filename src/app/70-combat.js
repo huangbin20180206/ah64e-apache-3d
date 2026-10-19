@@ -43,6 +43,7 @@ function _dmgApply(delta, wx, wy, wz) {
 let _hitEl = null, _hitArc = null;
 const _hfV = new THREE.Vector3(), _hfF = new THREE.Vector3();
 function _hitFeedback(src) {
+  radioSay('hit');   // E2 无线电
   if (!_hitEl) {
     const st = document.createElement('style');
     st.textContent = '#p5-hitvig{position:fixed;inset:0;pointer-events:none;z-index:40;opacity:0;' +
