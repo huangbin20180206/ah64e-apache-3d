@@ -38,7 +38,11 @@ function _tickPostFx(rawDt) {
   // 整片散焦，用户"目标模糊/不能瞄准"——改用战场距离保搜索视野清晰；
   // 锁定后仍精确聚焦目标，lockD 路径不变）；环绕模式关闭。0.75 档由
   // composer.dofOn=false 门控，uDof=0 零开销
-  if (composer.dofOn && fp && fp.active) {
+  if (composer.dofOn && KC.on) {
+    // E1 击毁特写：对焦爆炸点
+    composer.focus = Math.max(2, W.camera.position.distanceTo(_v.set(KC.x, KC.gy + 1, KC.z)));
+    composer.dof = 0.7;
+  } else if (composer.dofOn && fp && fp.active) {
     composer.focus = (fp.lockD && fp.lockD > 1) ? fp.lockD : 45;
     composer.dof = 0.85;
   } else if (composer.dofOn && S._photo) {
