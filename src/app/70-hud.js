@@ -15,6 +15,32 @@ function syncFlyText() {
   // 电影镜头包 S2/S3：太阳屏幕投影（光晕）+ 白闪/震屏衰减 + 击毁慢动作。
   // timeScale 只作用于 dt（整个模拟放慢），白闪/震屏衰减用原始 rawDt。
 // 返回 timeScale（慢动作 0.25，否则 1）；后续模拟的 dt 须乘以它。
+// E3：相机看向太阳的视线被多少烟柱挡住（0..0.8）。烟柱近似为残骸上方竖直圆柱
+//（半径 2.4u、高 10u；明火期浓、阴燃期淡），只算正在燃烧的残骸。
+const _ssD = new THREE.Vector3();
+function _smokeSunOcc() {
+  if (!targets || !targets.enabled || !W.sun) return 0;
+  const C = W.camera.position;
+  _ssD.copy(W.sun.position).normalize();
+  const hx = _ssD.x, hz = _ssD.z, h2 = hx * hx + hz * hz;
+  if (h2 < 1e-4) return 0;
+  let occ = 0;
+  for (const t of targets.targets) {
+    if (t.alive || !(t.burn > 0) || !t.wreck) continue;
+    const w = t.wreck.position;
+    const s = ((w.x - C.x) * hx + (w.z - C.z) * hz) / h2;   // 视线水平投影上离烟柱最近处
+    if (s <= 0) continue;
+    const py = C.y + s * _ssD.y;
+    if (py < 0 || py > 10) continue;
+    const dx = C.x + s * hx - w.x, dz = C.z + s * hz - w.z;
+    const dh = Math.sqrt(dx * dx + dz * dz);
+    if (dh > 2.4) continue;
+    const dens = t.burn > (t.burn0 || 22) * 0.4 ? 0.6 : 0.3;
+    occ += dens * (1 - dh / 2.4);
+  }
+  return Math.min(0.8, occ);
+}
+
 function _tickPostFx(rawDt) {
   const ts = S._slowmo > 0 ? 0.25 : 1;
   if (S._slowmo > 0) S._slowmo = Math.max(0, S._slowmo - rawDt);
@@ -33,6 +59,13 @@ function _tickPostFx(rawDt) {
     ? clamp(ENV_PRESETS[S.env].skySunI * 0.22 * (S.weather === 'sand' ? 1.8 : 1), 0, 0.9)
     : 0;
   composer.godCol.copy(W.sun.color);
+  // E3 浓烟遮日：相机→太阳视线穿过燃烧残骸烟柱时，光晕/光柱减弱、阳光变暗（最多 −45%）
+  const occ = _smokeSunOcc();
+  S._smokeOcc = lerp(S._smokeOcc || 0, occ, Math.min(1, rawDt * 3));
+  const ko = S._smokeOcc;
+  composer.flare *= 1 - ko; composer.god *= 1 - ko;
+  if (W.sun.intensity !== S._sunSet) S._sunBase = W.sun.intensity;   // 预设/天气改过阳光 → 重取基准
+  if (S._sunBase != null) { S._sunSet = S._sunBase * (1 - 0.45 * ko); W.sun.intensity = S._sunSet; }
   // M2 景深：仅 FPV 模式启用——锁定目标时聚焦目标距离（目标清晰/背景散焦），
   // 无锁定聚焦默认 45u（P16 验收修复：原 12u 近焦把 35~48u 交战区靶标环
   // 整片散焦，用户"目标模糊/不能瞄准"——改用战场距离保搜索视野清晰；
