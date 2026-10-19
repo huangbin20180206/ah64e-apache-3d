@@ -455,7 +455,11 @@ function bindUI() {
       if (damageSys) { if (damageSys.avionicsReboot()) toast('航电重启中…（2 秒，读数全黑）');
         else toast(damageSys.abCool > 0 ? '航电重启冷却中…' : '重启进行中…'); }
     }
-    else if (key === 'b') { resetRange(); }
+    // game4：游戏线关卡里 B = 重打本关（与"重试"按钮同一入口）；旧版 all 模式/无关卡仍是靶场重置
+    else if (key === 'b') {
+      if (S.app === 'play' && S._mission && S._mission.levelId) { if (S.mode !== 'mission') setMode('mission'); retryMission(); }
+      else resetRange();
+    }
     else if (key === 'o') setFlir(!NIGHT.flir);          // P5-G3 热成像
     else if (key === 'y') launchFlare();                // P5-G3 照明弹
     else if (key === 'g') { if (rig) rig.gunOn = true; }
