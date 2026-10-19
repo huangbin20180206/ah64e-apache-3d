@@ -26,6 +26,16 @@ const INF_WALK_N = 6, INF_RUN_N = 6;
 const INF_KINDS = ['s', 'g', 'm', 'o'];
 const INF_URL = { s: 'assets/targets/soldier_rifle.glb', g: 'assets/targets/soldier_rpg.glb', m: 'assets/targets/soldier_pkm.glb', o: 'assets/targets/soldier_officer.glb' };
 const INF_LABEL = { s: '步兵', g: '火箭筒兵', m: '机枪手', o: '指挥官' };
+// ASSETS6（2026-10-19 第三批）战斗动作帧：a=瞄准静帧、f0..f3=开火循环、c0..c3=备用战斗循环
+//（步枪兵蹲射 / 机枪手趴射 / 指挥官对讲机）、d0..d5=中弹倒地（末帧躺平）。模型缺该动作就不烘，_draw 回退旧帧。
+const _q4 = nm => [0, 0.25, 0.5, 0.75].map((t, i) => [null, nm, t, i]);
+const _dth = [0, 0.2, 0.4, 0.6, 0.8, 1].map((t, i) => ['d' + i, 'Death', t]);
+const INF_EXTRA = {
+  s: [['a', 'Aim', 0]].concat(_q4('Fire').map(e => ['f' + e[3], e[1], e[2]]), _q4('CrouchFire').map(e => ['c' + e[3], e[1], e[2]]), _dth),
+  g: [['a', 'KneelAim', 0]].concat(_q4('Fire').map(e => ['f' + e[3], e[1], e[2]]), _dth),
+  m: [['a', 'Fire', 0]].concat(_q4('Fire').map(e => ['f' + e[3], e[1], e[2]]), _q4('ProneFire').map(e => ['c' + e[3], e[1], e[2]]), _dth),
+  o: [['a', 'Radio', 0]].concat(_q4('Point').map(e => ['f' + e[3], e[1], 0.2 + e[2] * 0.8]), _q4('Radio').map(e => ['c' + e[3], e[1], e[2]]), _dth),
+};
 const INF_FRAMES = ['idle'].concat([...Array(INF_WALK_N)].map((_, i) => 'w' + i), [...Array(INF_RUN_N)].map((_, i) => 'r' + i));
 const _ifV = new THREE.Vector3(), _ifV2 = new THREE.Vector3(), _ifM = new THREE.Matrix4(),
   _ifQ = new THREE.Quaternion(), _ifS = new THREE.Vector3(), _ifE = new THREE.Euler();
@@ -33,7 +43,8 @@ const _ifV = new THREE.Vector3(), _ifV2 = new THREE.Vector3(), _ifM = new THREE.
 // 动作采样烘焙：gltf（带 Idle/Walk/Run 动画的人形骨骼模型，正面 +Z、Y 上）→
 // { idle, w0.., r0.. : BufferGeometry, mat }。人高按 Idle 首帧缩放到 H；
 // 每帧扣掉髋骨水平位移（原地动作）、最低点贴 y=0。失败返回 null。
-function bakeClipPoses(gltf, H) {
+// extra（ASSETS6 可选）：[[帧键, 动作名, 时间比例 0..1], ...]，动作不存在的帧跳过（调用方回退）。
+function bakeClipPoses(gltf, H, extra) {
   const root = gltf.scene;
   let sm = null;
   root.traverse(o => { if (o.isSkinnedMesh && !sm) sm = o; });
@@ -111,6 +122,10 @@ function bakeClipPoses(gltf, H) {
   mk('idle', cIdle, 0);
   for (let i = 0; i < INF_WALK_N; i++) mk('w' + i, cWalk, cWalk.duration * i / INF_WALK_N);
   for (let i = 0; i < INF_RUN_N; i++) mk('r' + i, cRun, cRun.duration * i / INF_RUN_N);
+  if (extra) for (const [key, nm, fr] of extra) {
+    const c = clip(nm.toLowerCase());
+    if (c) mk(key, c, Math.min(c.duration * fr, Math.max(0, c.duration - 1e-3)));
+  }
   mixer.stopAllAction();
   out.mat = sm.material;
   return out;
@@ -155,7 +170,7 @@ class Infantry {
           home: { x, z, ry: sq.face + (rnd() - 0.5) * 0.6 }, x, z, ry: 0,
           rpg: i === 3, k: i === 3 ? 'g' : i === 0 ? (qi === 0 ? 'o' : 'm') : 's', burst: 0, alive: true, st: 'idle', t: 0, cd: rnd(2, 6), flee: 0, fx: 0, fz: 0, ph: rnd(TAU),
           // 巡逻兵（每队第 2、3 人）：沿垂直于朝向的 1.8u 岗线来回走；pk=当前去往端点(0/1)，pw=端点停留
-          patrol: i === 1 || i === 2, pk: i & 1, pw: rnd(0.5, 2.5), walk: false,
+          patrol: i === 1 || i === 2, pk: i & 1, pw: rnd(0.5, 2.5), walk: false, shotT: 0,
         });
       });
     });
@@ -164,7 +179,7 @@ class Infantry {
 
   _build(got) {
     const B = {};
-    try { for (const k of INF_KINDS) if (got[k]) B[k] = bakeClipPoses(got[k], INF_H); } catch (e) { console.warn('[infantry] bake', e); return; }
+    try { for (const k of INF_KINDS) if (got[k]) B[k] = bakeClipPoses(got[k], INF_H, INF_EXTRA[k]); } catch (e) { console.warn('[infantry] bake', e); return; }
     if (!B.s || !B.g) return;
     // 可缺省兵种模型没到 → 该兵种用步枪兵外观
     for (const p of this.men) if (!B[p.k]) p.k = 's';
@@ -174,7 +189,8 @@ class Infantry {
     for (const p of this.men) cap[p.k] = (cap[p.k] || 0) + 1;
     for (const t of Object.keys(cap)) {
       const Bt = B[t];
-      for (const k of INF_FRAMES) {
+      for (const k of Object.keys(Bt)) {
+        if (k === 'mat') continue;
         const im = new THREE.InstancedMesh(Bt[k], Bt.mat, Math.max(1, cap[t]));
         im.count = 0;
         im.frustumCulled = false;
@@ -269,6 +285,7 @@ class Infantry {
     for (const p of this.men) {
       p.t += dt;
       if (!p.alive) continue;
+      if (p.shotT > 0) p.shotT -= dt;
       const dx = H.x - p.x, dz = H.z - p.z, dist = Math.hypot(dx, dz);
       const threat = env.fire && env.alt > 1.5 && dist < 42;
       if (p.st === 'flee') {
@@ -286,13 +303,13 @@ class Infantry {
         p.ry += dd * Math.min(1, dt * 3);
         p.cd -= dt * (env.rate || 1);
         if (p.cd <= 0) {
-          if (p.rpg) { this._fireRpg(p, H, env); p.cd = rnd(9, 14); }
+          if (p.rpg) { this._fireRpg(p, H, env); p.cd = rnd(9, 14); p.shotT = 0.7; }
           else if (p.k === 'm') {
             // 机枪手：3 发连射（间隔 0.12s），打完一串停 2.4–3.6s
-            this._fireRifle(p, H, env, dist);
+            this._fireRifle(p, H, env, dist); p.shotT = 0.3;
             if (p.burst <= 0) p.burst = 3;
             p.burst--; p.cd = p.burst > 0 ? 0.12 : rnd(2.4, 3.6);
-          } else { this._fireRifle(p, H, env, dist); p.cd = p.k === 'o' ? rnd(2.6, 4) : rnd(1.6, 3.2); }
+          } else { this._fireRifle(p, H, env, dist); p.shotT = p.k === 'o' ? 0.9 : 0.3; p.cd = p.k === 'o' ? rnd(2.6, 4) : rnd(1.6, 3.2); }
         }
       } else {
         p.st = 'idle';
@@ -400,11 +417,23 @@ class Infantry {
     for (const p of this.men) {
       // 帧选择：奔逃 → 跑步 6 帧（0.88s 一个循环）；巡逻走动 → 走路 6 帧（1.29s）；其余站立帧
       let f = 'idle';
+      const has = x => !!this.meshes[p.k + x];
+      const fc = Math.floor(p.t * 10 + p.ph * 3) % 4;
       if (p.alive && p.st === 'flee') f = 'r' + (Math.floor(p.t / 0.88 * INF_RUN_N + p.ph * 3) % INF_RUN_N);
       else if (p.alive && p.walk) f = 'w' + (Math.floor(p.t / 1.29 * INF_WALK_N + p.ph * 3) % INF_WALK_N);
+      else if (p.alive && (p.st === 'aim' || p.st === 'kneel')) {
+        // ASSETS6 战斗姿态：机枪手趴射、巡逻步枪兵蹲射（循环）；指挥官平时对讲机、开火时抬手指挥；
+        // 其余：开火瞬间播开火循环（后坐抖动），平时举枪瞄准静帧
+        const alt = p.k === 'm' || (p.k === 's' && p.patrol);
+        if (p.k === 'o') f = p.shotT > 0 && has('f0') ? 'f' + Math.min(3, Math.floor((0.9 - p.shotT) / 0.9 * 4)) : has('c0') ? 'c' + (Math.floor(p.t * 2.5 + p.ph) % 4) : f;
+        else if (alt && has('c0')) f = 'c' + fc;
+        else if (p.shotT > 0 && has('f0')) f = 'f' + fc;
+        else if (has('a')) f = 'a';
+      } else if (!p.alive && has('d0')) f = 'd' + Math.min(5, Math.floor(p.t / 0.9 * 6));
       const k = p.k + f;
       const im = this.meshes[k];
-      if (!p.alive) {
+      const fallen = !p.alive && f[0] !== 'd';   // 有倒地动作的不再整体放倒
+      if (fallen) {
         // 倒地：站立帧仰面放倒（绕 X 轴 -90°，头朝身后）
         _ifE.set(-PI / 2, p.ry, 0, 'YXZ');
         _ifQ.setFromEuler(_ifE);
