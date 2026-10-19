@@ -52,7 +52,7 @@ const PROP_DEFS = {
   wreck:     { url: 'assets/targets/car_wreck.glb', len: 1.94 },      // 烧毁轿车 4.4m
   commtower: { url: 'assets/targets/comms_tower.glb', h: 11.0 },      // 通信铁塔 25m
   // 2026-10-19 ASSETS6（团结 AI 生成，AIGC）
-  heliwreck: { url: 'assets/targets/heli_wreck.glb', len: 6.6 },      // 侧翻烧毁的黑鹰 15m（尾梁折断）
+  heliwreck: { url: 'assets/targets/heli_wreck.glb', len: 6.6, scorch: 7.5, debris: 6 },      // 侧翻烧毁的黑鹰 15m（尾梁折断）
   rubble:    { url: 'assets/targets/rubble_pile.glb', len: 2.7 },     // 瓦砾堆 6m（碎水泥+钢筋）
   // 抽油机 8m：beam 游梁点头、crank 曲柄配重旋转（节点原点在各自转轴，绕模型 X 轴）
   pumpjack:  { url: 'assets/targets/oil_pumpjack.glb', len: 3.5, anim: 'pump' },
@@ -146,6 +146,31 @@ function _fixPalm(root) {
   });
 }
 
+// 坠毁现场（polish2）：残骸不能"干净地躺在沙地上"——加一片拉长的焦痕（沿机身方向）
+// 和几块散落碎片（旋翼断片/蒙皮），按固定伪随机摆放（不用 Math.random）
+let _debrisMat = null;
+function _crashSite(parent, x, z, ry, def) {
+  const scMat = new THREE.MeshBasicMaterial({ map: scorchTexture(), transparent: true, depthWrite: false,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const sc = new THREE.Mesh(new THREE.PlaneGeometry(def.scorch, def.scorch * 0.62), scMat);
+  sc.rotation.set(-PI / 2, 0, ry); sc.position.set(x, 0.02, z); sc.renderOrder = 2;
+  parent.add(sc);
+  _debrisMat = _debrisMat || new THREE.MeshStandardMaterial({ color: 0x3f4236, roughness: 0.85, metalness: 0.25 });
+  const geos = [];
+  let h = 9301 + Math.floor(x * 7 + z * 13);
+  const rr = () => { h = (h * 16807) % 2147483647; return (h & 0xffff) / 0x10000; };
+  for (let i = 0; i < (def.debris || 0); i++) {
+    const blade = i < 2;                                     // 前 3 块是断掉的旋翼叶片（细长）
+    const bg = new THREE.BoxGeometry(blade ? 0.09 : 0.25 + rr() * 0.3, 0.025, blade ? 0.7 + rr() * 0.4 : 0.2 + rr() * 0.3);
+    const a = rr() * TAU, d = def.scorch * (0.35 + rr() * 0.4);
+    bg.rotateZ((rr() - 0.5) * 0.3); bg.rotateX((rr() - 0.5) * 0.25); bg.rotateY(rr() * TAU);
+    bg.translate(x + Math.cos(a) * d, 0.03, z + Math.sin(a) * d * 0.7);
+    geos.push(bg);
+  }
+  const mg = geos.length ? mergeGeos(geos) : null;
+  if (mg) { const m = new THREE.Mesh(mg, _debrisMat); m.castShadow = m.receiveShadow = true; parent.add(m); }
+}
+
 // list: [[key, x, z, ry], ...]（世界坐标）
 function placeProps(parent, list) {
   const cache = _loadPropModels();
@@ -187,6 +212,7 @@ function placeProps(parent, list) {
       parent.add(g);
       g.updateMatrixWorld(true);
       mergeTargetStatics({ group: g });
+      if (def.scorch) _crashSite(parent, x, z, ry, def);
     });
   }
 }
