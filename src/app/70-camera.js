@@ -42,7 +42,12 @@ function setView(i) {
   // 为参照物：目标点 = 机体局部偏移按当前航向旋转 + 机体位置；theta 同步
   // 加航向角——"正侧/尾后"才会跟着机头转。否则退出 FPV 后所有机位仍对着
   // 旧原点，取景全是空地（用户实测）。
-  const v = VIEWS[i];
+  let v = VIEWS[i];
+  // 2026-10-19 游戏线复查：游戏模式下"英雄视角"是 12.6u 长焦近景，机身占满画面看不到敌人。
+  // 游戏模式改用作战视角：机尾后上方、略广角、目标点前移，前方战场进画面。展示模式不变。
+  if (i === 0 && HOST.appMode && HOST.appMode.mode === 'play') {
+    v = { ...v, name: '作战视角', target: [0, 1.6, 7], theta: PI * 0.9, phi: 1.24, dist: 21, fov: 46 };
+  }
   const yaw = apache ? apache.root.rotation.y : 0;
   const cos = Math.cos(yaw), sin = Math.sin(yaw);
   const ox = v.target[0], oz = v.target[2];
