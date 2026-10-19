@@ -189,7 +189,8 @@ const TARGET_MODELS = {
   zsu:   { url: 'assets/targets/zsu234_shilka.glb', yaw: 0, len: 2.86,
     parts: { yaw: 'turret', pitch: 'guns', spin: 'radar', attach: [['guns', 'turret'], ['radar', 'turret']], maxEl: 1.3 } },
   // BM-21"冰雹"火箭炮 7.35m≈3.24u（卡车池）
-  bm21:  { url: 'assets/targets/bm21_grad.glb', yaw: 0, len: 3.24 },
+  // ASSETS6：换成拆件版——launcher 40 管发射架整体回转对准直升机（发射架自身是固定仰角）
+  bm21:  { url: 'assets/targets/bm21_grad.glb', yaw: 0, len: 3.24, parts: { yaw: 'launcher' } },
   // 武装皮卡第二款（车斗 ZU-23-2 双管高炮）5.2m≈2.29u（卡车池）
   technical2: { url: 'assets/targets/technical_zu23.glb', yaw: 0, len: 2.29 },
 };
