@@ -110,6 +110,14 @@ function _frame(dt, doRender) {
     flyUpdate(dt);
     // 跟随飞行高度抬升/压低相机目标（保留用户手动平移后的相对位置）
     if (FLY.alt !== S._alt) { orbit.tTarget.y += (FLY.alt - S._alt) * 0.92; S._alt = FLY.alt; }
+    // 2026-10-19 游戏线复查：第三人称下方向键平移机体时相机原地不动，几秒后飞机就飞出画面。
+    // 与高度同理，按机体水平位移平移相机目标（用户拖拽平移后的相对偏移保留）。
+    if (S._fx === undefined) { S._fx = FLY.x || 0; S._fz = FLY.z || 0; }
+    if (FLY.x !== S._fx || FLY.z !== S._fz) {
+      const ddx = (FLY.x || 0) - S._fx, ddz = (FLY.z || 0) - S._fz;
+      if (Math.abs(ddx) + Math.abs(ddz) < 20) { orbit.tTarget.x += ddx; orbit.tTarget.z += ddz; }   // 瞬移/复位不跟（setView 自会重设）
+      S._fx = FLY.x || 0; S._fz = FLY.z || 0;
+    }
 
     // 机体姿态 = 飞行俯仰 + 高转速下的毫米级高频微颤（幅度收敛，避免拖拉机感）
     // 2026-10-14 用户反馈「起飞后抖动太厉害」：离地后微颤降到地面的 35%（离地 0~3u 平滑过渡），
