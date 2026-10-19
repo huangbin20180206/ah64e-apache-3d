@@ -497,6 +497,9 @@
     "rnd",
     "tex"
    ],
+   "01-host.js": [
+    "HOST"
+   ],
    "15-terrain.js": [
     "duneH"
    ],
