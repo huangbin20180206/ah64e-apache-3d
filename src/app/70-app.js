@@ -94,6 +94,7 @@ function updateTargetHUD(hit) {
     }
     // E1 击毁特写：切侧面低机位慢镜头（条件/频率见 70-killcam.js）
     killcamTry(hit, _final);
+    if (!_final) radioSay(_streak >= 2 ? 'multi' : 'kill');   // E2 无线电（最后一个由任务完成台词接）
     toast(`已击毁：${hit.label}（第 ${_kills} 个）`);
     killFeed(hit.label, hit._chain);
     if (_streak >= 2) streakBanner(STREAK_NAMES[Math.min(_streak, STREAK_NAMES.length - 1)]);
