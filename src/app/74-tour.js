@@ -218,7 +218,7 @@ function tourNext() {
   const n = document.createElement('button');
   n.id = 'tour-next';
   n.type = 'button';
-  n.textContent = '下一段 ⏭';
+  n.textContent = '下一段 »';
   n.title = '跳到导览下一段';
   n.setAttribute('aria-label', n.title);
   n.style.cssText = ctlBase + ';right:12px';
