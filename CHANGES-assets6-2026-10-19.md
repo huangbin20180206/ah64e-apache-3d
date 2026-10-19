@@ -13,10 +13,14 @@
   - 活动件挪到模型根下再合批（车体合批会连子节点一起移除——首版炮塔消失的原因）；静止角存 userData.r0，任务重置回正。
 - CREDITS 增加第三批说明。
 
-## 未接（下一部分）
-- BM-21 拆件、ZU-23 牵引炮、山羊/骆驼/驴车、黑鹰残骸、抽油机、瓦砾堆、椰枣树 v2。
+## 第二部分（同日）
+- 27-life 城镇牲口：西郊巷子 4 只山羊、2 头骆驼（吃草 Idle 4 帧循环 ↔ 游荡圈内踱步；直升机低空 <14u 或子弹/爆炸在身边 → 奔跑 3–5s 换地方）；主街 1 辆驴车 z −9→7.5 来回，车厢+两轮按烘焙同比例装组、车轮按行驶距离转，受惊小跑 4s。打死侧倒，不计分（纯氛围）。
+- 27-infantry bakeClipPoses：四足无 Hips → 用根骨；H<0 = 固定比例（米制模型）；比例/时长元数据不可枚举（否则调用方 Object.keys 会把数字当帧几何——首版报错 e.addEventListener 的原因）。
+- 16-targetmodels：BM-21 换拆件版，发射架回转对准直升机。
+- 16-targetprops：椰枣树换镂空细叶 v2（8.2m）；新增道具 heliwreck（基地东南荒地）、rubble×2（城镇南街）、pumpjack×2（城镇东郊，游梁点头/配重转）、zu23t 牵引高炮（城镇东北，上座左右搜索）。道具动画挂在活动件的 onBeforeRender（看得见才算，不进主循环），活动件不合批。
+- 资产：proc.mjs 减面（bm21 30000→22876、heli_wreck 11396→8326、rubble 8588→7332），动物 proc_char 压贴图 1024，全部 tagaigc 补 AIGC 标识。
 
 ## 状态
-- 代码已入 src；构建通过（Exit 0，dist/index.html 2031 KB）。
+- 代码已入 src；构建通过（Exit 0，dist/index.html 2043 KB，第二部分后）。
 - tests_pure 91 passed；DOM ID 通过；拓扑自测 8/8。
-- 截图：cmp/vis/shot_a6.py（趴射机枪手、倒地士兵）、shot_a6v.py（石勒喀炮塔 1.85rad、炮管 -0.65rad 抬头、雷达转动）。
+- 截图：cmp/vis/shot_a6.py（趴射机枪手、倒地士兵）、shot_a6v.py（石勒喀炮塔 1.85rad、炮管 -0.65rad 抬头、雷达转动）、shot_a6s.py town|base（骆驼/驴车/倒地山羊/抽油机/牵引炮/黑鹰残骸）。
