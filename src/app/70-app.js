@@ -88,9 +88,12 @@ function updateTargetHUD(hit) {
     // 电影镜头包 S3：击毁慢动作 + 白闪 + 震屏（连续击毁不叠加，取峰值语义）
     S._slowmo = 0.55; S._flash = 0.5; S._shake = 1.0;
     // B3 终结镜头：任务局清掉最后一个地面目标 → 慢动作拉长到 1.3s、震屏加重
-    if (targets && targets.aliveCount === 0 && S._mission && S._mission.phase === 'active') {
+    const _final = !!(targets && targets.aliveCount === 0 && S._mission && S._mission.phase === 'active');
+    if (_final) {
       S._slowmo = 1.3; S._flash = 0.7; S._shake = 1.4;
     }
+    // E1 击毁特写：切侧面低机位慢镜头（条件/频率见 70-killcam.js）
+    killcamTry(hit, _final);
     toast(`已击毁：${hit.label}（第 ${_kills} 个）`);
     killFeed(hit.label, hit._chain);
     if (_streak >= 2) streakBanner(STREAK_NAMES[Math.min(_streak, STREAK_NAMES.length - 1)]);
