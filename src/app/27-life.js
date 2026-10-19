@@ -14,6 +14,9 @@
 // 摩托侦察兵：基地进场土路 2 辆来回疾驰（与步兵同条件出现）+ 城镇环路 1 辆（城镇关）。
 //   平时 5u/s（≈40km/h），直升机 35u 内加速到 7.5u/s 并蛇形躲闪；机炮一发或爆炸波及即翻倒冒烟，
 //   计分 arcade 'moto'。不开火（侦察兵）。
+// ASSETS6（2026-10-19）：城镇牲口——西郊巷子 4 只山羊、2 头骆驼，主街 1 辆驴车（团结 AI 生成，带骨骼 Idle/Walk/Run）。
+//   平时低头吃草、隔几秒踱到附近另一处；直升机低空逼近或子弹/爆炸落在身边 → 跑开 3–5 秒，在新地方接着吃草。
+//   驴车沿主街慢慢来回（车轮跟着转），受惊时小跑。打死只侧倒（不扣分不加分，纯氛围）。
 // 依赖（运行时注入）：fx = WeaponRig（65-weapons）。确定性：只用 rnd()。
 // 自动化测试（webdriver）默认不出现（同 27-infantry），截图脚本可置 allow=true。
 // ============================================================
@@ -28,6 +31,14 @@ const CIV_HK = { c: CIV_H, w: CIV_H * 1.62 / 1.70, e: CIV_H * 1.68 / 1.70 };
 // 民用车（城镇外环，反向车道）：车长 = 真车长 / 2.27m
 const CIV_CARS = { sedan: { url: 'assets/targets/civ_sedan.glb', len: 1.94 }, minibus: { url: 'assets/targets/civ_minibus.glb', len: 2.2 },
   cargo: { url: 'assets/targets/civ_cargo.glb', len: 2.86 } };
+// 牲口：模型本身是真实米制 → 统一比例 1/2.27；走/跑速度 u/s；hw=侧倒时抬高（半个身宽）
+const ANIMAL_DEF = {
+  g: { url: 'assets/targets/goat.glb', walk: 0.3, run: 1.5, hw: 0.07, hit: 0.3 },
+  m: { url: 'assets/targets/camel.glb', walk: 0.35, run: 1.3, hw: 0.13, hit: 0.5 },
+  d: { url: 'assets/targets/donkey_cart.glb', walk: 0.5, run: 1.2, hw: 0.1, hit: 0.55 },
+};
+const ANIMAL_K = 1 / 2.27;
+const ANIMAL_IDLE = [0, 0.25, 0.5, 0.75].map((t, i) => ['i' + i, 'Idle', t]);
 const MOTO_LEN = 0.95;               // 2.1m
 const CIV_PENALTY = 150;
 const _lfV = new THREE.Vector3(), _lfV2 = new THREE.Vector3(), _lfM = new THREE.Matrix4(), _lfQ = new THREE.Quaternion(),
@@ -50,6 +61,8 @@ class BattleLife {
     for (const k of CIV_KINDS) L.load(CIV_URL[k], (g) => done(k, g), undefined, () => done(k, null));
     L.load('assets/targets/moto_scout.glb', (g) => this._buildMoto(g), undefined, () => {});
     for (const [key, d] of Object.entries(CIV_CARS)) L.load(d.url, (g) => this._buildCar(key, g), undefined, () => {});
+    this.animMeshes = {}; this.carts = [];
+    for (const [k, d] of Object.entries(ANIMAL_DEF)) L.load(d.url, (g) => this._buildAnimal(k, g), undefined, () => {});
   }
 
   _layout() {
@@ -77,7 +90,56 @@ class BattleLife {
       c.car = key; c.hp = 3; c.dir0 = -1; c.dir = -1;
       return c;
     });
+    // 牲口（TOWN_CENTER 相对）：[种类, x, z, 游荡半径]；驴车 = 主街 z −9 → 7.5 来回
+    this.animals = [['g', -24, 0.5, 1.4], ['g', -26, -0.4, 1.4], ['g', -28.5, 0.6, 1.4], ['g', -30, -0.2, 1.4],
+      ['m', -20, 12.5, 1.6], ['m', 22, -10.5, 1.6], ['d', 0, -9, 0]].map(([k, x, z, r]) => ({
+      k, hx: C.x + x, hz: C.z + z, r, x: 0, z: 0, ry: 0, alive: true, st: 'graze', t: 0, wait: 0, tx: 0, tz: 0,
+      flee: 0, fx: 0, fz: 0, ph: rnd(TAU), wheel: 0, dir: 1,
+      a: k === 'd' ? [C.x, C.z - 9] : null, b: k === 'd' ? [C.x, C.z + 7.5] : null,
+    }));
     this.reset();
+  }
+
+  // 牲口：烘焙动作帧（Idle 4 帧吃草循环 + 走/跑），每种一组 InstancedMesh；
+  // 驴车另把车厢 + 两个车轮（静态件，原样在模型里）按烘焙同一比例装进一个组，跟着驴走
+  _buildAnimal(k, gltf) {
+    let B;
+    try { B = bakeClipPoses(gltf, -ANIMAL_K, ANIMAL_IDLE); } catch (e) { console.warn('[life] animal bake', e); return; }
+    if (!B) return;
+    const list = this.animals.filter(a => a.k === k);
+    for (const key of Object.keys(B)) {
+      if (!B[key] || !B[key].isBufferGeometry) continue;
+      const im = new THREE.InstancedMesh(B[key], B.mat, list.length);
+      im.count = 0; im.frustumCulled = false; im.castShadow = true; im.visible = false;
+      this.scene.add(im);
+      this.animMeshes[k + key] = im;
+    }
+    this['_dur' + k] = B.dur;
+    if (k !== 'd') return;
+    const root = gltf.scene, rInv = new THREE.Matrix4().copy(root.matrixWorld).invert(), M = new THREE.Matrix4();
+    for (const a of list) {
+      const g = new THREE.Group(), hold = new THREE.Group();
+      hold.scale.setScalar(B.sc); hold.position.y = -B.y0 * B.sc;
+      g.add(hold);
+      a.mats = []; a.wheels = [];
+      for (const nm of ['cart', 'wheel_L', 'wheel_R']) {
+        const src = root.getObjectByName(nm);
+        if (!src) continue;
+        const n = src.clone(true);
+        M.multiplyMatrices(rInv, src.matrixWorld).decompose(n.position, n.quaternion, n.scale);
+        n.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.material = o.material.clone(); a.mats.push(o.material); } });
+        hold.add(n);
+        if (nm !== 'cart') {
+          const bx = new THREE.Box3().setFromObject(src);
+          n.userData.q0 = n.quaternion.clone();
+          a.wheels.push(n);
+          a.wr = Math.max(0.05, (bx.max.y - bx.min.y) / 2 * B.sc);   // 车轮半径（u）
+        }
+      }
+      g.visible = false;
+      this.scene.add(g);
+      a.g = g;
+    }
   }
 
   _mkMoto(pts, loop, f0, lane, zone) {
@@ -172,6 +234,12 @@ class BattleLife {
       c.s = c.f0 * c.L; c.dir = c.dir0; c.alive = true; c.t = 0; c.hp = 3; c.roll = 0;
       for (const mt of c.mats) mt.color.setScalar(1);
     }
+    for (const a of this.animals) {
+      if (a.k === 'd') { a.x = a.a[0]; a.z = a.a[1]; a.ry = 0; a.dir = 1; }
+      else { a.x = a.hx + Math.sin(a.ph) * a.r * 0.5; a.z = a.hz + Math.cos(a.ph) * a.r * 0.5; a.ry = a.ph; }
+      a.alive = true; a.st = a.k === 'd' ? 'walk' : 'graze'; a.t = 0; a.wait = 1 + (a.ph % 3); a.flee = 0; a.wheel = 0;
+      if (a.mats) for (const mt of a.mats) mt.color.setScalar(1);
+    }
     this.civKills = 0; this.motoKills = 0;
   }
 
@@ -188,6 +256,12 @@ class BattleLife {
       if (!m.alive || !this._motoOn(m)) continue;
       const dx = pos.x - m.x, dz = pos.z - m.z;
       if (dx * dx + dz * dz < 0.5 * 0.5) { this._killMoto(m); return true; }
+    }
+    if (this.townOn) for (const a of this.animals) {
+      if (!a.alive) continue;
+      const d = Math.hypot(pos.x - a.x, pos.z - a.z);
+      if (d < ANIMAL_DEF[a.k].hit) { this._killAnimal(a); return true; }
+      if (d < 3) this._scareAnimal(a, pos.x, pos.z);
     }
     if (this.townOn) for (const c of this.cars) {
       if (!c.alive || !c.g || pos.y > 1.4) continue;
@@ -216,6 +290,12 @@ class BattleLife {
       if (!m.alive || !this._motoOn(m)) continue;
       if (Math.hypot(m.x - x, m.z - z) < R * 0.9) this._killMoto(m);
     }
+    if (this.townOn) for (const a of this.animals) {
+      if (!a.alive) continue;
+      const d = Math.hypot(a.x - x, a.z - z);
+      if (d < R * 0.8) this._killAnimal(a);
+      else if (d < R * 3) this._scareAnimal(a, x, z);
+    }
     if (this.townOn) for (const c of this.cars) {
       if (!c.alive || !c.g) continue;
       const d = Math.hypot(c.x - x, c.z - z);
@@ -236,6 +316,94 @@ class BattleLife {
     if (this.fx) this.fx._puff(p.x, 0.15, p.z, { color: 0x9a8f7c, s0: 0.15, s1: 0.6, life: 0.5, base: 0.4, rise: 0.2 });
     this.civKills++;
     if (this.onCivilian) this.onCivilian('平民');
+  }
+
+  _scareAnimal(a, sx, sz) {
+    if (a.k === 'd') { a.flee = 4; return; }          // 驴车：沿主街小跑 4 秒
+    const dx = a.x - sx, dz = a.z - sz, d = Math.hypot(dx, dz) || 1;
+    a.st = 'flee'; a.flee = rnd(3, 5); a.fx = dx / d; a.fz = dz / d;
+  }
+
+  _killAnimal(a) {
+    a.alive = false; a.t = 0;
+    if (a.mats) for (const mt of a.mats) mt.color.setScalar(0.55);
+    if (this.fx) this.fx._puff(a.x, 0.15, a.z, { color: 0x9a8f7c, s0: 0.15, s1: 0.7, life: 0.5, base: 0.4, rise: 0.2 });
+  }
+
+  // 牲口：吃草（Idle 循环）↔ 踱步到游荡圈内另一点；受惊奔跑后以落脚点为新圈心；驴车沿主街来回
+  _updateAnimals(dt, H, env, town) {
+    for (const k in this.animMeshes) this.animMeshes[k].visible = town;
+    for (const a of this.animals) if (a.g) a.g.visible = town;
+    if (!town) return;
+    for (const a of this.animals) {
+      a.t += dt;
+      if (!a.alive) continue;
+      const D = ANIMAL_DEF[a.k];
+      if (Math.hypot(H.x - a.x, H.z - a.z) < 14 && env.alt < 10 && env.alt > 0.5) this._scareAnimal(a, H.x, H.z);
+      if (a.k === 'd') {
+        const tg = a.dir > 0 ? a.b : a.a, ex = tg[0] - a.x, ez = tg[1] - a.z, ed = Math.hypot(ex, ez);
+        if (a.flee > 0) a.flee -= dt;
+        if (a.wait > 0) { a.wait -= dt; a.st = 'graze'; }
+        else if (ed < 0.05) { a.dir = -a.dir; a.wait = 3; }
+        else {
+          const v = Math.min(ed, (a.flee > 0 ? D.run : D.walk) * dt);
+          a.x += ex / ed * v; a.z += ez / ed * v; a.wheel += v;
+          a.st = a.flee > 0 ? 'flee' : 'walk';
+          let dd = Math.atan2(ex, ez) - a.ry; dd = Math.atan2(Math.sin(dd), Math.cos(dd));
+          a.ry += dd * Math.min(1, dt * 1.5);
+        }
+        continue;
+      }
+      if (a.st === 'flee') {
+        a.flee -= dt;
+        a.x += a.fx * D.run * dt; a.z += a.fz * D.run * dt;
+        a.ry = Math.atan2(a.fx, a.fz);
+        if (a.flee <= 0) { a.st = 'graze'; a.wait = rnd(3, 6); a.hx = a.x; a.hz = a.z; }
+        continue;
+      }
+      if (a.st === 'graze') {
+        if ((a.wait -= dt) <= 0) {
+          const ang = rnd(TAU), rr = rnd(0.4, 1) * a.r;
+          a.tx = a.hx + Math.sin(ang) * rr; a.tz = a.hz + Math.cos(ang) * rr; a.st = 'walk';
+        }
+        continue;
+      }
+      const ex = a.tx - a.x, ez = a.tz - a.z, ed = Math.hypot(ex, ez);
+      if (ed < 0.05) { a.st = 'graze'; a.wait = rnd(4, 9); continue; }
+      const v = Math.min(ed, D.walk * dt);
+      a.x += ex / ed * v; a.z += ez / ed * v;
+      let dd = Math.atan2(ex, ez) - a.ry; dd = Math.atan2(Math.sin(dd), Math.cos(dd));
+      a.ry += dd * Math.min(1, dt * 3);
+    }
+    this._drawAnimals();
+  }
+
+  _drawAnimals() {
+    const cnt = {};
+    for (const k in this.animMeshes) cnt[k] = 0;
+    for (const a of this.animals) {
+      const dur = this['_dur' + a.k];
+      if (!dur) continue;
+      let f = 'idle';
+      if (a.alive && a.st === 'flee') f = 'r' + (Math.floor(a.t / dur.r * INF_RUN_N + a.ph * 3) % INF_RUN_N);
+      else if (a.alive && a.st === 'walk') f = 'w' + (Math.floor(a.t / dur.w * INF_WALK_N + a.ph * 3) % INF_WALK_N);
+      else if (a.alive && this.animMeshes[a.k + 'i0']) f = 'i' + (Math.floor(a.t / Math.max(1, dur.i) * 4 + a.ph) % 4);
+      const im = this.animMeshes[a.k + f];
+      if (!im) continue;
+      if (a.alive) { _lfQ.setFromAxisAngle(_lfV2.set(0, 1, 0), a.ry); _lfV.set(a.x, 0, a.z); }
+      else { _lfE.set(0, a.ry, Math.min(1, a.t * 2.5) * PI / 2, 'YXZ'); _lfQ.setFromEuler(_lfE); _lfV.set(a.x, ANIMAL_DEF[a.k].hw * Math.min(1, a.t * 2.5), a.z); }
+      _lfM.compose(_lfV, _lfQ, _lfS);
+      im.setMatrixAt(cnt[a.k + f]++, _lfM);
+      if (a.g) {                                         // 驴车车厢：驴倒下时车停在原地不翻
+        if (a.alive) { a.g.position.set(a.x, 0, a.z); a.g.rotation.set(0, a.ry, 0); }
+        for (const w of a.wheels) w.quaternion.copy(w.userData.q0).premultiply(_lfQ.setFromAxisAngle(_lfV2.set(1, 0, 0), a.wheel / a.wr));
+      }
+    }
+    for (const k in this.animMeshes) {
+      const im = this.animMeshes[k];
+      im.count = cnt[k];
+      im.instanceMatrix.needsUpdate = true;
+    }
   }
 
   _killCar(c) {
@@ -348,6 +516,7 @@ class BattleLife {
       m.g.rotation.set(0, m.ry, m.roll, 'YXZ');
     }
     this._updateCars(dt, H, env);
+    this._updateAnimals(dt, H, env, town);
   }
 
   // 民用车：外环匀速 3u/s（≈25km/h）；受惊（直升机低空逼近 / 附近中弹爆炸）→ 6u/s 逃离 6 秒
