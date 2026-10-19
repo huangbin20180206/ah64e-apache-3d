@@ -53,7 +53,8 @@ function bakeClipPoses(gltf, H, extra) {
   const cIdle = clip('idle'), cWalk = clip('walk') || cIdle, cRun = clip('run') || cWalk;
   if (!cIdle) return null;
   const mixer = new THREE.AnimationMixer(root);
-  const sk = sm.skeleton, hips = sk.bones.find(b => /hips/i.test(b.name)) || sk.bones[0];
+  // 髋骨（人形）；四足动物没有 Hips → 用骨架根骨（父节点不是骨头的那根）
+  const sk = sm.skeleton, hips = sk.bones.find(b => /hips/i.test(b.name)) || sk.bones.find(b => !(b.parent && b.parent.isBone)) || sk.bones[0];
   const sg = sm.geometry, pa = sg.attributes.position, na = sg.attributes.normal,
     ja = sg.attributes.skinIndex, wa = sg.attributes.skinWeight, ua = sg.attributes.uv, n = pa.count;
   const BM = sk.bones.map(() => new THREE.Matrix4()), rInv = new THREE.Matrix4(), hp = new THREE.Vector3();
@@ -104,10 +105,11 @@ function bakeClipPoses(gltf, H, extra) {
     }
     return { P, N, minY, maxY };
   };
-  const out = {};
+  const out = {}, meta = {};
   const mk = (key, c, t) => {
     const r = skin(c, t);
-    if (key === 'idle') sc = H / Math.max(1e-3, r.maxY - r.minY);
+    // H>0：按 Idle 首帧身高缩放到 H；H<0：固定比例 -H（ASSETS6 动物/驴车：模型本身是真实米制）
+    if (key === 'idle') { sc = H < 0 ? -H : H / Math.max(1e-3, r.maxY - r.minY); meta.sc = sc; meta.y0 = r.minY; }
     for (let i = 0; i < n; i++) {
       r.P[i * 3] *= sc; r.P[i * 3 + 1] = (r.P[i * 3 + 1] - r.minY) * sc; r.P[i * 3 + 2] *= sc;
     }
@@ -128,6 +130,9 @@ function bakeClipPoses(gltf, H, extra) {
   }
   mixer.stopAllAction();
   out.mat = sm.material;
+  meta.dur = { w: cWalk.duration, r: cRun.duration, i: cIdle.duration };
+  // 比例/时长等元数据设为不可枚举：调用方用 Object.keys 遍历帧几何，不会把它们当帧
+  for (const k in meta) Object.defineProperty(out, k, { value: meta[k], enumerable: false });
   return out;
 }
 
