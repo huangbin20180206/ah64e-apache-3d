@@ -289,7 +289,13 @@ function _frame(dt, doRender) {
       W.duneFar.material.color.setHex(DUNE_BASE).multiplyScalar(desertEnvDim(P) * 0.78);
       if (S.env === 'dusk' || S.env === 'dawn') W.duneFar.material.color.multiply(_scnWarm);
     }
-    if (nlights) { nlights.searchOn = FLY.state !== 'ground' || (S.spin || 0) > 0.15; nlights.update(dt, S.time, s); }   // polish3：冷机停放不开搜索灯
+    if (nlights) {
+      // 2026-10-19 游戏线复查：夜战关在 28u 高度仍开机腹白光搜索灯，地面一大片黄光池既暴露位置又抢画面。
+      // 实战任务中离地 8u 以上关灯（起降贴地时仍亮）；展示/训练不变。
+      const _M = S._mission, _combat = !!(_M && _M.phase === 'active' && _M.variant && !/^train/.test(_M.variant));
+      nlights.searchOn = (FLY.state !== 'ground' || (S.spin || 0) > 0.15) && !(_combat && FLY.alt > 8);
+      nlights.update(dt, S.time, s);
+    }   // polish3：冷机停放不开搜索灯
     // 湖面倒影：镜像整机逐帧同步姿态（仅湖面场地启用）
     if (refl) refl.update(apache.root, S.time);
     // 程序化旋翼音效（转速+下洗驱动音量/音高）
