@@ -17073,9 +17073,9 @@ function buildWorldScenery(W) {
       if (done) done(g, sz.clone().multiplyScalar(k));
       if (++got === 2) fbm.visible = false;
     }, undefined, () => {});
-    // 仓库原贴图是锈透的民用铁皮棚，放在军用停机坪旁不合理 → 材质乘一层军用灰绿，锈迹变成旧漆斑
+    // 仓库原贴图是锈透的民用铁皮棚，放在军用停机坪旁不合理 → 材质乘一层军用灰绿（线性值，约等于屏幕上六成亮），锈迹变成旧漆斑
     fit('assets/targets/warehouse.glb', Math.PI / 2, 16, 'x', hx, hz, (g) => g.traverse(q => {
-      if (q.isMesh) { q.material = q.material.clone(); q.material.color.setRGB(0.6, 0.66, 0.6); }
+      if (q.isMesh) { q.material = q.material.clone(); q.material.color.setRGB(0.3, 0.36, 0.3); }
     }));
     fit('assets/targets/fuel.glb', ta, 4.3, 'z', tx, tz);
     const lm = new THREE.MeshBasicMaterial({ color: 0x8a8f94 });
@@ -30342,7 +30342,7 @@ HOST.makeProgress = (opts) => new ProgressModule(opts);
 </script>
 
 <script>
-;(function(){ try { var __b = window.__BUILD_ID = window.__BUILD_ID || {}; __b.git_sha = "unknown"; __b.bundle_sha256 = '6533a87b7cb97054b09d655adeb982a92cfd9b0410d386cc96605b02a852a4bf'; } catch(e){} })();
+;(function(){ try { var __b = window.__BUILD_ID = window.__BUILD_ID || {}; __b.git_sha = "unknown"; __b.bundle_sha256 = '2caeca959f6a15dc0badd56e04d88b771622c8377b53e9eb09b37c599ce53516'; } catch(e){} })();
 </script>
 </body>
 </html>
