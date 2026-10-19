@@ -116,25 +116,65 @@ class BattleLife {
     }
     this['_dur' + k] = B.dur;
     if (k !== 'd') return;
-    const root = gltf.scene, rInv = new THREE.Matrix4().copy(root.matrixWorld).invert(), M = new THREE.Matrix4();
+    // polish2（2026-10-19 用户指出"驴车不像车、货拖在地上、没轮子"）：原生成模型里车架/车轮
+    // 比例和位置都不对（车轮埋在地下、只剩一摞麻袋贴地拖）。改为按驴的实际身高程序化搭一辆
+    // 两轮木板车：车板 + 侧栏 + 两个带辐条的木轮（铁箍）+ 两根车辕前伸到驴肩两侧 + 横担；
+    // 原模型的麻袋作为货物放在车板上。驴头朝 +z，车在驴身后。
+    const root = gltf.scene;
+    root.updateMatrixWorld(true);
+    const hb = new THREE.Box3();
+    root.traverse(o => { if (o.isSkinnedMesh) hb.expandByObject(o); });
+    const H = Math.max(0.2, (hb.max.y - hb.min.y) * B.sc);       // 驴身高（u）
+    const zr = hb.min.z * B.sc, xc = (hb.min.x + hb.max.x) / 2 * B.sc;   // 驴屁股 z、驴身中线 x
+    const sack = root.getObjectByName('cart');
+    const wood = new THREE.MeshStandardMaterial({ color: 0x6e4c30, roughness: 0.92 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x4a3322, roughness: 0.95 });
+    const iron = new THREE.MeshStandardMaterial({ color: 0x2b2a28, roughness: 0.6, metalness: 0.5 });
+    const r = 0.29 * H, W = 0.86 * H, Lb = 1.15 * H, z1 = zr - 0.3 * H, z0 = z1 - Lb, yb = r + 0.04 * H, th = 0.05 * H;
+    const zA = (z0 + z1) / 2 - 0.05 * H, xw = W / 2 + 0.07 * H;
+    const box = (w, h, d, m) => { const q = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); q.castShadow = q.receiveShadow = true; return q; };
     for (const a of list) {
-      const g = new THREE.Group(), hold = new THREE.Group();
-      hold.scale.setScalar(B.sc); hold.position.y = -B.y0 * B.sc;
-      g.add(hold);
-      a.mats = []; a.wheels = [];
-      for (const nm of ['cart', 'wheel_L', 'wheel_R']) {
-        const src = root.getObjectByName(nm);
-        if (!src) continue;
-        const n = src.clone(true);
-        M.multiplyMatrices(rInv, src.matrixWorld).decompose(n.position, n.quaternion, n.scale);
-        n.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.material = o.material.clone(); a.mats.push(o.material); } });
-        hold.add(n);
-        if (nm !== 'cart') {
-          const bx = new THREE.Box3().setFromObject(src);
-          n.userData.q0 = n.quaternion.clone();
-          a.wheels.push(n);
-          a.wr = Math.max(0.05, (bx.max.y - bx.min.y) / 2 * B.sc);   // 车轮半径（u）
+      const g = new THREE.Group();
+      a.mats = [wood, dark, iron]; a.wheels = [];
+      const bed = box(W, th, Lb, wood); bed.position.set(xc, yb, (z0 + z1) / 2); g.add(bed);
+      for (const sx of [-1, 1]) {
+        const rail = box(0.04 * H, 0.16 * H, Lb, dark); rail.position.set(xc + sx * (W / 2 - 0.02 * H), yb + 0.1 * H, (z0 + z1) / 2); g.add(rail);
+        // 车辕：车板前角 → 驴肩侧（驴身外侧一点、肩高约 0.55H）
+        const p0 = new THREE.Vector3(xc + sx * 0.3 * H, yb, z1 - 0.15 * H), p1 = new THREE.Vector3(xc + sx * 0.24 * H, 0.52 * H, zr + 0.75 * H);
+        const len = p0.distanceTo(p1), sh = box(0.035 * H, 0.035 * H, len, dark);
+        sh.position.copy(p0).lerp(p1, 0.5); sh.lookAt(p1); g.add(sh);
+      }
+      const tail = box(W, 0.16 * H, 0.04 * H, dark); tail.position.set(xc, yb + 0.1 * H, z0 + 0.02 * H); g.add(tail);
+      const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * H, 0.03 * H, W + 0.2 * H, 6), iron);
+      axle.rotation.z = PI / 2; axle.position.set(xc, r, zA); g.add(axle);
+      for (const sx of [-1, 1]) {
+        const w = new THREE.Group();
+        w.position.set(xc + sx * xw, r, zA);
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(r * 0.94, r * 0.07, 6, 18), iron);
+        rim.rotation.y = PI / 2; w.add(rim);
+        const fel = new THREE.Mesh(new THREE.TorusGeometry(r * 0.84, r * 0.08, 5, 18), wood);
+        fel.rotation.y = PI / 2; w.add(fel);
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.16, r * 0.16, 0.1 * H, 8), dark);
+        hub.rotation.z = PI / 2; w.add(hub);
+        for (let i = 0; i < 6; i++) {                       // 6 根辐条：车轮滚动看得出来
+          const sp = box(0.025 * H, r * 1.66, 0.03 * H, wood); sp.rotation.x = i * PI / 6; w.add(sp);
         }
+        w.traverse(o => { if (o.isMesh) o.castShadow = true; });
+        w.userData.q0 = w.quaternion.clone();
+        g.add(w); a.wheels.push(w);
+      }
+      a.wr = r;
+      if (sack) {                                           // 货：原模型麻袋，缩放到车板内放上去
+        const n = sack.clone(true);
+        n.position.set(0, 0, 0); n.quaternion.identity(); n.scale.set(1, 1, 1);
+        n.updateMatrixWorld(true);
+        const sb = new THREE.Box3().setFromObject(n), ss = sb.getSize(new THREE.Vector3());
+        const k = Math.min(W * 0.8 / Math.max(ss.x, 1e-4), Lb * 0.75 / Math.max(ss.z, 1e-4), 0.45 * H / Math.max(ss.y, 1e-4));
+        n.scale.setScalar(k);
+        const c = sb.getCenter(new THREE.Vector3());
+        n.position.set(xc - c.x * k, yb + th / 2 - sb.min.y * k, (z0 + z1) / 2 - c.z * k);
+        n.traverse(o => { if (o.isMesh) { o.castShadow = true; o.material = o.material.clone(); a.mats.push(o.material); } });
+        g.add(n);
       }
       g.visible = false;
       this.scene.add(g);
@@ -242,7 +282,7 @@ class BattleLife {
         a.x = a.hx + Math.sin(a.ph) * a.r * 0.5; a.z = a.hz + Math.cos(a.ph) * a.r * 0.5; a.ry = a.ph;
       }
       a.alive = true; a.st = a.k === 'd' ? 'walk' : 'graze'; a.t = 0; a.wait = 1 + (a.ph % 3); a.flee = 0; a.wheel = 0;
-      if (a.mats) for (const mt of a.mats) mt.color.setScalar(1);
+      if (a.mats) for (const mt of a.mats) mt.color.copy(mt.userData.c0 || (mt.userData.c0 = mt.color.clone()));
     }
     this.civKills = 0; this.motoKills = 0;
   }
@@ -330,7 +370,7 @@ class BattleLife {
 
   _killAnimal(a) {
     a.alive = false; a.t = 0;
-    if (a.mats) for (const mt of a.mats) mt.color.setScalar(0.55);
+    if (a.mats) for (const mt of a.mats) mt.color.copy(mt.userData.c0 || (mt.userData.c0 = mt.color.clone())).multiplyScalar(0.55);
     if (this.fx) this.fx._puff(a.x, 0.15, a.z, { color: 0x9a8f7c, s0: 0.15, s1: 0.7, life: 0.5, base: 0.4, rise: 0.2 });
   }
 
