@@ -172,7 +172,7 @@ function showMissionBriefing() {
   const mp = UI('mission');
   // Phase 11 C1：简报阶段允许交互（变体 chip 选择），其余阶段保持
   // pointer-events:none（P4-B 纯只读展示契约——既有断言按非简报态读取不变）
-  mp.classList.add('briefing');
+  mp.classList.add('briefing'); mp.classList.remove('fin');
   renderCampaignChips();
   renderVariantChips();
   renderDiffChips();
@@ -464,6 +464,7 @@ function completeMission() {
     '<div class="mhint">按 B 或点重试可再来一次</div>';
   UI('mission').classList.add('show');
   UI('mission').classList.remove('briefing');   // 结算阶段恢复纯只读（pointer-events:none）
+  UI('mission').classList.add('fin');   // game3：战报可滚动
   UI('mission').classList.add('result');        // 结算态标记（窄屏字号等）
   if (betty) betty.speak('GOOD EFFECT');
   if (music) music.setMode('victory');                       // Phase 13-S4：胜利旋律
@@ -596,6 +597,7 @@ function failMission(reason) {
     '<div class="mhint">按 B 或点重试可再来一次</div>';
   UI('mission').classList.add('show');
   UI('mission').classList.remove('briefing');
+  UI('mission').classList.add('fin');   // game3：战报可滚动
   UI('mission').classList.add('result');
   if (betty) betty.speak('MISSION FAILED');
   if (music) music.setMode('ambient');                       // Phase 13-S4：失败回落氛围
@@ -709,7 +711,7 @@ function startCampaign(i) {
 function beginMission() {
   const m = S._mission;
   if (!m || m.phase !== 'briefing') return;
-  m.phase = 'active';
+  m.phase = 'active'; UI('mission').classList.remove('fin');   // game3
   radioSay('start');   // E2 无线电开场
   if (m.t0 == null) m.t0 = S.time;
   if (m.gun0 == null) { m.gun0 = rig ? rig.gunAmmo : 0; m.rk0 = rig ? rig.rocketAmmo : 0; m.hf0 = rig ? rig.hfAmmo : 0; }
