@@ -524,9 +524,9 @@ function buildWorldScenery(W) {
       if (done) done(g, sz.clone().multiplyScalar(k));
       if (++got === 2) fbm.visible = false;
     }, undefined, () => {});
-    // 仓库原贴图是锈透的民用铁皮棚，放在军用停机坪旁不合理 → 材质乘一层军用灰绿，锈迹变成旧漆斑
+    // 仓库原贴图是锈透的民用铁皮棚，放在军用停机坪旁不合理 → 材质乘一层军用灰绿（线性值，约等于屏幕上六成亮），锈迹变成旧漆斑
     fit('assets/targets/warehouse.glb', Math.PI / 2, 16, 'x', hx, hz, (g) => g.traverse(q => {
-      if (q.isMesh) { q.material = q.material.clone(); q.material.color.setRGB(0.6, 0.66, 0.6); }
+      if (q.isMesh) { q.material = q.material.clone(); q.material.color.setRGB(0.3, 0.36, 0.3); }
     }));
     fit('assets/targets/fuel.glb', ta, 4.3, 'z', tx, tz);
     const lm = new THREE.MeshBasicMaterial({ color: 0x8a8f94 });
