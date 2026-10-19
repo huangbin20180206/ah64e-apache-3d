@@ -269,7 +269,13 @@ function _armDraw() {
     if (!v) { d.style.opacity = '0'; d.style.pointerEvents = 'none'; continue; }
     const pop = R * 0.06 * v.near;
     const x = cx + Math.cos(v.a) * (g.ri + pop), y = cy + Math.sin(v.a) * (g.ri + pop);
-    const sc = (g.v ? 0.84 : 0.88) + 0.32 * v.near;
+    let sc = (g.v ? 0.84 : 0.88) + 0.32 * v.near;
+    // polish3：横屏时文字沿半径排，长名字（串列双座座舱 / 机身与生存性）放大后会冲出扇区外沿 → 按扇区宽度封顶
+    if (!g.v) {
+      if (!d._w) d._w = d.offsetWidth;
+      const room = (R - g.ri) - 18;
+      if (d._w > 0 && d._w * sc > room) sc = room / d._w;
+    }
     const op = (v.ar <= 1 ? 1 - 0.35 * v.ar : 0.65 - 0.2 * (v.ar - 1)) * v.f;
     d.style.opacity = String(Math.max(0, op));
     d.style.pointerEvents = op > 0.15 ? 'auto' : 'none';
