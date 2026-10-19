@@ -213,7 +213,8 @@
     "mergeGeos"
    ],
    "16-targetmodels.js": [
-    "mergeTargetStatics"
+    "mergeTargetStatics",
+    "scorchTexture"
    ]
   }
  },
