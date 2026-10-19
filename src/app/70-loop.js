@@ -305,7 +305,8 @@ function _frame(dt, doRender) {
   // 第一人称：相机由 FPView 驱动（机头姿态即视线），环绕控制器让位
   if (fp && fp.active) fp.update(dt);
   else orbit.update(dt);
-  killcamUpdate(rawDt);   // E1 击毁特写：覆盖本帧相机（70-killcam.js）
+  killcamUpdate(rawDt);
+  radioTick(rawDt);       // E2 无线电字幕/静音/锁定检测（70-radio.js）   // E1 击毁特写：覆盖本帧相机（70-killcam.js）
   W.skyMat.uniforms.uTime.value = S.time;
   if (W.terrainKey === 'water') W.updateWater(S.time, washfx ? washfx.strength : 0, FLY.alt, apache.root.position.x, apache.root.position.z);
 
