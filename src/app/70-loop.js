@@ -38,6 +38,9 @@ function stepFrames(sec, h = 1 / 30, until = null) {
 
 function _frame(dt, doRender) {
   const rawDt = dt;                 // 慢动作会缩放 dt，白闪/震屏衰减用原始值
+  // E1（2026-10-19）：慢动作真正作用于整帧模拟。此前 timeScale 在帧末才乘到 dt，
+  // 只影响 HUD，世界并没有变慢。webdriver 下不缩放（保旧测试时间推进不变）。
+  if (S._slowmo > 0 && KC.allow) dt *= 0.25;
   S.time += dt;
 
   // 转速：启停各按自己的时间常数线性趋近
@@ -302,17 +305,18 @@ function _frame(dt, doRender) {
   // 第一人称：相机由 FPView 驱动（机头姿态即视线），环绕控制器让位
   if (fp && fp.active) fp.update(dt);
   else orbit.update(dt);
+  killcamUpdate(rawDt);   // E1 击毁特写：覆盖本帧相机（70-killcam.js）
   W.skyMat.uniforms.uTime.value = S.time;
   if (W.terrainKey === 'water') W.updateWater(S.time, washfx ? washfx.strength : 0, FLY.alt, apache.root.position.x, apache.root.position.z);
 
   // 电影镜头包 S2/S3（光晕/体积光/景深/白闪/震屏）+ 慢动作 timeScale：见 70-hud.js
-  dt *= _tickPostFx(rawDt);
+  _tickPostFx(rawDt);   // 慢动作已在帧首作用于 dt
 
   if (doRender) { composer.render(W.scene, W.camera, S.time); updateLabels(); }
 
   _tickModeChip();     // P14-B+E 模式/输入状态徽标（70-hud.js）
 
-  _tickHud(dt, s, rpm);   // RPM/弹药/FPS/自动降档/首访引导（70-hud.js）
+  _tickHud(rawDt, s, rpm);   // FPS 读数/降档用真实时钟（慢动作期间不误判）   // RPM/弹药/FPS/自动降档/首访引导（70-hud.js）
 
   // NaN 兜底：任何一环算出 NaN 都会污染 FLY 状态并静默黑屏。
   // NaN !== NaN 恒真，用这个特性廉价自检；触发即复位（外部系统写坏状态时的最后防线）
