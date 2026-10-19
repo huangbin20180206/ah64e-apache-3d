@@ -236,7 +236,11 @@ class BattleLife {
     }
     for (const a of this.animals) {
       if (a.k === 'd') { a.x = a.a[0]; a.z = a.a[1]; a.ry = 0; a.dir = 1; }
-      else { a.x = a.hx + Math.sin(a.ph) * a.r * 0.5; a.z = a.hz + Math.cos(a.ph) * a.r * 0.5; a.ry = a.ph; }
+      else {
+        if (a.x0 === undefined) { a.x0 = a.hx; a.z0 = a.hz; }
+        a.hx = a.x0; a.hz = a.z0;
+        a.x = a.hx + Math.sin(a.ph) * a.r * 0.5; a.z = a.hz + Math.cos(a.ph) * a.r * 0.5; a.ry = a.ph;
+      }
       a.alive = true; a.st = a.k === 'd' ? 'walk' : 'graze'; a.t = 0; a.wait = 1 + (a.ph % 3); a.flee = 0; a.wheel = 0;
       if (a.mats) for (const mt of a.mats) mt.color.setScalar(1);
     }
@@ -345,6 +349,8 @@ class BattleLife {
         if (a.flee > 0) a.flee -= dt;
         if (a.wait > 0) { a.wait -= dt; a.st = 'graze'; }
         else if (ed < 0.05) { a.dir = -a.dir; a.wait = 3; }
+        // 外环有车正开过路口 → 驴车在路口外停下等；已经上了路口（横街 ±1.4u）就不停，免得和让路的车互相干等
+        else if (Math.abs(a.z - TOWN_CENTER.z) > 1.4 && this._carNear(a)) a.st = 'graze';
         else {
           const v = Math.min(ed, (a.flee > 0 ? D.run : D.walk) * dt);
           a.x += ex / ed * v; a.z += ez / ed * v; a.wheel += v;
@@ -356,7 +362,20 @@ class BattleLife {
       }
       if (a.st === 'flee') {
         a.flee -= dt;
+        // 拴在出生点 4u 内：跑出圈 → 方向往回拐（不会一路冲进房子或跑出镇子）
+        const ox = a.x - a.x0, oz = a.z - a.z0, od = Math.hypot(ox, oz);
+        if (od > 4) {
+          const bx = -ox / od, bz = -oz / od, k = Math.min(1, dt * 3);
+          a.fx += (bx - a.fx) * k; a.fz += (bz - a.fz) * k;
+          const l = Math.hypot(a.fx, a.fz) || 1; a.fx /= l; a.fz /= l;
+        }
         a.x += a.fx * D.run * dt; a.z += a.fz * D.run * dt;
+        if (this.fx && (a.dust = (a.dust || 0) - dt) <= 0) {      // 蹄下扬尘
+          a.dust = 0.3;
+          const free = this.fx.puffs.reduce((n, q) => n + (q.m.visible ? 0 : 1), 0);
+          if (free > 24) this.fx._puff(a.x - a.fx * 0.3, 0.06, a.z - a.fz * 0.3,
+            { color: 0xbcae92, s0: 0.12, s1: 0.6, life: 0.7, base: 0.3, rise: 0.15 });
+        }
         a.ry = Math.atan2(a.fx, a.fz);
         if (a.flee <= 0) { a.st = 'graze'; a.wait = rnd(3, 6); a.hx = a.x; a.hz = a.z; }
         continue;
@@ -376,6 +395,17 @@ class BattleLife {
       a.ry += dd * Math.min(1, dt * 3);
     }
     this._drawAnimals();
+  }
+
+  // 驴车前方 2.4u、左右 1u 内有行驶中的民用车/摩托
+  _carNear(a) {
+    const hx = Math.sin(a.ry), hz = Math.cos(a.ry);
+    for (const c of this.cars.concat(this.motos)) {
+      if (!c.alive || !c.g || c.zone !== 'town') continue;
+      const dx = c.x - a.x, dz = c.z - a.z, al = dx * hx + dz * hz;
+      if (al > 0 && al < 2.4 && Math.abs(dx * hz - dz * hx) < 1.0) return true;
+    }
+    return false;
   }
 
   _drawAnimals() {
@@ -543,6 +573,12 @@ class BattleLife {
         if (!p.alive) continue;
         const dx = p.x - c.x, dz = p.z - c.z, al = dx * hx + dz * hz;
         if (al > 0 && al < c.half + 1.8 && Math.abs(dx * hz - dz * hx) < 0.7) { v = 0; break; }
+      }
+      // ASSETS6：也给牲口/驴车让路（驴车车身更宽）
+      if (v > 0) for (const a of this.animals) {
+        if (!a.alive) continue;
+        const dx = a.x - c.x, dz = a.z - c.z, al = dx * hx + dz * hz;
+        if (al > 0 && al < c.half + 1.8 && Math.abs(dx * hz - dz * hx) < (a.k === 'd' ? 1.0 : 0.7)) { v = 0; break; }
       }
       c.s = (((c.s + c.dir * v * dt) % c.L) + c.L) % c.L;
       const P = this._at(c, c.s);
