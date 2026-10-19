@@ -208,7 +208,8 @@
   ],
   "depends": {
    "00-utils.js": [
-    "PI"
+    "PI",
+    "TAU"
    ],
    "16-targetmodels.js": [
     "mergeTargetStatics"
