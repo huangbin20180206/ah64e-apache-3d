@@ -219,7 +219,7 @@ class AirTargets {
     let best = null, bestD = 1e9;
     const v = _atV;
     for (const t of this.list) {
-      if (!t.alive) continue;
+      if (!t.alive || t.off) continue;
       v.copy(t.pos).sub(from);
       const d = v.length();
       v.normalize();
@@ -234,7 +234,7 @@ class AirTargets {
   // 无人机半径只有 0.85，零余量时高速弹体常常在两帧之间"穿过"目标球。
   hitTest(pos, dmg, margin = 0) {
     for (const t of this.list) {
-      if (!t.alive) continue;
+      if (!t.alive || t.off) continue;
       if (pos.distanceTo(t.pos) > t.radius + margin) continue;
       t.hp -= dmg;
       if (t.hp <= 0) this._kill(t);
@@ -253,8 +253,17 @@ class AirTargets {
   }
 
   update(dt, time) {
+    // 2026-10-19 游戏线复查：红黄条纹热气球是靶场/训练道具，实战关卡里飘在敌方基地上空不合理。
+    // 实战任务（非 train_* 变体）期间隐藏且不可锁定/命中；无人机与沙赫德巡飞弹保留（战场上合理）。
+    const M = HOST.S && HOST.S._mission;
+    const combat = !!(M && M.variant && !/^train/.test(M.variant));
     for (const t of this.list) {
       const g = t.g;
+      if (t.type === 'balloon') {
+        t.off = combat && t.alive;
+        if (t.off) { g.visible = false; continue; }
+        if (t.alive) g.visible = true;
+      }
       if (t.alive) {
         // —— 常规机动 ——
         if (t.type === 'drone') {
