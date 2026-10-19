@@ -41,7 +41,7 @@ const PROP_DEFS = {
   stall:     { url: 'assets/targets/market_stall.glb', len: 1.3 },    // 集市果蔬摊 2.9m
   // 椰枣树 8.2m（ASSETS6 换镂空细叶版）。cutout：叶片改"镂空裁切"不走半透明排序（远近叠放不再闪），
   // 叶色压成带灰土的橄榄绿（原贴图偏鲜绿，和沙漠色调不搭）
-  palm:      { url: 'assets/targets/palm_tree_v2.glb', h: 3.6, cutout: [0.74, 0.72, 0.56] },
+  palm:      { url: 'assets/targets/palm_tree_v2.glb', h: 3.6, cutout: [0.6, 0.58, 0.4], fix: _fixPalm },
   tent:      { url: 'assets/targets/tent_military.glb', len: 2.64 },  // 军用帐篷 6m（门帘朝 +Z）
   generator: { url: 'assets/targets/generator.glb', len: 0.97 },      // 柴油发电机 + 油桶 2.2m
   container: { url: 'assets/targets/container.glb', len: 2.67 },      // 集装箱（按 20 尺 6.06m 摆）
@@ -109,9 +109,41 @@ function _loadPropModels() {
   _propCache = {};
   const byUrl = {};   // 同一文件只下载一次（村落 6 栋共用一个 GLB）
   for (const [k, d] of Object.entries(PROP_DEFS)) {
-    _propCache[k] = byUrl[d.url] || (byUrl[d.url] = new Promise((res) => loader.load(d.url, (g) => res(g.scene), undefined, () => res(null))));
+    _propCache[k] = byUrl[d.url] || (byUrl[d.url] = new Promise((res) => loader.load(d.url, (g) => { if (d.fix) try { d.fix(g.scene); } catch (e) { console.error('[props] fix ' + k + ': ' + e.message); } res(g.scene); }, undefined, () => res(null))));
   }
   return _propCache;
+}
+
+// 椰枣树 v2 原模型两处不合理（polish2 2026-10-19 用户指出）：
+// ① 树干顶 8.2m 高过叶冠中心 ~8.0m，树干尖从叶丛中间戳出来 → 把 7.75m 以上的树干顶点压到 7.75m，
+//    并把这一截往叶冠中心（x≈0）收拢（原树干微斜，顶端偏 0.22m，正好错开叶冠）；
+// ② 叶片只有一圈 ~8 片、像把破伞 → 叶片几何绕树冠中心再复制两圈（转 22°/45°，略缩、略上翘），
+//    成为三层更密的叶冠。只改加载后的几何，一次性，所有实例共享。
+function _fixPalm(root) {
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const g = o.geometry, P = g.attributes.position;
+    if (!o.material.transparent && !(o.material.name || '').includes('frond')) {
+      for (let i = 0; i < P.count; i++) {
+        const y = P.getY(i);
+        if (y > 6.6) P.setX(i, P.getX(i) * (1 - Math.min(1, (y - 6.6) / 1.4) * 0.9));
+        if (y > 7.75) P.setY(i, 7.75);
+      }
+      P.needsUpdate = true; g.computeBoundingBox(); g.computeBoundingSphere();
+      return;
+    }
+    const parts = [g];
+    for (const [a, k, lift] of [[0.39, 0.9, 0.12], [0.79, 0.8, 0.22]]) {
+      const c = g.clone();
+      c.translate(0, -8.0, 0);
+      c.applyMatrix4(new THREE.Matrix4().makeScale(k, k, k));
+      c.rotateY(a);
+      c.translate(0, 8.0 + lift, 0);
+      parts.push(c);
+    }
+    const m = mergeGeos(parts);   // 保持原有索引/属性一致（后面 mergeTargetStatics 要求与树干同构）
+    if (m) o.geometry = m;
+  });
 }
 
 // list: [[key, x, z, ry], ...]（世界坐标）
