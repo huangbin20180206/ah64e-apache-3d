@@ -80,6 +80,20 @@ def run(pg):
     assert '100' in pb['fillW'], ('load-fill width should be 100% after full load', pb['fillW'])
     print('ci smoke OK: A1 _qCool/_qAutoOff + A3 _guide + A6 progressbar aria + load-fill 一致')
 
+    # ---- 固定画质档=1（手动选档，阻止后续自动降档）----
+    # 起因（2026-10-19 assets5/E1）：CI SwiftShader fps<<38 → 70-hud 自动降档到
+    # 0.75，而 QUALITY_PRESETS['0.75'].reflect=0（低画质档主动关湖面倒影，产品
+    # 行为正确）→ P3-7 切 water 时 refl.enabled=true 但 group.visible=false，
+    # 断言挂。本质是 P3-7 偷偷依赖帧率，违反本文件"帧率无关"契约。
+    # 修法：经 sel-quality change 走 72-uibind 唯一入口 → S._qManual=true（自动
+    # 降档彻底让位）+ applyQuality(1)（reflect rate=1，倒影恢复）。此后全程画质
+    # 钉死，与机器帧率解耦。必须放 A1 之后：A1 要测 _qAutoOff 默认 false 与
+    # chk-qauto 开关，提前设档不干扰它（_qManual 与 _qAutoOff 是两条独立让位路径）。
+    pg.evaluate("(() => { const s = document.getElementById('sel-quality'); s.value = '1'; s.dispatchEvent(new Event('change', { bubbles: true })); })()")
+    qfix = pg.evaluate("({ manual: __dbg.S._qManual, q: __dbg.S.quality, rate: __dbg.refl._rate })")
+    assert qfix['manual'] is True and qfix['q'] == 1 and qfix['rate'] == 1, ('固定画质档=1 应生效（_qManual/quality/reflect rate）', qfix)
+    print('ci smoke OK: 画质档钉死=1（_qManual 让位自动降档 / reflect rate=1，P3-7 倒影与帧率解耦）')
+
     # ---- Phase 2-B 结构断言（帧率无关：全部同步 DOM/状态操作） ----
     # B2: 键盘切机位 → 一次性 toast 报机位名（setView/toast 均为同步操作）。
     # 合成 keydown 与状态读取合并进同一 evaluate（先例：P5-D visibilitychange

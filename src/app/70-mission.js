@@ -633,8 +633,8 @@ function startMission(variant, levelIdx, levelId) {
   if (scenery) scenery.resetTrees();   // 上一关被炸倒/烧焦的树复原
   if (rig && rig.clearImpacts) rig.clearImpacts();   // P5-G1 清弹坑/爆闪
   if (air) air.reset();
-  if (infantry) infantry.reset();
-  if (life) life.reset();             // 2026-10-18 平民/摩托归位   // P5-G2 步兵归位复活
+  if (infantry) infantry.reset();   // P5-G2 步兵归位复活
+  if (life) life.reset();             // 2026-10-18 平民/摩托归位
   resetNightOps();                  // P5-G3 照明弹补满
   if (samwar) samwar.reset();   // Phase 19：新任务清 SAM 状态（干扰弹补满/导弹清空/相位复位）
   if (damageSys) damageSys.reset();   // Phase 19：新任务清机务损伤（系统归零/卡壳过热处置全清）

@@ -317,7 +317,7 @@ function _frame(dt, doRender) {
 
   _tickModeChip();     // P14-B+E 模式/输入状态徽标（70-hud.js）
 
-  _tickHud(rawDt, s, rpm);   // FPS 读数/降档用真实时钟（慢动作期间不误判）   // RPM/弹药/FPS/自动降档/首访引导（70-hud.js）
+  _tickHud(rawDt, s, rpm);   // RPM/弹药/FPS/自动降档/首访引导（70-hud.js）；FPS 读数/降档用真实时钟（慢动作期间不误判）
 
   // NaN 兜底：任何一环算出 NaN 都会污染 FLY 状态并静默黑屏。
   // NaN !== NaN 恒真，用这个特性廉价自检；触发即复位（外部系统写坏状态时的最后防线）
