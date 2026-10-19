@@ -15,6 +15,8 @@ function syncFlyText() {
   // 电影镜头包 S2/S3：太阳屏幕投影（光晕）+ 白闪/震屏衰减 + 击毁慢动作。
   // timeScale 只作用于 dt（整个模拟放慢），白闪/震屏衰减用原始 rawDt。
 // 返回 timeScale（慢动作 0.25，否则 1）；后续模拟的 dt 须乘以它。
+// polish3c：触屏设备（无键盘）提示条改说按钮名
+const _hudTouch = (typeof matchMedia === 'function') && matchMedia('(pointer:coarse)').matches;   // polish3c
 // E3：相机看向太阳的视线被多少烟柱挡住（0..0.8）。烟柱近似为残骸上方竖直圆柱
 //（半径 2.4u、高 10u；明火期浓、阴燃期淡），只算正在燃烧的残骸。
 const _ssD = new THREE.Vector3();
@@ -301,6 +303,14 @@ function _tickHud(dt, s, rpm) {
     }
     // Q1：训练关（1-1~1-4）实时教练——按关卡状态给「第 n 步」，覆盖通用提示（73-coach）
     if (lc && !(fp && fp.active)) tip = lc;
+    // polish3c：触屏展示模式没有键盘——把"按 空格 / T / C"换成面板按钮名（教练 lc 已自带触屏措辞，不再替换）
+    if (_hudTouch && tip && tip !== lc) {
+      tip = tip.replace('按 空格 启动旋翼', '点面板「启动旋翼」').replace('后按 T 起飞', '后点「起飞」')
+        .replace('按 T 起飞至悬停', '点「起飞」升到悬停').replace('按 T 起飞', '点「起飞」')
+        .replace('C 第一人称驾驶', '「第一人称」驾驶').replace('T 降落', '「降落」');
+      const pnl = document.getElementById('panel');
+      if (pnl && pnl.classList.contains('hide')) tip = tip.replace('点面板「', '点右上 ☰ 打开面板，再点「');
+    }
     const gEl = UI('guide');
     if (gEl.dataset.tip !== tip) { gEl.dataset.tip = tip; gEl.textContent = tip; gEl.style.opacity = tip ? 1 : 0; }
     S._fa = 0; S._ft = 0;
