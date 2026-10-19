@@ -15,3 +15,4 @@
 - 椰枣树：原模型树干顶高过叶冠、且微斜偏离叶冠中心 → 加载后把树干顶压到叶冠内并收拢到中心；叶片绕树冠中心再复制两圈（三层，更密）；叶色再压暗（cutout [0.6,0.58,0.4]）。16-targetprops `_fixPalm`，PROP_DEFS 新增 `fix` 钩子；module-contracts 16-targetprops depends 增 mergeGeos。
 - 驴车：原生成模型车轮埋地下、只剩麻袋贴地拖 → 27-life 按驴身高程序化搭两轮木板车（车板/侧栏/尾板、带 6 辐条铁箍木轮、车轴、两根车辕接到驴肩两侧），原麻袋缩放后放在车板上；车轮随行驶滚动。倒地变暗改为按原色比例（不再把木头刷白）。
 - 构建通过（dist 2051 KB）；tests_pure 91 passed；拓扑自检 8/8；DOM id 检查通过。截图 cmp/vis/shot_pd.py town。
+- 黑鹰残骸：加坠毁现场——沿机身拉长的焦痕 + 6 块散落碎片（2 段断旋翼、4 块蒙皮），固定伪随机摆放（16-targetprops `_crashSite`，PROP_DEFS `scorch/debris`；契约增 scorchTexture）。构建 2053 KB。
