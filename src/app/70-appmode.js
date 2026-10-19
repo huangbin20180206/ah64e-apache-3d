@@ -189,6 +189,12 @@ function setAppMode(m, opts) {
       const bp = UI('btn-panel');
       if (bp) { bp.classList.add('on'); bp.setAttribute('aria-expanded', 'true'); }
     }
+    // polish3c：竖屏手机（宽 ≤600）面板默认整屏盖住直升机——进入时收起，右上 ☰ 再打开
+    else if (panel && !panel.classList.contains('hide') && window.innerWidth <= 600 && !o.fromPanel) {
+      panel.classList.add('hide');
+      const bp = UI('btn-panel');
+      if (bp) { bp.classList.remove('on'); bp.setAttribute('aria-expanded', 'false'); }
+    }
   }
   // URL 同步（replaceState 不触发 hashchange，不污染历史栈）
   if (!o.fromHash && m !== 'all' && !(m === 'play' && S._mission && S._mission.levelId)) {
