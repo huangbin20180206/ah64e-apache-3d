@@ -158,6 +158,9 @@ function resize() {
   renderer.setPixelRatio(dpr);
   renderer.setSize(w, h, false);
   W.camera.aspect = w / h;
+  // polish3c：竖屏（宽<高）时相机只按竖向视角取景，左右太窄——直升机被切掉一半。
+  // 竖屏把镜头拉广，让横向看到的范围约等于方屏（横屏/桌面 zoom 恒为 1，不受影响）
+  W.camera.zoom = w < h ? Math.max(0.4, w / h) : 1;
   W.camera.updateProjectionMatrix();
   composer.setSize(Math.max(1, Math.floor(w * dpr)), Math.max(1, Math.floor(h * dpr)));
 }
