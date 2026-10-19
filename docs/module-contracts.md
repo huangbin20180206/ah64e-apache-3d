@@ -938,6 +938,9 @@
    ],
    "70-killcam.js": [
     "killcamTry"
+   ],
+   "70-radio.js": [
+    "radioSay"
    ]
   }
  },
@@ -1047,6 +1050,9 @@
    "70-mission.js": [
     "applyVariantAmmo",
     "failMission"
+   ],
+   "70-radio.js": [
+    "radioSay"
    ]
   }
  },
@@ -1249,6 +1255,9 @@
    "70-killcam.js": [
     "KC",
     "killcamUpdate"
+   ],
+   "70-radio.js": [
+    "radioTick"
    ]
   }
  },
@@ -1335,6 +1344,9 @@
    ],
    "70-nightops.js": [
     "resetNightOps"
+   ],
+   "70-radio.js": [
+    "radioSay"
    ]
   }
  },
@@ -1393,6 +1405,25 @@
    ],
    "70-mission.js": [
     "startMission"
+   ]
+  }
+ },
+ "70-radio.js": {
+  "provides": [
+   "radioSay",
+   "radioTick"
+  ],
+  "depends": {
+   "01-host.js": [
+    "HOST"
+   ],
+   "70-app.js": [
+    "S",
+    "audio",
+    "samwar"
+   ],
+   "70-appmode.js": [
+    "appState"
    ]
   }
  },
@@ -1535,6 +1566,9 @@
    ],
    "70-loop.js": [
     "loop"
+   ],
+   "70-radio.js": [
+    "radioSay"
    ]
   }
  },
