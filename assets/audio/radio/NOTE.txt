@@ -1,0 +1,7 @@
+无线电喊话语音（18 条，中文）
+生成：Microsoft Edge 在线神经语音合成（edge-tts，声音 zh-CN-YunjianNeural 指挥所 / zh-CN-YunxiNeural 射手），
+再经 ffmpeg 处理成无线电效果（带通 380–3000Hz、压缩、软削波、静噪噪声）。
+文本为本项目原创台词，见 src/app/70-radio.js RADIO_LINES。
+说明：此为 AI 合成语音，非真人录音；微软合成语音的再分发条款未明确授予 CC 类许可，
+本项目为非商业个人作品。如需完全无版权顾虑，可删除本目录（游戏仍显示字幕，只是无声）。
+生成脚本：lines.txt + mk.sh + fx.sh（保存在 Hark 工作区，未入库）。
