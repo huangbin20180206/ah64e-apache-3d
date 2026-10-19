@@ -166,7 +166,7 @@ const VIEWS = [
   { key: '4', name: '顶视', target: [0, 1.0, 0.1], theta: 0.30, phi: 0.14, dist: 13.6, fov: 34 },
   { key: '5', name: '尾后', target: [0, 1.30, -3.0], theta: PI, phi: 1.36, dist: 8.6, fov: 34 },
   { key: '6', name: '座舱', target: [0, 1.35, 2.55], theta: 0.95, phi: 1.34, dist: 3.5, fov: 40 },
-  { key: '7', name: '机炮', target: [0.05, 0.45, 3.25], theta: 0.62, phi: 1.30, dist: 2.7, fov: 42 },
+  { key: '7', name: '机炮', target: [0.05, 0.55, 3.15], theta: 0.55, phi: 1.50, dist: 2.2, fov: 40 },   // polish3：压低到炮口水平视线，炮管衬在亮地面上（原俯视一半画面是地砖）
   { key: '8', name: '桨毂', target: [0, 2.30, 1.56], theta: 1.05, phi: 1.02, dist: 3.2, fov: 38 },
   { key: '9', name: '龙弓雷达', target: [0, 2.75, 1.56], theta: 2.30, phi: 1.10, dist: 2.6, fov: 36 },
   { key: '0', name: '尾桨', target: [0.36, 2.30, -3.62], theta: 1.62, phi: 1.24, dist: 3.0, fov: 38 },
