@@ -305,7 +305,8 @@ class TargetRange {
     // B2：解除警报，疏散车辆回到原车位（原巡逻目标保留各自巡逻定义）
     this._alert = false; this._alertT = null;
     for (const t of this.targets) {
-      if (t.turret) t.turret.rotation.y = 0;   // ASSETS3 炮塔回正
+      if (t.turret) t.turret.rotation.y = t.turret.userData.r0 ? t.turret.userData.r0.y : 0;   // ASSETS3 炮塔回正
+      if (t.gunP && t.gunP.userData.r0) t.gunP.rotation.x = t.gunP.userData.r0.x;   // ASSETS6 炮管回平
       if (!t.home) continue;
       t.mov = t.home.mov;
       if (!t.mov) {
