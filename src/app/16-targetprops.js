@@ -39,7 +39,7 @@ const PROP_DEFS = {
   mosque:    { url: 'assets/targets/mosque.glb', len: 6.3 },          // 小清真寺 14m（门朝 +Z）
   shoprow:   { url: 'assets/targets/shop_row.glb', len: 5.3 },        // 三间临街铺面 12m（铺面朝 +X）
   stall:     { url: 'assets/targets/market_stall.glb', len: 1.3 },    // 集市果蔬摊 2.9m
-  palm:      { url: 'assets/targets/palm_tree.glb', h: 4.0 },         // 椰枣树 9m
+  palm:      { url: 'assets/targets/palm_tree_v2.glb', h: 3.6 },      // 椰枣树 8.2m（ASSETS6 换镂空细叶版）
   tent:      { url: 'assets/targets/tent_military.glb', len: 2.64 },  // 军用帐篷 6m（门帘朝 +Z）
   generator: { url: 'assets/targets/generator.glb', len: 0.97 },      // 柴油发电机 + 油桶 2.2m
   container: { url: 'assets/targets/container.glb', len: 2.67 },      // 集装箱（按 20 尺 6.06m 摆）
@@ -49,7 +49,45 @@ const PROP_DEFS = {
   bunker:    { url: 'assets/targets/bunker.glb', h: 1.1 },            // 混凝土碉堡 2.5m 高（射击孔朝 +Z）
   wreck:     { url: 'assets/targets/car_wreck.glb', len: 1.94 },      // 烧毁轿车 4.4m
   commtower: { url: 'assets/targets/comms_tower.glb', h: 11.0 },      // 通信铁塔 25m
+  // 2026-10-19 ASSETS6（团结 AI 生成，AIGC）
+  heliwreck: { url: 'assets/targets/heli_wreck.glb', len: 6.6 },      // 侧翻烧毁的黑鹰 15m（尾梁折断）
+  rubble:    { url: 'assets/targets/rubble_pile.glb', len: 2.7 },     // 瓦砾堆 6m（碎水泥+钢筋）
+  // 抽油机 8m：beam 游梁点头、crank 曲柄配重旋转（节点原点在各自转轴，绕模型 X 轴）
+  pumpjack:  { url: 'assets/targets/oil_pumpjack.glb', len: 3.5, anim: 'pump' },
+  // ZU-23-2 牵引高炮 4.6m（不带沙袋）：turret 上座缓慢左右搜索、barrels 双管上扬
+  zu23t:     { url: 'assets/targets/zu23_towed.glb', len: 2.03, anim: 'scan' },
 };
+// 道具小动画（ASSETS6）：活动件不进合批，挂在其网格的 onBeforeRender 上按时钟摆动——
+// 只在画面里看得到时才算，不进主循环；纯装饰，不影响玩法。
+const PROP_ANIM = {
+  pump: { pump: ['beam', 'crank'] },
+  scan: { scan: ['turret', 'barrels'] },
+};
+const _paQ = new THREE.Quaternion(), _paX = new THREE.Vector3(1, 0, 0), _paY = new THREE.Vector3(0, 1, 0);
+function _rigPropAnim(inst, kind) {
+  const names = Object.values(PROP_ANIM[kind])[0];
+  const a = inst.getObjectByName(names[0]), b = inst.getObjectByName(names[1]);
+  if (!a || !b) return;
+  if (kind === 'scan') a.attach(b);                 // 炮管跟着上座转
+  for (const n of [a, b]) { n.userData.q0 = n.quaternion.clone(); n.traverse(o => { if (o.isMesh) o.userData.noMerge = true; }); }
+  const ph = (inst.id % 7) * 0.9;
+  let last = -1;
+  const tick = () => {
+    const t = performance.now() / 1000 + ph;
+    if (t === last) return; last = t;
+    if (kind === 'pump') {
+      // 约 6 秒一冲程：曲柄匀速转，游梁随之点头 ±14°
+      const w = TAU / 6;
+      a.quaternion.copy(a.userData.q0).multiply(_paQ.setFromAxisAngle(_paX, Math.sin(t * w) * 0.25));
+      b.quaternion.copy(b.userData.q0).multiply(_paQ.setFromAxisAngle(_paX, t * w));
+    } else {
+      // 上座左右搜索 ±50°（约 14 秒一个来回），双管保持上扬 35°
+      a.quaternion.copy(a.userData.q0).multiply(_paQ.setFromAxisAngle(_paY, Math.sin(t * 0.45) * 0.87));
+      b.quaternion.copy(b.userData.q0).multiply(_paQ.setFromAxisAngle(_paX, -0.6));
+    }
+  };
+  for (const n of [a, b]) n.traverse(o => { if (o.isMesh) o.onBeforeRender = tick; });
+}
 let _propCache = null;
 function _loadPropModels() {
   if (_propCache) return _propCache;
@@ -85,6 +123,7 @@ function placeProps(parent, list) {
       // 先缩放再平移：包围盒是在 inst 现有变换下量的，缩放绕原点 ⇒ 新位置 = (旧位置-中心)·k
       inst.scale.multiplyScalar(k);
       inst.position.set((inst.position.x - c.x) * k, (inst.position.y - box.min.y) * k, (inst.position.z - c.z) * k);
+      if (def.anim) _rigPropAnim(inst, def.anim);
       const g = new THREE.Group();
       g.add(inst);
       g.position.set(x, 0, z);
@@ -162,6 +201,8 @@ function placeRangeProps(parent, BC) {
     ['wreck', BC.x - 20.0, BC.z - 30.6, 0.35],
     ['palm', BC.x - 4.4, BC.z - 18.0, 0],
     ['palm', BC.x + 4.6, BC.z - 18.4, 1.7],
+    // 2026-10-19 ASSETS6：东南荒地一架坠毁烧黑的黑鹰（背景故事件）
+    ['heliwreck', BC.x + 32.0, BC.z - 28.0, 0.8],
   ]);
 }
 
@@ -192,5 +233,9 @@ function placeTownProps(parent, C) {
     ['palm', C.x - 19.0, C.z - 8.5, 1.0], ['palm', C.x + 19.2, C.z - 8.2, 3.0],
     ['palm', C.x + 25.6, C.z - 4.2, 0.5], ['palm', C.x + 25.8, C.z + 5.4, 2.4],
     ['palm', C.x - 2.6, C.z + 19.6, 1.3], ['palm', C.x + 3.4, C.z + 18.8, 4.0],
+    // 2026-10-19 ASSETS6：南街瓦砾、东郊两台抽油机、东北角牵引高炮
+    ['rubble', C.x - 8.0, C.z - 11.6, 0.4], ['rubble', C.x + 9.0, C.z - 12.0, 2.2],
+    ['pumpjack', C.x + 32.0, C.z + 9.0, 0.2], ['pumpjack', C.x + 33.5, C.z - 8.5, -0.3],
+    ['zu23t', C.x + 21.0, C.z + 13.5, -0.6],
   ]);
 }
