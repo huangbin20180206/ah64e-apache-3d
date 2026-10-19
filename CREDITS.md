@@ -44,6 +44,9 @@ Hark 只做了贴图压缩（2048→1024/512）与缩放摆放；第二批非角
 | assets/targets/civilian_old.glb | 拄拐老人（带骨骼）（第二批 2026-10-19） |
 | soldier_rifle / soldier_rpg / soldier_pkm / soldier_officer / civilian / civilian_woman .glb | 第三批 2026-10-19：同一模型补战斗/倒地/抱头动作（团结 AI 程序化动作，UniRig 骨骼） |
 | assets/targets/zsu234_shilka.glb、technical.glb | 第三批 2026-10-19：换成拆件版（炮塔/炮管/雷达/机枪底座可动） |
+| assets/targets/bm21_grad.glb | 第三批：换成拆件版（发射架可回转） |
+| assets/targets/goat.glb、camel.glb、donkey_cart.glb | 第三批：山羊、骆驼、驴车（带骨骼动作） |
+| assets/targets/heli_wreck.glb、oil_pumpjack.glb、rubble_pile.glb、zu23_towed.glb、palm_tree_v2.glb | 第三批：黑鹰残骸、抽油机、瓦砾堆、ZU-23 牵引高炮、镂空细叶椰枣树 |
 | assets/targets/bm21_grad.glb | BM-21 火箭炮（第二批 2026-10-19） |
 | assets/targets/zsu234_shilka.glb | ZSU-23-4 石勒喀高炮（第二批 2026-10-19） |
 | assets/targets/technical_zu23.glb | ZU-23 高炮皮卡（第二批 2026-10-19） |
