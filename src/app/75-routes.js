@@ -38,6 +38,19 @@ function routeBars(on) {
     route.bars = [mk('top'), mk('bottom')];
   }
   for (const b of route.bars) b.style.height = on ? '7vh' : '0';
+  // polish3：航线是电影画幅，右侧面板/左下参数框/操作提示/机位条会挡住直升机 → 播放期间收起，退出时恢复
+  if (!route.css) {
+    route.css = document.createElement('style');
+    route.css.textContent = 'body.route-mode #specs,body.route-mode #guide,body.route-mode #views,' +
+      'body.route-mode #top{opacity:0!important;pointer-events:none!important;transition:opacity .4s}';
+    document.head.appendChild(route.css);
+  }
+  document.body.classList.toggle('route-mode', on);
+  const pn = document.getElementById('panel');
+  if (pn) {
+    if (on) { route._pnHid = pn.classList.contains('hide'); pn.classList.add('hide'); }
+    else if (route._pnHid === false) { pn.classList.remove('hide'); route._pnHid = undefined; }
+  }
 }
 
 function routeStart(id) {
@@ -219,7 +232,7 @@ function routeTick(ts) {
   x.id = 'route-exit'; x.type = 'button';
   x.textContent = '■ 退出航线';
   x.title = '退出航线并回到航线菜单（Esc）；任意键或点击画面 = 原地接管驾驶';
-  x.style.cssText = 'position:fixed;left:50%;bottom:calc(7vh + 10px);transform:translateX(-50%);z-index:62;' +
+  x.style.cssText = 'position:fixed;right:16px;bottom:calc(7vh + 10px);z-index:62;' +   // 右下角：不与居中字幕叠在一起
     'padding:7px 20px;border:1px solid rgba(120,255,170,.45);border-radius:18px;' +
     'background:rgba(10,18,14,.88);color:#cfe;font-size:12.5px;letter-spacing:1.5px;cursor:pointer;display:none';
   x.addEventListener('click', e => { e.stopPropagation(); routeStop(false, true); });
