@@ -63,3 +63,10 @@
 - 70-mission beginMission：游戏模式开打时自动切到作战视角（FPV / 过场持有镜头时不动）。
 - docs/module-contracts.md 同步新依赖（HOST、PI、setView）。
 - 检查：check_topology 违规 0；tests_pure 91 passed；selftest 8/8；check_dom_ids 通过；截图 2-1 起飞/开火/前飞（cmp/vis/gl_pc.py）无报错。
+
+## game2（2026-10-19，游戏线 PC 复查第二批：实战关合理性）
+状态：代码已入 src / 构建通过（Exit 0，dist/index.html 2063 KB）
+- 26-airtargets：红黄条纹热气球是靶场道具，实战关（非 train_* 变体）里飘在敌方基地上空不合理 → 实战任务期间隐藏、不可锁定/命中；训练关与展示不变。无人机、沙赫德巡飞弹保留。
+- 70-loop：夜战关 28u 高度仍开机腹白光搜索灯，地面一大片黄光池既暴露位置又抢画面 → 实战任务进行中离地 8u 以上关灯，起降贴地仍亮；展示/训练不变。
+- docs/module-contracts.md 同步（26 → HOST）。
+- 检查：check_topology 违规 0；tests_pure 91 passed；selftest 8/8；check_dom_ids 通过；截图 2-1 / 3-3 / 4-2 起飞、开火、前飞无报错。
