@@ -24,3 +24,10 @@
 - `71-armory.js` 装备图鉴：横屏转盘选中项放大后长名字（串列双座座舱 / 机身与生存性）冲出扇区外沿 → 按扇区宽度封顶缩放。
 - 近景审查：12 个机位、停机坪机库/油车/全景、城镇航线播放与退出、图鉴 3 项（脚本 cmp/vis/sv_views.py / sv_apron.py / sv_rt2.py / sv_rt3.py / sv_arm.py）。
 - 未改：航线里城镇上空的训练热气球（靶标原设计）。
+
+## polish3b（展示线）
+状态：代码已入 src / 构建通过（Exit0，dist/index.html 2056 KB，bundle_sha256 6f4f8905…6443）；tests_pure 91 passed；topology selftest 8/8。test_navlights 在本沙箱卡在“夜灯强度收敛”等待（实时帧太慢，非本批改动的数值），已按新行为改断言，未能在本机跑通。
+- `24-navlights.js` + `70-loop.js`：冷机停放时搜索灯离地 0.4u 斜照，在机头前打出一条硬边纯白“彗星”光斑（清晨/黄昏/夜间英雄机位都很显眼，压亮度到 1/25 仍是白块）。真机冷机停放不开搜索灯 → 改为离地或旋翼转起来才渐亮（searchOn 由 70-loop 每帧写）。`tools/tests/test_navlights.py`：停放断言改为搜索灯关、停放光池只打印；悬停光池断言不变。
+- `74-tour.js` 新增 `cineChrome(on)`：一键导览（精选 60 秒）也和航线一样播放时收起面板/HUD；`75-routes.js` 改用同一函数；`docs/module-contracts.md` 登记 cineChrome。
+- `50-controls.js` 机位 7「机炮」：原俯视半屏地砖、炮管小且埋在阴影里 → 压低到炮口水平视线、拉近（dist 2.7→2.2）。
+- 近景审查：5 种时段英雄机位、机炮机位、导览播放（sv_env.py / sv_sl.py / sv_sl2.py）。
