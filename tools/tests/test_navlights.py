@@ -51,7 +51,8 @@ def run(pg):
         assert st['lights'][k]['visible'], ('nav/fmt on', k, st)
     assert not st['lights']['beaconTop']['visible'], ('beacon off', st)
     assert not st['lights']['strobe']['visible'], ('strobe off', st)
-    assert st['search'] > 2500, ('searchlight on', st)
+    # polish3：冷机停放不开搜索灯（原来斜照出机头前硬边白斑）；离地/旋翼转起来才亮——见 2b
+    assert st['search'] < 50, ('searchlight off when parked cold', st)
     assert st['dash'] > 0.35, ('dash glow on', st)
 
     # 2) 右侧机位：绿灯+编队灯条像素 + 停放搜索灯光池（腹部灯离地仅 0.4u，
@@ -62,7 +63,7 @@ def run(pg):
     g_px = count(right, GREEN)
     pool_px = count(right, WARM, y_min=0.45)
     assert g_px > 250, ('green nav+formation pixels', g_px)
-    assert pool_px > 150, ('searchlight ground pool parked', pool_px)
+    # polish3：冷机停放不再有光池，pool_px 只打印不断言
     print('green px=%d, warm pool px (parked)=%d' % (g_px, pool_px))
     pg.screenshot(path=H.output_path('shot_nl_night_right.jpg'), type='jpeg', quality=90)
 
