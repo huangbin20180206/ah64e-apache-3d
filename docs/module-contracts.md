@@ -935,6 +935,9 @@
    ],
    "50-controls.js": [
     "Orbit"
+   ],
+   "70-killcam.js": [
+    "killcamTry"
    ]
   }
  },
@@ -1093,6 +1096,30 @@
    "70-mission.js": [
     "TRAIN_NUM",
     "TRAIN_STEPS"
+   ],
+   "70-killcam.js": [
+    "KC"
+   ]
+  }
+ },
+ "70-killcam.js": {
+  "provides": [
+   "KC",
+   "killcamTry",
+   "killcamUpdate"
+  ],
+  "depends": {
+   "01-host.js": [
+    "HOST"
+   ],
+   "70-app.js": [
+    "S",
+    "W",
+    "apache",
+    "rig"
+   ],
+   "70-appmode.js": [
+    "appState"
    ]
   }
  },
@@ -1218,6 +1245,10 @@
    ],
    "70-nightops.js": [
     "_tickNightOps"
+   ],
+   "70-killcam.js": [
+    "KC",
+    "killcamUpdate"
    ]
   }
  },
