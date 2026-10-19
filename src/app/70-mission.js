@@ -715,6 +715,8 @@ function beginMission() {
   if (m.gun0 == null) { m.gun0 = rig ? rig.gunAmmo : 0; m.rk0 = rig ? rig.rocketAmmo : 0; m.hf0 = rig ? rig.hfAmmo : 0; }
   // 任务进行中靶场必须启用（直接设状态源；不依赖 72-uibind 闭包内的 syncTargetsVis）
   if (targets) { targets.enabled = true; for (const t of targets.targets) t.group.visible = t.alive; }
+  // 2026-10-19：游戏模式开打时切到作战视角（70-camera setView 内按模式取景）；FPV/过场持有镜头时不动
+  if (HOST.appMode && HOST.appMode.mode === 'play' && !(HOST.fp && HOST.fp.active) && !(HOST.camSeq && HOST.camSeq.owner)) setView(0);
   updateMissionPanel();
 }
 // P6：重试——与 startMission 相同清场语义（任务面板由 startMission 重新渲染）。
