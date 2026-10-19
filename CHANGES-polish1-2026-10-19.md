@@ -10,3 +10,8 @@
 - 代码已入 src；构建通过（Exit 0，dist/index.html 2046 KB）。
 - tests_pure 91 passed；check_dom_ids 通过；拓扑自检 8/8。
 - 截图：cmp/vis/shot_a6s.py town（pump/pump2/palm/donkey）。
+
+# polish2（同日，用户指出两处不合理）
+- 椰枣树：原模型树干顶高过叶冠、且微斜偏离叶冠中心 → 加载后把树干顶压到叶冠内并收拢到中心；叶片绕树冠中心再复制两圈（三层，更密）；叶色再压暗（cutout [0.6,0.58,0.4]）。16-targetprops `_fixPalm`，PROP_DEFS 新增 `fix` 钩子；module-contracts 16-targetprops depends 增 mergeGeos。
+- 驴车：原生成模型车轮埋地下、只剩麻袋贴地拖 → 27-life 按驴身高程序化搭两轮木板车（车板/侧栏/尾板、带 6 辐条铁箍木轮、车轴、两根车辕接到驴肩两侧），原麻袋缩放后放在车板上；车轮随行驶滚动。倒地变暗改为按原色比例（不再把木头刷白）。
+- 构建通过（dist 2051 KB）；tests_pure 91 passed；拓扑自检 8/8；DOM id 检查通过。截图 cmp/vis/shot_pd.py town。
