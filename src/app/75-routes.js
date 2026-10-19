@@ -38,19 +38,7 @@ function routeBars(on) {
     route.bars = [mk('top'), mk('bottom')];
   }
   for (const b of route.bars) b.style.height = on ? '7vh' : '0';
-  // polish3：航线是电影画幅，右侧面板/左下参数框/操作提示/机位条会挡住直升机 → 播放期间收起，退出时恢复
-  if (!route.css) {
-    route.css = document.createElement('style');
-    route.css.textContent = 'body.route-mode #specs,body.route-mode #guide,body.route-mode #views,' +
-      'body.route-mode #top{opacity:0!important;pointer-events:none!important;transition:opacity .4s}';
-    document.head.appendChild(route.css);
-  }
-  document.body.classList.toggle('route-mode', on);
-  const pn = document.getElementById('panel');
-  if (pn) {
-    if (on) { route._pnHid = pn.classList.contains('hide'); pn.classList.add('hide'); }
-    else if (route._pnHid === false) { pn.classList.remove('hide'); route._pnHid = undefined; }
-  }
+  cineChrome(on);   // polish3：电影画幅期间收起面板/HUD（74-tour 共用）
 }
 
 function routeStart(id) {
