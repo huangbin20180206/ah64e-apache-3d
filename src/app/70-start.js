@@ -86,6 +86,7 @@ function finish() {
   };
   targets.canyon.onLock = () => {
     toast('⚠ 被雷达锁定——压低到崖顶以下！');
+    radioSay('lock');
     if (betty) betty.warn('MISSILE LAUNCH', 4);
   };
   rig.targets = targets;
@@ -146,6 +147,7 @@ function finish() {
     const m = S._mission;
     if (arcade && m && m.phase === 'active') { arcade.addBonus(-CIV_PENALTY); m.civKills = (m.civKills || 0) + 1; }
     toast('误伤' + (what || '平民') + '！−' + CIV_PENALTY + ' 分');
+    radioSay('civ');
   };
   rig.onInfantryHit = (p) => {
     const h = infantry.bulletHit(p) || life.bulletHit(p);
@@ -180,7 +182,7 @@ function finish() {
     // Phase 19：命中方位 → 四子系统确定性分配（86-damage 纯逻辑）
     _dmgApply(dmg, hitPos ? hitPos.x : null, hitPos ? hitPos.y : null, hitPos ? hitPos.z : null);
   };
-  air.onKill = (label, type) => { _kills++; S._slowmo = 0.55; S._flash = 0.5; S._shake = 1.0; killFeed(label); updateTargetHUD(null); if (arcade && S._mission && S._mission.phase === 'active') { arcade.onKill(type, S._mission); } };
+  air.onKill = (label, type) => { _kills++; S._slowmo = 0.55; S._flash = 0.5; S._shake = 1.0; killFeed(label); updateTargetHUD(null); radioSay('air'); if (arcade && S._mission && S._mission.phase === 'active') { arcade.onKill(type, S._mission); } };
   // 机体夜间指示灯（航行灯/信标/频闪）：先建灯再绑倒影，灯珠才能进镜像
   nlights = new NightLights(apache);
   nlights.syncEnv(S.env);
