@@ -1728,6 +1728,7 @@
   "provides": [
    "clickEnv",
    "clickTerrain",
+   "cineChrome",
    "syncTourCtl",
    "tour",
    "tourCap",
@@ -1790,6 +1791,7 @@
    "74-tour.js": [
     "clickEnv",
     "clickTerrain",
+    "cineChrome",
     "tourCap",
     "tourKey",
     "tourStart",
