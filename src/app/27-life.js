@@ -22,6 +22,8 @@ const CIV_H = 0.774;                 // 1.70m（与步兵 1.78m=0.81u 同比例�
 // 平民外观：c=长袍男 w=黑袍女(1.62m) e=拄拐老人(1.68m，走/跑速度 ×0.7)
 const CIV_KINDS = ['c', 'w', 'e'];
 const CIV_URL = { c: 'assets/targets/civilian.glb', w: 'assets/targets/civilian_woman.glb', e: 'assets/targets/civilian_old.glb' };
+// ASSETS6：平民 Cower（蹲下抱头发抖，c0..c3）+ Death（倒地，d0..d5）；缺动作的模型（老人）回退旧帧
+const CIV_EXTRA = [0, 0.25, 0.5, 0.75].map((t, i) => ['c' + i, 'Cower', t]).concat([0, 0.2, 0.4, 0.6, 0.8, 1].map((t, i) => ['d' + i, 'Death', t]));
 const CIV_HK = { c: CIV_H, w: CIV_H * 1.62 / 1.70, e: CIV_H * 1.68 / 1.70 };
 // 民用车（城镇外环，反向车道）：车长 = 真车长 / 2.27m
 const CIV_CARS = { sedan: { url: 'assets/targets/civ_sedan.glb', len: 1.94 }, minibus: { url: 'assets/targets/civ_minibus.glb', len: 2.2 },
@@ -93,13 +95,14 @@ class BattleLife {
 
   _buildCiv(got) {
     const B = {};
-    try { for (const k of CIV_KINDS) if (got[k]) B[k] = bakeClipPoses(got[k], CIV_HK[k]); } catch (e) { console.warn('[life] bake', e); return; }
+    try { for (const k of CIV_KINDS) if (got[k]) B[k] = bakeClipPoses(got[k], CIV_HK[k], CIV_EXTRA); } catch (e) { console.warn('[life] bake', e); return; }
     if (!B.c) return;
     for (const p of this.civs) if (!B[p.k]) p.k = 'c';     // 缺模型 → 用长袍男外观
     const cap = {};
     for (const p of this.civs) cap[p.k] = (cap[p.k] || 0) + 1;
     this.civMeshes = {};
-    for (const t of Object.keys(cap)) for (const k of INF_FRAMES) {
+    for (const t of Object.keys(cap)) for (const k of Object.keys(B[t])) {
+      if (k === 'mat') continue;
       const im = new THREE.InstancedMesh(B[t][k], B[t].mat, cap[t]);
       im.count = 0; im.frustumCulled = false; im.castShadow = true; im.visible = false;
       this.scene.add(im);
@@ -397,8 +400,10 @@ class BattleLife {
       let f = 'idle';
       if (p.alive && p.st === 'flee') f = 'r' + (Math.floor(p.t / 0.88 * INF_RUN_N + p.ph * 3) % INF_RUN_N);
       else if (p.alive && p.st === 'walk' && p.pw === 0) f = 'w' + (Math.floor(p.t / 1.29 * INF_WALK_N + p.ph * 3) % INF_WALK_N);
+      else if (p.alive && p.st === 'cower' && this.civMeshes[p.k + 'c0']) f = 'c' + (Math.floor(p.t * 6 + p.ph * 3) % 4);
+      else if (!p.alive && this.civMeshes[p.k + 'd0']) f = 'd' + Math.min(5, Math.floor(p.t / 0.9 * 6));
       const im = this.civMeshes[p.k + f];
-      if (!p.alive) { _lfE.set(-PI / 2, p.ry, 0, 'YXZ'); _lfQ.setFromEuler(_lfE); _lfV.set(p.x, 0.07, p.z); }
+      if (!p.alive && f[0] !== 'd') { _lfE.set(-PI / 2, p.ry, 0, 'YXZ'); _lfQ.setFromEuler(_lfE); _lfV.set(p.x, 0.07, p.z); }
       else { _lfQ.setFromAxisAngle(_lfV2.set(0, 1, 0), p.ry); _lfV.set(p.x, 0, p.z); }
       _lfM.compose(_lfV, _lfQ, _lfS);
       im.setMatrixAt(cnt[p.k + f]++, _lfM);
