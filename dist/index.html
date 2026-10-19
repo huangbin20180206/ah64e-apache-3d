@@ -39,6 +39,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
   border-left:2px solid var(--accent)}
 #brand small{display:block;font-size:9px;letter-spacing:.26em;color:var(--dim);font-weight:400;margin-top:2px}
 #hud{display:flex;gap:12px;font-family:var(--mono);font-size:10px;color:var(--dim);flex-wrap:wrap}
+/* polish3c：竖屏手机标题被挤成三行压到读数上——标题不换行、副标题收起、读数让位 */
+@media (max-width:600px){#brand{flex:none;white-space:nowrap;letter-spacing:.1em}#brand small{display:none}#hud{gap:8px;min-width:0}.app-show #hud{display:none}}
 #hud b{color:var(--fg);font-weight:500}
 #top-right{margin-left:auto;display:flex;gap:6px;pointer-events:auto}
 .iconbtn{width:30px;height:30px;border:1px solid var(--line);background:rgba(10,14,18,.62);
@@ -547,6 +549,8 @@ body.photo-mode > *:not(canvas):not(#photo-exit):not(.route-bar):not(#tour-cap){
 @media (prefers-reduced-motion: reduce){.ln-card{transition:none}}
 /* 展示模式：解说牌让到面板左侧（面板收起时贴右） */
 .app-show #panel:not(.hide) ~ #label-info{right:296px;top:64px}
+/* polish3c：知识卡在面板左边会正好盖住被讲解的部件——改停靠屏幕左侧，镜头画面同步移到卡片与面板之间（70-loop _panelShift） */
+.app-show #panel:not(.hide) ~ #label-info.kc{right:auto;left:12px;top:64px;max-height:calc(100vh - 210px);overflow:auto}
 @media (max-width:820px){.app-show #panel:not(.hide) ~ #label-info{right:12px;top:auto;bottom:70px;left:12px;max-width:none}}
 .app-show #panel,.app-play #panel{bottom:auto;max-height:calc(100vh - 64px)}
 .app-play #mission{border:1px solid var(--hair);border-top:1px solid rgba(159,212,184,.45);clip-path:none;border-radius:3px;
@@ -21240,6 +21244,9 @@ function resize() {
   renderer.setPixelRatio(dpr);
   renderer.setSize(w, h, false);
   W.camera.aspect = w / h;
+  // polish3c：竖屏（宽<高）时相机只按竖向视角取景，左右太窄——直升机被切掉一半。
+  // 竖屏把镜头拉广，让横向看到的范围约等于方屏（横屏/桌面 zoom 恒为 1，不受影响）
+  W.camera.zoom = w < h ? Math.max(0.4, w / h) : 1;
   W.camera.updateProjectionMatrix();
   composer.setSize(Math.max(1, Math.floor(w * dpr)), Math.max(1, Math.floor(h * dpr)));
 }
@@ -21454,6 +21461,12 @@ function setAppMode(m, opts) {
       panel.classList.remove('hide');
       const bp = UI('btn-panel');
       if (bp) { bp.classList.add('on'); bp.setAttribute('aria-expanded', 'true'); }
+    }
+    // polish3c：竖屏手机（宽 ≤600）面板默认整屏盖住直升机——进入时收起，右上 ☰ 再打开
+    else if (panel && !panel.classList.contains('hide') && window.innerWidth <= 600 && !o.fromPanel) {
+      panel.classList.add('hide');
+      const bp = UI('btn-panel');
+      if (bp) { bp.classList.remove('on'); bp.setAttribute('aria-expanded', 'false'); }
     }
   }
   // URL 同步（replaceState 不触发 hashchange，不污染历史栈）
@@ -21891,6 +21904,8 @@ function syncFlyText() {
   // 电影镜头包 S2/S3：太阳屏幕投影（光晕）+ 白闪/震屏衰减 + 击毁慢动作。
   // timeScale 只作用于 dt（整个模拟放慢），白闪/震屏衰减用原始 rawDt。
 // 返回 timeScale（慢动作 0.25，否则 1）；后续模拟的 dt 须乘以它。
+// polish3c：触屏设备（无键盘）提示条改说按钮名
+const _hudTouch = (typeof matchMedia === 'function') && matchMedia('(pointer:coarse)').matches;   // polish3c
 // E3：相机看向太阳的视线被多少烟柱挡住（0..0.8）。烟柱近似为残骸上方竖直圆柱
 //（半径 2.4u、高 10u；明火期浓、阴燃期淡），只算正在燃烧的残骸。
 const _ssD = new THREE.Vector3();
@@ -22177,6 +22192,14 @@ function _tickHud(dt, s, rpm) {
     }
     // Q1：训练关（1-1~1-4）实时教练——按关卡状态给「第 n 步」，覆盖通用提示（73-coach）
     if (lc && !(fp && fp.active)) tip = lc;
+    // polish3c：触屏展示模式没有键盘——把"按 空格 / T / C"换成面板按钮名（教练 lc 已自带触屏措辞，不再替换）
+    if (_hudTouch && tip && tip !== lc) {
+      tip = tip.replace('按 空格 启动旋翼', '点面板「启动旋翼」').replace('后按 T 起飞', '后点「起飞」')
+        .replace('按 T 起飞至悬停', '点「起飞」升到悬停').replace('按 T 起飞', '点「起飞」')
+        .replace('C 第一人称驾驶', '「第一人称」驾驶').replace('T 降落', '「降落」');
+      const pnl = document.getElementById('panel');
+      if (pnl && pnl.classList.contains('hide')) tip = tip.replace('点面板「', '点右上 ☰ 打开面板，再点「');
+    }
     const gEl = UI('guide');
     if (gEl.dataset.tip !== tip) { gEl.dataset.tip = tip; gEl.textContent = tip; gEl.style.opacity = tip ? 1 : 0; }
     S._fa = 0; S._ft = 0;
@@ -22438,6 +22461,35 @@ function stepFrames(sec, h = 1 / 30, until = null) {
   }
   clock.last = performance.now() / 1000;
   return t;
+}
+
+// polish3c：展示模式右侧面板展开时，画面中心落在面板下面——小窗口（1024 宽）直升机尾桨被面板盖住。
+// 面板打开时把镜头画面整体左移半个面板宽（相机视口偏移，不动相机本身；拾取/标签投影用同一投影矩阵，自动一致）。
+// 只在展示模式 + 环绕镜头生效：游戏模式准星在屏幕正中、第一人称/航线/导览都不动。
+const _PS = { x: 0, w: 0, h: 0 };
+function _panelShift(dt) {
+  let want = 0;
+  const w = innerWidth, h = innerHeight;
+  if (S.app === 'show' && !(fp && fp.active) && w > 600 && !document.body.classList.contains('route-mode')) {
+    let L = 0, R = w;
+    const pn = document.getElementById('panel');
+    if (pn && !pn.classList.contains('hide')) {
+      const r = pn.getBoundingClientRect();
+      if (r.width > 0 && r.left > w * 0.4) R = r.left;
+    }
+    // 知识卡停靠左侧时（模板 #label-info.kc 规则），画面中心落在卡片右缘与面板左缘之间
+    const kc = document.getElementById('label-info');
+    if (kc && kc.classList.contains('kc') && kc.style.display !== 'none') {
+      const r = kc.getBoundingClientRect();
+      if (r.width > 0 && r.left < w * 0.2 && r.right < w * 0.5) L = r.right;
+    }
+    want = Math.round(w / 2 - (L + R) / 2);
+  }
+  const nx = Math.abs(want - _PS.x) < 0.5 ? want : _PS.x + (want - _PS.x) * Math.min(1, dt * 6);
+  if (Math.abs(nx - _PS.x) < 0.01 && w === _PS.w && h === _PS.h) return;
+  _PS.x = nx; _PS.w = w; _PS.h = h;
+  if (Math.abs(nx) < 0.5) W.camera.clearViewOffset();
+  else W.camera.setViewOffset(w, h, nx, 0, w, h);
 }
 
 function _frame(dt, doRender) {
@@ -22709,6 +22761,7 @@ function _frame(dt, doRender) {
   // 第一人称：相机由 FPView 驱动（机头姿态即视线），环绕控制器让位
   if (fp && fp.active) fp.update(dt);
   else orbit.update(dt);
+  _panelShift(rawDt);
   killcamUpdate(rawDt);
   radioTick(rawDt);       // E2 无线电字幕/静音/锁定检测（70-radio.js）   // E1 击毁特写：覆盖本帧相机（70-killcam.js）
   W.skyMat.uniforms.uTime.value = S.time;
@@ -30354,7 +30407,7 @@ HOST.makeProgress = (opts) => new ProgressModule(opts);
 </script>
 
 <script>
-;(function(){ try { var __b = window.__BUILD_ID = window.__BUILD_ID || {}; __b.git_sha = "unknown"; __b.bundle_sha256 = '6f4f89059f660421db07e42e92719e063143bec3d1c6bda6e7f5a74d7a926443'; } catch(e){} })();
+;(function(){ try { var __b = window.__BUILD_ID = window.__BUILD_ID || {}; __b.git_sha = "unknown"; __b.bundle_sha256 = '7ece452a9f867667e004bedb40ec1b8b2554bdbda327cd7233f3ca70b7454c42'; } catch(e){} })();
 </script>
 </body>
 </html>
