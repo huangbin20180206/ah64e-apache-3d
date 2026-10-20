@@ -181,6 +181,9 @@ try {
   # 此处验证检查器本身能抓已知违规样本，防其退化成永远绿灯）
   node tools/check_topology_selftest.mjs
   if ($LASTEXITCODE -ne 0) { throw 'TOPOLOGY CHECKER SELFTEST FAILED' }
+  # opt1（2026-10-20）：纯逻辑 pytest 进本地门禁（此前只在 CI 跑，本地门禁零引用——孤儿测试）
+  python -m pytest -q tools/tests_pure
+  if ($LASTEXITCODE -ne 0) { throw 'PURE LOGIC TESTS FAILED' }
 } catch {
   Write-Host "FATAL: $_"
   Pop-Location
