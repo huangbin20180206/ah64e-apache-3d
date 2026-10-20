@@ -9,6 +9,22 @@
 // ============================================================
 
 // ---------- 草地：绿底 + 多色调软斑层 + 高频草丛噪声（P29 分层升级） ----------
+// opt1：软斑九宫格回绕绘制（草地/湖床贴图共用一份；绘制顺序与旧实现逐笔一致）
+function wrapBlobOn(x, N, px, py, rr, mid, comp) {
+  x.globalCompositeOperation = comp;
+  for (let dx = -N; dx <= N; dx += N) {
+    for (let dy = -N; dy <= N; dy += N) {
+      const cx = px + dx, cy = py + dy;
+      if (cx + rr < 0 || cx - rr > N || cy + rr < 0 || cy - rr > N) continue;
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, rr);
+      g.addColorStop(0, mid);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = g;
+      x.beginPath(); x.arc(cx, cy, rr, 0, TAU); x.fill();
+    }
+  }
+  x.globalCompositeOperation = 'source-over';
+}
 function makeGrassGround(N = 1024) {
   const { c, x } = canvas2d(N);
   // 底色：中橄榄绿（略暖于旧版纯绿，给枯黄斑留融合空间）
@@ -18,21 +34,7 @@ function makeGrassGround(N = 1024) {
   // 软斑九宫格回绕（P29）：贴图是 repeat 平铺的，软斑跨边界被裁切会留
   // 直边硬缝——在 8 个邻位各补画一份，四个方向平铺都无缝。只回绕"大斑"
   //（划线/微粒太碎，裁切不可读，不值得 9 倍绘制量）。
-  const wrapBlob = (px, py, rr, mid, comp) => {
-    x.globalCompositeOperation = comp;
-    for (let dx = -N; dx <= N; dx += N) {
-      for (let dy = -N; dy <= N; dy += N) {
-        const cx = px + dx, cy = py + dy;
-        if (cx + rr < 0 || cx - rr > N || cy + rr < 0 || cy - rr > N) continue;
-        const g = x.createRadialGradient(cx, cy, 0, cx, cy, rr);
-        g.addColorStop(0, mid);
-        g.addColorStop(1, 'rgba(0,0,0,0)');
-        x.fillStyle = g;
-        x.beginPath(); x.arc(cx, cy, rr, 0, TAU); x.fill();
-      }
-    }
-    x.globalCompositeOperation = 'source-over';
-  };
+  const wrapBlob = (px, py, rr, mid, comp) => wrapBlobOn(x, N, px, py, rr, mid, comp);
 
   // —— 大尺度色层（P29：破"死板均匀绿"）：亮草甸 / 枯黄干草 / 冷深绿 ——
   // 对比度刻意压低（alpha≤0.18）且多层叠压：单斑不可辨认，合成后是
@@ -203,21 +205,7 @@ function makeWaterGround(N = 1024) {
   x.fillRect(0, 0, N, N);
   // 湖床沉积斑（P29）：深色腐殖斑 + 浅色淤沙斑，九宫格回绕保平铺无缝
   //（软斑跨贴图边界被裁切会留直边硬缝；对比较大尺度渐变靠回绕解决）
-  const wrapBlob = (px, py, rr, mid, comp) => {
-    x.globalCompositeOperation = comp;
-    for (let dx = -N; dx <= N; dx += N) {
-      for (let dy = -N; dy <= N; dy += N) {
-        const cx = px + dx, cy = py + dy;
-        if (cx + rr < 0 || cx - rr > N || cy + rr < 0 || cy - rr > N) continue;
-        const g = x.createRadialGradient(cx, cy, 0, cx, cy, rr);
-        g.addColorStop(0, mid);
-        g.addColorStop(1, 'rgba(0,0,0,0)');
-        x.fillStyle = g;
-        x.beginPath(); x.arc(cx, cy, rr, 0, TAU); x.fill();
-      }
-    }
-    x.globalCompositeOperation = 'source-over';
-  };
+  const wrapBlob = (px, py, rr, mid, comp) => wrapBlobOn(x, N, px, py, rr, mid, comp);
   for (let i = 0; i < 30; i++) {         // 腐殖暗斑：湖底腐叶沉积
     wrapBlob(rnd(N), rnd(N), rnd(N * 0.02, N * 0.05), 'rgba(18,44,44,0.34)', 'multiply');
   }
