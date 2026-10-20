@@ -227,6 +227,21 @@ function _frame(dt, doRender) {
     if (rescue) {
       if (W.terrainKey !== S._rescueTerr) { S._rescueTerr = W.terrainKey; rescue.setTerrain(W.terrainKey); }
       rescue.update(dt, apache.root.position);
+      // game5：游戏线作战视角朝前看，放绞车时幸存者和吊绳在机腹正下方出画。
+      // 放绳/对位/收绳期间镜头飞到斜侧后方、对准机腹到地面之间，人和绳都在画面里；结束后回作战视角。
+      // 只在作战视角（S.view 0）且镜头无人占用（非 FPV/过场）时接管
+      {
+        const winch = rescue.state === 'deploying' || rescue.state === 'holding' || rescue.state === 'lifting';
+        const camFree = S.app === 'play' && S.view === 0 && !(fp && fp.active) && !(HOST.camSeq && HOST.camSeq.owner);
+        if (winch && camFree && !S._winchCam) {
+          S._winchCam = true;
+          const yaw = apache.root.rotation.y;
+          orbit.flyTo({ target: [FLY.x || 0, FLY.alt * 0.55, FLY.z || 0], theta: PI * 0.9 + yaw + 0.75, phi: 1.12, dist: 14 + FLY.alt * 1.1, fov: 46 }, 0.9);
+        } else if (!winch && S._winchCam) {
+          S._winchCam = false;
+          if (camFree) setView(0);
+        }
+      }
       // M6 救援成功 replay：delivered 触发短回放（每局一次；startMission 复位标记）。
       // 最终闭环修复（生命周期）：maybe 返回 accepted——仅当请求真正被接受/入队
       // 才提交 S._rescueCut；被拒（其他序列活跃）时不消费标记，下一帧重试，
