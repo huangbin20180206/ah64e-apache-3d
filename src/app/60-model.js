@@ -106,6 +106,8 @@ class Apache {
     // 手动反馈第 2 批：GLB 原始 USMC 低可视贴花观感修正——必须在爆炸视图
     // 记录 origin 之前调用（Serial 位移进 origin，爆炸时不会跳回原位）
     this._fixLowvisMarking();
+    // 手动反馈第 3 批：喷涂贴花悬空（详见方法注释），同样放在 origin 记录前
+    this._conformDecals();
     this.hellfire = pick(PART_GROUPS.hellfire);
     this.rocketPods = pick(PART_GROUPS.rocketPod);
     this.gunParts = pick(PART_GROUPS.gun);
@@ -316,6 +318,205 @@ class Apache {
     }
   }
 
+  // 手动反馈第 3 批：喷涂贴花"悬空"——GLB 里的机身喷涂（MARINES/尾号/徽标/
+  // 机号星徽/文字）是贴在 |x|≈0.37 的平面薄片，而尾梁圆柱面在 |x|≈0.20–0.33，
+  // 正视/俯视能看到薄片边缘与蒙皮之间的缝隙（实测缝隙 0.04–0.21u）。
+  // 修正：把贴花每个顶点沿 x 方向压到 BODY 侧向三角形上（(y,z) 平面内重心
+  // 插值求交点，取同格最外表面），再外扩 EPS 防 z-fighting。
+  // 四顶点平面不能只压四个角——弦会切进圆柱面导致贴花中段被蒙皮裁掉，
+  // 所以先按 UV 双线性细分 8×8 再压。尾号 TailNum 是本就贴合的薄壳，跳过。
+  _conformDecals() {
+    const hull = this.get('BODY');
+    if (!hull) return;
+    this.root.updateMatrixWorld(true);
+    const CELL = 0.05;                 // 空间分桶边长（u）
+    const EPS = 0.010;                 // 贴花离蒙皮的法向余量（Hark 合入复核：0.004 时美军绿星徽被蒙皮小凸起刺穿成碎块）
+    const MAX_DROP = 0.35;             // 单个顶点最多向内压多少，超了判为误吸附
+    const keyOf = (ky, kz) => (ky + 1000) * 100000 + (kz + 1000);
+    const buckets = new Map();         // 键 -> [ax,ay,az,bx,by,bz,cx,cy,cz, ...] 侧向面
+    const soft = new Map();            // 同上，肩部面（星徽顶边等贴到蒙皮转角处）
+    const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3();
+    const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), nrm = new THREE.Vector3();
+
+    // 收集三角形（世界系）。法线与 x 轴夹角小于 60° 的才算侧向面——机腹/翼面
+    // 顶面等水平面在 (y,z) 投影里会相互重叠，混进来会吸附到错误的高度。
+    // 60°–78° 的肩部面单独放软桶：只在侧面查不到时兜底（否则整条贴花边悬空）。
+    let triN = 0;
+    hull.traverse((hm) => {
+      if (!hm.isMesh || !hm.geometry) return;
+      const pos = hm.geometry.attributes.position;
+      const idx = hm.geometry.index;
+      const count = idx ? idx.count : pos.count;
+      for (let i = 0; i + 2 < count; i += 3) {
+        const ia = idx ? idx.getX(i) : i;
+        const ib = idx ? idx.getX(i + 1) : i + 1;
+        const ic = idx ? idx.getX(i + 2) : i + 2;
+        A.fromBufferAttribute(pos, ia).applyMatrix4(hm.matrixWorld);
+        B.fromBufferAttribute(pos, ib).applyMatrix4(hm.matrixWorld);
+        C.fromBufferAttribute(pos, ic).applyMatrix4(hm.matrixWorld);
+        e1.subVectors(B, A); e2.subVectors(C, A);
+        nrm.crossVectors(e1, e2);
+        const len = nrm.length();
+        if (len < 1e-9) continue;
+        const ratio = Math.abs(nrm.x) / len;
+        if (ratio < 0.2) continue;
+        const dest = ratio >= 0.5 ? buckets : soft;
+        const y0 = Math.floor(Math.min(A.y, B.y, C.y) / CELL);
+        const y1 = Math.floor(Math.max(A.y, B.y, C.y) / CELL);
+        const z0 = Math.floor(Math.min(A.z, B.z, C.z) / CELL);
+        const z1 = Math.floor(Math.max(A.z, B.z, C.z) / CELL);
+        for (let ky = y0; ky <= y1; ky++) {
+          for (let kz = z0; kz <= z1; kz++) {
+            const k = keyOf(ky, kz);
+            let arr = dest.get(k);
+            if (!arr) dest.set(k, arr = []);
+            arr.push(A.x, A.y, A.z, B.x, B.y, B.z, C.x, C.y, C.z);
+          }
+        }
+        if (dest === buckets) triN++;
+      }
+    });
+    if (!triN) return;
+
+    // 表面 |x|：重心插值命中三角形则返回该点 x，未命中返回 null
+    const hitX = (arr, i, y, z) => {
+      const ay = arr[i + 1], az = arr[i + 2];
+      const by = arr[i + 4], bz = arr[i + 5];
+      const cy = arr[i + 7], cz = arr[i + 8];
+      const det = (by - ay) * (cz - az) - (cy - ay) * (bz - az);
+      if (Math.abs(det) < 1e-12) return null;
+      const w1 = ((y - ay) * (cz - az) - (cy - ay) * (z - az)) / det;
+      const w2 = ((by - ay) * (z - az) - (y - ay) * (bz - az)) / det;
+      const w0 = 1 - w1 - w2;
+      if (w0 < -1e-6 || w1 < -1e-6 || w2 < -1e-6) return null;
+      return w0 * arr[i] + w1 * arr[i + 3] + w2 * arr[i + 6];
+    };
+    // 外层优先：由近及远扩圈，第一个有命中的圈取 |x| 最大者（同格多面取最外蒙皮）
+    const surfaceIn = (map, sign, y, z, cap) => {
+      const ky = Math.floor(y / CELL), kz = Math.floor(z / CELL);
+      for (let r = 0; r <= 3; r++) {
+        let best = 0;
+        for (let dy = -r; dy <= r; dy++) {
+          for (let dz = -r; dz <= r; dz++) {
+            if (r > 0 && Math.abs(dy) !== r && Math.abs(dz) !== r) continue;  // 只扫环
+            const arr = map.get(keyOf(ky + dy, kz + dz));
+            if (!arr) continue;
+            for (let i = 0; i < arr.length; i += 9) {
+              const x = hitX(arr, i, y, z);
+              if (x === null) continue;
+              if (sign * x <= 0.05 || Math.abs(x) > cap) continue;
+              const ax = Math.abs(x);
+              if (ax > best) best = ax;
+            }
+          }
+        }
+        if (best > 0) return best;
+      }
+      return 0;
+    };
+    const surfaceAbs = (sign, y, z, cap) =>
+      surfaceIn(buckets, sign, y, z, cap) || surfaceIn(soft, sign, y, z, cap);
+
+    const P = new THREE.Vector3();
+    const list = this.armyDecals.concat(this.usmcDecals);
+    for (const o of list) {
+      if (!o || !o.isMesh || !o.geometry) continue;
+      if (o.name && o.name.indexOf('TailNum') === 0) continue;
+      // 四顶点平面先细分（含 UV 双线性插值，贴图不会走样）
+      if (o.geometry.attributes.position.count <= 8) this._subdivideDecalQuad(o, 16);
+      const geo = o.geometry;
+      const pos = geo.attributes.position;
+      const inv = o.matrixWorld.clone().invert();
+      let cap = 0;
+      for (let i = 0; i < pos.count; i++) {
+        P.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+        cap = Math.max(cap, Math.abs(P.x));
+      }
+      if (cap <= 0.05) continue;
+      // 逐顶点求表面；查不到或吸附过深（误命中内部结构）的顶点先记 0，稍后补
+      const surf = new Float32Array(pos.count);
+      const py = new Float32Array(pos.count), pz = new Float32Array(pos.count);
+      let hits = 0;
+      for (let i = 0; i < pos.count; i++) {
+        P.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+        py[i] = P.y; pz[i] = P.z;
+        const s = surfaceAbs(P.x >= 0 ? 1 : -1, P.y, P.z, cap);
+        if (s && cap - s <= MAX_DROP) { surf[i] = s; hits++; }
+      }
+      if (!hits) continue;
+      // 少数越过蒙皮边界的顶点（星徽顶边）用最近的已命中顶点补齐——整块放弃会
+      // 让贴花继续悬空，留原值又会撕开网格，就近补齐在视觉上等价于顺势延伸。
+      for (let i = 0; i < pos.count; i++) {
+        if (surf[i]) continue;
+        let best = 0, bestD = Infinity;
+        for (let j = 0; j < pos.count; j++) {
+          if (!surf[j]) continue;
+          const dy = py[i] - py[j], dz = pz[i] - pz[j];
+          const d = dy * dy + dz * dz;
+          if (d < bestD && d > 0) { bestD = d; best = surf[j]; }
+        }
+        surf[i] = best || surf[i];
+      }
+      for (let i = 0; i < pos.count; i++) {
+        P.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+        P.x = (P.x >= 0 ? 1 : -1) * (surf[i] + EPS);
+        P.applyMatrix4(inv);
+        pos.setXYZ(i, P.x, P.y, P.z);
+      }
+      pos.needsUpdate = true;
+      geo.computeVertexNormals();
+      geo.computeBoundingBox();
+      geo.computeBoundingSphere();
+    }
+  }
+
+  // 把四顶点贴花平面重建为 N×N 网格：位置按 (y,z) 双线性、UV 按四角双线性，
+  // 索引绕向沿用原网格 [(00,01,11),(00,11,10)]，材质双面不影响但保持原样。
+  _subdivideDecalQuad(o, N) {
+    const geo = o.geometry;
+    const pos = geo.attributes.position;
+    const uv = geo.attributes.uv;
+    const x0 = pos.getX(0);
+    let y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (let i = 0; i < pos.count; i++) {
+      y0 = Math.min(y0, pos.getY(i)); y1 = Math.max(y1, pos.getY(i));
+      z0 = Math.min(z0, pos.getZ(i)); z1 = Math.max(z1, pos.getZ(i));
+    }
+    // 角点 UV：四个顶点正好落在包围盒四角，按 (fy,fz) 归属
+    const corner = {};
+    for (let i = 0; i < pos.count; i++) {
+      const fy = (y1 - y0) > 1e-6 && (pos.getY(i) - y0) / (y1 - y0) > 0.5 ? 1 : 0;
+      const fz = (z1 - z0) > 1e-6 && (pos.getZ(i) - z0) / (z1 - z0) > 0.5 ? 1 : 0;
+      corner[fy + ',' + fz] = [uv ? uv.getX(i) : 0, uv ? uv.getY(i) : 0];
+    }
+    const c00 = corner['0,0'], c01 = corner['0,1'], c10 = corner['1,0'], c11 = corner['1,1'];
+    if (!c00 || !c01 || !c10 || !c11) return;
+    const P = [], U = [], I = [];
+    for (let i = 0; i <= N; i++) {
+      for (let j = 0; j <= N; j++) {
+        const fy = i / N, fz = j / N;
+        const w00 = (1 - fy) * (1 - fz), w01 = (1 - fy) * fz;
+        const w10 = fy * (1 - fz), w11 = fy * fz;
+        P.push(x0, y0 + (y1 - y0) * fy, z0 + (z1 - z0) * fz);
+        U.push(w00 * c00[0] + w01 * c01[0] + w10 * c10[0] + w11 * c11[0],
+               w00 * c00[1] + w01 * c01[1] + w10 * c10[1] + w11 * c11[1]);
+      }
+    }
+    const row = N + 1;
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        const g00 = i * row + j, g01 = g00 + 1, g10 = g00 + row, g11 = g10 + 1;
+        I.push(g00, g01, g11, g00, g11, g10);
+      }
+    }
+    const ng = new THREE.BufferGeometry();
+    ng.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+    ng.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+    ng.setIndex(I);
+    geo.dispose();
+    o.geometry = ng;
+  }
+
   setArmySkin(t) {
     t.colorSpace = THREE.SRGBColorSpace;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -364,7 +565,11 @@ class Apache {
         if (!mesh) continue;
         if (n.startsWith('Decal_Star')) {
           const cv = subduedFromTexture(mesh.material.map);
-          if (cv) applyDecalTex(mesh, cv);
+          if (cv) {
+            applyDecalTex(mesh, cv);
+            mesh.material.alphaTest = 0.5;   // 底色已透明：只留星和横条，不再是一块灰方牌
+            mesh.material.needsUpdate = true;
+          }
         } else if (n.startsWith('Decal_Text')) {
           applyDecalTex(mesh, makeDecalText(mesh, 'U.S. ARMY'));
         } else {
