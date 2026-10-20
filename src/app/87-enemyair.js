@@ -91,7 +91,14 @@ class EnemyAirModule {
     this.active = false;         // 任务局门控（spawn 置 true）
     this.anchor = { x: 0, z: 42 };   // 巡逻锚（任务锚点；spawn 传入）
     this.hitPending = null;      // 敌机→玩家命中事件（消费后置 null）
-    this.killEvent = null;       // 玩家击落敌机事件（消费后置 null）
+    // opt1（2026-10-20）：killEvent 改为事件队列——同一帧连毁两个时第二个不再被覆盖丢分。
+    // 对外语义不变：读 killEvent = 队首（无则 null）；消费方写 null = 出队一个；写对象 = 入队。
+    this._kq = [];
+    Object.defineProperty(this, 'killEvent', {
+      get() { return this._kq.length ? this._kq[0] : null; },
+      set(v) { if (v == null) this._kq.shift(); else this._kq.push(v); },
+      configurable: true,
+    });
     this.fireEvent = null;       // 敌机开火事件（渲染层曳光；消费后置 null）
     this._res = 1;               // 难度抗打击系数缓存（env 喂入）
     this._env = null;            // 上次 env 引用
@@ -104,7 +111,7 @@ class EnemyAirModule {
     this.active = true;
     this.anchor = { x: anchor ? anchor.x : 0, z: anchor ? anchor.z : 42 };
     this.hitPending = null;
-    this.killEvent = null;
+    this._kq.length = 0;          // 清空击落事件队列
     this.fireEvent = null;
     const r = ENEMYCFG.PATROL_R, h = ENEMYCFG.PATROL_H;
     for (const u of this.units) {
@@ -124,7 +131,7 @@ class EnemyAirModule {
   reset() {
     this.active = false;
     this.hitPending = null;
-    this.killEvent = null;
+    this._kq.length = 0;          // 清空击落事件队列
     this.fireEvent = null;
     for (const u of this.units) { u.on = false; u.phase = 'patrol'; u.pt = 0; u.aimT = 0; }
   }
