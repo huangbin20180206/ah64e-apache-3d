@@ -12,11 +12,9 @@ function fmtMissionTime(t) {
   const m = Math.floor(t / 60), s = Math.floor(t % 60);
   return m + ':' + String(s).padStart(2, '0');
 }
+// opt1：曲线数值只在 90-campaign GRADE_BASE 一处（经宿主槽读取，守拓扑：低编号不直接引用 90）
 function missionRating(elapsed, acc) {
-  if (elapsed < 150 && acc >= 0.5) return 'S';
-  if (elapsed < 240 && acc >= 0.35) return 'A';
-  if (elapsed < 420 && acc >= 0.2) return 'B';
-  return 'C';
+  return HOST.baseGrade ? HOST.baseGrade(elapsed, acc) : 'C';
 }
 // 任务超时（秒）：超过即失败（P6 新增失败路径——此前只有成功无失败）
 const MISSION_TIMEOUT = 360;
@@ -398,18 +396,23 @@ function updateMissionPanel() {
     UI('mission-body').innerHTML += '<div class="mhint">地面已清剿——还需摧毁敌雷达站与防空发射车完成 SEAD 压制</div>';
   }
 }
+// opt1（2026-10-20）：各变体"附加完成条件"唯一来源——结算复核（completeMission）
+// 与主循环判定（_tickMission）共用，新增变体只改这里。地面全歼由调用方另判。
+function variantGoalMet(m) {
+  switch (m.variant) {
+    case 'timed_rescue':                                   // Phase 11 C2：全歼 + 救援送达
+    case 'train_rescue': return !!(rescue && rescue.state === 'delivered');
+    case 'sead_strike': return _seadObjectiveDone();       // Phase 24：雷达 + 防空车已毁
+    case 'air_superiority': return (m._airKills || 0) >= AIRSUP_KILLS;   // C005
+    case 'finale': return m._fin === 4;
+    case 'train_flight': return !!(course && course.done);
+    default: return true;
+  }
+}
 function completeMission() {
   const m = S._mission;
   if (!m || m.frozen) return;                    // 冻结/已结算不重复
-  // Phase 11 C2：限时救援完成条件 = 全歼 AND 至少完成 1 次救援（delivered）
-  if (m.variant === 'timed_rescue' && (!rescue || rescue.state !== 'delivered')) return;
-  // Phase 24：SEAD 变体完成条件 = 全歼 AND 雷达+防空车已摧毁（防御式复核，与 loop 判定一致）
-  if (m.variant === 'sead_strike' && !_seadObjectiveDone()) return;
-  // C005：制空作战完成条件 = 击落数达 AIRSUP_KILLS（防御式复核，与 loop 判定一致）
-  if (m.variant === 'air_superiority' && (m._airKills || 0) < AIRSUP_KILLS) return;
-  if (m.variant === 'finale' && m._fin !== 4) return;
-  if (m.variant === 'train_flight' && !(course && course.done)) return;
-  if (m.variant === 'train_rescue' && (!rescue || rescue.state !== 'delivered')) return;
+  if (!variantGoalMet(m)) return;                // 变体附加目标未达成（与 loop 判定共用同一函数）
   m.done = true; m.phase = 'done'; m.frozen = true;
   radioSay('done');   // E2 无线电
   const el = S.time - m.t0;
@@ -796,7 +799,7 @@ function _tickMission(dt) {
       // （借本 0.5s 节流，不会每帧狂 spawn；且只在未满 6 时续）。
       if (S._mission.variant === 'air_superiority' && S._mission.phase === 'active') {
         const killed = S._mission._airKills || 0;
-        if (killed >= AIRSUP_KILLS) { completeMission(); }
+        if (variantGoalMet(S._mission)) { completeMission(); }
         else if (_airWaveCleared()) { if (enemyAir) enemyAir.spawn(_airSupAnchor()); }
       }
       // P3：首飞/救援训练——完成条件与地面目标无关（全部下场 aliveCount 恒 0）
@@ -804,21 +807,22 @@ function _tickMission(dt) {
       if (S._mission.phase === 'active') _tickLevelThreat();
       if (vv === 'finale') {
         if (S._mission.phase === 'active') _tickFinale();
-        if (S._mission.phase === 'active' && S._mission._fin === 4) completeMission();
+        if (S._mission.phase === 'active' && variantGoalMet(S._mission)) completeMission();
         else if (S._mission.phase === 'active' && (S.time - S._mission.t0) > missionTimeout()) failMission('timeout');
         else if (S._mission.phase === 'active' && targets._heliDmg >= 12) failMission('damage');
       }
       else if (vv === 'train_flight' || vv === 'train_rescue') {
-        if (S._mission.phase === 'active' && (vv === 'train_flight' ? (course && course.done) : (rescue && rescue.state === 'delivered'))) completeMission();
+        if (S._mission.phase === 'active' && variantGoalMet(S._mission)) completeMission();
         else if (S._mission.phase === 'active' && (S.time - S._mission.t0) > missionTimeout()) failMission('timeout');
       }
       else if (targets.aliveCount === 0 && S._mission.variant !== 'air_superiority') {
-        if (S._mission.variant === 'timed_rescue' && (!rescue || rescue.state !== 'delivered')) {
+        if (variantGoalMet(S._mission)) { completeMission(); }
+        else if (S._mission.variant === 'timed_rescue') {
           if (!S._mission._rescueHint) { S._mission._rescueHint = true; toast('目标已全歼——还需完成救援：放绞车救起并送抵停机坪'); }
-        } else if (S._mission.variant === 'sead_strike' && !_seadObjectiveDone()) {
+        } else if (S._mission.variant === 'sead_strike') {
           // Phase 24：地面全歼但雷达/防空车未清 → 不结算，给 SEAD 指引（仿限时救援）
           if (!S._mission._seadHint) { S._mission._seadHint = true; toast('地面已清剿——还需摧毁敌雷达站与防空发射车完成 SEAD'); }
-        } else { completeMission(); }
+        }
       }
       else if (S._mission.phase === 'active' && (S.time - S._mission.t0) > missionTimeout()) { failMission('timeout'); }
       // P8：损伤过重失败——损伤 ≥12（Lv.3 顶格）强制返航，归因可解释（有分级、有恢复=重试）
