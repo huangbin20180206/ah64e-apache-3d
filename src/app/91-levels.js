@@ -80,7 +80,7 @@ const LEVELS = [
       { type: 'truck', x: 29, z: 8, mov: { kind: 'circle', cx: 22, cz: 8, r: 7, w: 0.32, ph: 0 } },
       { type: 'truck', x: 22, z: 15, mov: { kind: 'circle', cx: 22, cz: 8, r: 7, w: 0.32, ph: 2.1 } },
       { type: 'truck', x: 15, z: 8, mov: { kind: 'circle', cx: 22, cz: 8, r: 7, w: 0.32, ph: 4.2 } },
-      { type: 'tank', x: 10, z: 2, mov: { kind: 'line', a: 0.3, half: 5, v: 1.2 } },
+      { type: 'tank', x: 34, z: 3, mov: { kind: 'line', a: 0.3, half: 5, v: 1.2 } },   // game5：原 (10,2) 折返时离停机坪只剩 ~5u，移到幸存者外侧
       { type: 'tank', x: 14, z: 20, mov: { kind: 'line', a: 1.9, half: 4, v: 1.0 } },
       { type: 'barrel', x: 18, z: 15 },
     ] },
