@@ -136,3 +136,9 @@ def test_search_to_patrol_no_teleport():
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))
+
+
+def test_kill_event_queue_keeps_same_frame_double_kill():
+    """opt1：同一帧击落两架都计分（旧单槽会覆盖丢掉一个）。"""
+    out = drive("kill_queue")
+    assert out == {"first": 0, "second": 1, "empty": True, "clearedByReset": True}, out
