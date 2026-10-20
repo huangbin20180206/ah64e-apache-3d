@@ -386,6 +386,9 @@ class TargetRange {
       t.benched = true; t.alive = false; t.group.visible = false;
     }
     this._layout = true;
+    // game5：关卡里不少敌人离停机坪只有 10~25u，旧的 3s 首发冷却让你刚离地就挨打。
+    // 关卡模式给 7s"敌军发现你"的反应时间（只在进入射程后倒计时；旧版 all 模式不走这里）
+    this._aaCool = 7;
     if (this.onHit) this.onHit(null);
   }
 
