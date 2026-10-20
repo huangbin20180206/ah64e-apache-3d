@@ -672,7 +672,7 @@ function startMission(variant, levelIdx, levelId) {
   // replay 标记复位（新轮次重新具备资格）
   const isNewRound = prevPhase === null || prevPhase === 'done' || prevPhase === 'failed';
   if (isNewRound) S._missionRound = (S._missionRound || 0) + 1;   // 新轮次 ID（round 制）
-  S._rescueCut = false;
+  S._rescueCut = false; S._winchCam = false;   // game5：新一轮清绞车镜头标记
   if (HOST.cutsceneState) HOST.cutsceneState.maybe('mission', S._missionRound);
   // 弹药恢复满 + 按变体应用（受限弹药减半、切回标准即满弹）——重试不累积
   applyVariantAmmo();
