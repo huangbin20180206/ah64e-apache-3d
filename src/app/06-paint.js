@@ -54,9 +54,10 @@ const ARMY_OVERRIDE = {
       let g;
       if (lum > 0.60) g = 0.42;        // 白星/白条 → 浅灰（低调但清晰可辨）
       else if (lum > 0.32) g = 0.33;   // 红条 → 中灰
-      else g = 0.235;                  // 绿底/描边 → 暗灰（融入机身）
+      else g = 0;                      // 绿底/描边 → 透明（2026-10-20：旧值暗灰 0.235 在绿机身上是一块灰方牌）
       const v = g * 255;
       d[i] = d[i + 1] = d[i + 2] = v;
+      if (g === 0) d[i + 3] = 0;
     }
     x.putImageData(id, 0, 0);
     return c;
