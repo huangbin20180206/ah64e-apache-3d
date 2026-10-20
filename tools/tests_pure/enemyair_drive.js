@@ -253,6 +253,18 @@ const CASES = {
       bounded: jump < 2.0,             // 有界（无粗暴瞬移）；残差=偏离巡逻圆半径的回位
     };
   },
+  // opt1：killEvent 队列——同帧两次写入都保留，消费方写 null 逐个出队；reset/spawn 清空
+  kill_queue() {
+    const mod = makeEnemyAir({ rng: () => 0.5 });
+    mod.killEvent = { i: 0 }; mod.killEvent = { i: 1 };
+    const first = mod.killEvent && mod.killEvent.i;
+    mod.killEvent = null;
+    const second = mod.killEvent && mod.killEvent.i;
+    mod.killEvent = null;
+    const empty = mod.killEvent === null;
+    mod.killEvent = { i: 2 }; mod.reset();
+    return { first, second, empty, clearedByReset: mod.killEvent === null };
+  },
 };
 
 const name = process.argv[2];
