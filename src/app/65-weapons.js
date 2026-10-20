@@ -445,7 +445,11 @@ class WeaponRig {
     // #6 鼠标容错③：自瞄锥角整体放宽（对空 10→14° / 敌机 25→30° / 地面 45→60°），
     // 十字线离目标更远也能咬住——补偿指针锁定瞄准的抖动与低容错。
     if (this.airTargets && this.airTargets.enabled) {
-      const at = this.airTargets.nearest(from, dir, 14);
+      // 2026-10-20 展示线实测：停在地面时机头不能抬，两架四轴无人机/热气球在机头上方
+      // 约 24°，落在 14° 锥外，机炮永远打不到（用户反馈"有两件打不掉"）。M230 炮塔可上仰，
+      // 地面状态把对空锥放宽到 28°；离地后仍 14°（飞行中玩家能自己对准）。
+      const airCone = a.root.position.y < 2 ? 28 : 14;   // 机体离地 <2u 视为在地面
+      const at = this.airTargets.nearest(from, dir, airCone);
       if (at) { aim = _W_AIM.copy(at.t.pos); aimD = at.d; aimAir = true; }
     }
     // Phase 20-A：A2A 敌机同台竞争软锁（锥角放宽到 30°——敌机更远更大，
