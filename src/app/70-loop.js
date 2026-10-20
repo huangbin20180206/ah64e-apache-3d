@@ -327,7 +327,7 @@ function _frame(dt, doRender) {
       narrative.syncEnabled(!!(targets && targets.enabled));
       narrative.update(dt, S.time, S.env);
       // Phase 21：玩家摧毁基地设施 → 计分（83-arcade radar/sam/ammo 分 + sead 成就）
-      // + 信息流/播报（仿 enemyAir.killEvent 消费，单槽）
+      // + 信息流/播报（仿 enemyAir.killEvent 消费；opt1 起为队列，每帧出队一个）
       if (narrative.killEvent) {
         const k = narrative.killEvent;
         narrative.killEvent = null;
