@@ -27,6 +27,7 @@ const _W_SPREAD = new THREE.Vector3();    // 曳光散布项
 const _W_MZL = new THREE.Vector3();       // 机炮/火箭发射起点（局部→世界）
 const _W_DIR = new THREE.Vector3();       // 机炮方向（机头四元数应用）
 const _W_AIM = new THREE.Vector3();       // 瞄准点（发射时构造）
+const _W_TUR = new THREE.Vector3(), _W_TUR2 = new THREE.Vector3();   // 炮塔射界 scratch
 const _W_TO = new THREE.Vector3();       // 火箭半瞄准修正向量
 const _HF_TO = new THREE.Vector3();       // 地狱火导引目标点（每弹每帧）
 
@@ -425,6 +426,24 @@ class WeaponRig {
 
   // 机炮单发：弹药递减 + 后坐 + 曳光 + 炮口焰
   // M230 为可转向炮塔（±110°方位），演示模式下自动追踪机头锥角内最近靶标
+  // M230 炮塔射界内最近的空中目标（机体坐标系：方位 ±86°，俯仰 -60°..+11°）
+  _turretAir(from) {
+    const root = this.apache.root;
+    let best = null, bestD = 1e9;
+    for (const t of this.airTargets.list) {
+      if (!t.alive || t.off) continue;
+      const v = _W_TUR.copy(t.pos);
+      root.worldToLocal(v);
+      const m = _W_TUR2.copy(this.muzzle);
+      v.sub(m);
+      const h = Math.hypot(v.x, v.z), d = v.length();
+      const el = Math.atan2(v.y, h) * 57.2958, az = Math.atan2(v.x, v.z) * 57.2958;   // 弧度→度
+      if (Math.abs(az) > 86 || el > 11 || el < -60 || d > 150) continue;
+      if (d < bestD) { best = t; bestD = d; }
+    }
+    return best ? { t: best, d: bestD } : null;
+  }
+
   shoot() {
     const a = this.apache;
     if (this.gunAmmo <= 0) return;
@@ -445,11 +464,12 @@ class WeaponRig {
     // #6 鼠标容错③：自瞄锥角整体放宽（对空 10→14° / 敌机 25→30° / 地面 45→60°），
     // 十字线离目标更远也能咬住——补偿指针锁定瞄准的抖动与低容错。
     if (this.airTargets && this.airTargets.enabled) {
-      // 2026-10-20 展示线实测：停在地面时机头不能抬，两架四轴无人机/热气球在机头上方
-      // 约 24°，落在 14° 锥外，机炮永远打不到（用户反馈"有两件打不掉"）。M230 炮塔可上仰，
-      // 地面状态把对空锥放宽到 28°；离地后仍 14°（飞行中玩家能自己对准）。
-      const airCone = a.root.position.y < 2 ? 28 : 14;   // 机体离地 <2u 视为在地面
-      const at = this.airTargets.nearest(from, dir, airCone);
+      // 2026-10-20 展示线：展示模式飞机不能转向/抬头，只靠十字线 14° 锥永远打不到
+      // 机头外的无人机/气球。展示模式改按 M230 炮塔真实射界自动找目标：左右各 86°，
+      // 上仰最多 11°、下俯最多 60°。所以停在地面打不到高处的无人机（真机也打不到），
+      // 起飞悬停后无人机在下方，炮塔下俯即可打。游戏关卡仍是 14° 十字线软锁，不变。
+      const at = (HOST.S && HOST.S.app === 'show')
+        ? this._turretAir(from) : this.airTargets.nearest(from, dir, 14);
       if (at) { aim = _W_AIM.copy(at.t.pos); aimD = at.d; aimAir = true; }
     }
     // Phase 20-A：A2A 敌机同台竞争软锁（锥角放宽到 30°——敌机更远更大，
