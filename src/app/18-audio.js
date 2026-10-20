@@ -557,12 +557,7 @@ class RotorAudio {
   // 一次性噪声源（预接低通滤波器），供短音效使用
   _noiseBurst(seconds, lpFreq) {
     const ctx = this.ctx;
-    const len = Math.max(1, Math.floor(ctx.sampleRate * seconds));
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = this._noiseRnd() * 2 - 1;
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
+    const src = this._noiseSrc(seconds);   // opt1：噪声缓冲生成只留 _noiseSrc 一份（随机序列调用次数不变）
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
     lp.frequency.value = lpFreq;
