@@ -29,13 +29,18 @@
 // 拓扑：90 顶层符号不得被低编号模块引用；70-app 经 HOST.makeCampaign() 取用。
 // ============================================================
 
-// 评级基础曲线（与 70-app missionRating 同式——唯一数值源，两处同步注释）
+// 评级基础曲线——唯一数值源（opt1：70-mission missionRating 经 HOST.baseGrade 读这里，不再抄一份）
 const GRADE_BASE = [
   { t: 150, acc: 0.50, g: 'S' },
   { t: 240, acc: 0.35, g: 'A' },
   { t: 420, acc: 0.20, g: 'B' },
 ];
 const GRADE_ORDER = ['S', 'A', 'B', 'C'];
+// 基础档：旧曲线（越界即落 C）
+function baseGrade(elapsed, acc) {
+  for (const b of GRADE_BASE) if (elapsed < b.t && acc >= b.acc) return b.g;
+  return 'C';
+}
 
 // 评级调整配置（权重可注入：constructor opts.cfg 覆盖）
 const GRADECFG = {
@@ -79,8 +84,7 @@ class CampaignModule {
     const C = this.cfg;
     const elapsed = ctx.elapsed, acc = ctx.acc;
     // 基础档：旧曲线（越界即落 C）
-    let base = 'C';
-    for (const b of GRADE_BASE) if (elapsed < b.t && acc >= b.acc) { base = b.g; break; }
+    const base = baseGrade(elapsed, acc);
     // 调整链（只降不升）
     const drops = [];
     const dmg = ctx.damage || 0;
@@ -212,3 +216,4 @@ class CampaignModule {
 
 // 经 HOST 注册工厂——70-app（低编号）经宿主槽位取用（拓扑同款模式）。
 HOST.makeCampaign = (opts) => new CampaignModule(opts);
+HOST.baseGrade = baseGrade;   // opt1：70-mission missionRating 的唯一来源
