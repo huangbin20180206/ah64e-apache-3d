@@ -1172,6 +1172,7 @@
   "depends": {
    "00-utils.js": [
     "DEG",
+    "PI",
     "TAU",
     "clamp",
     "damp",
@@ -1241,7 +1242,8 @@
     "weather"
    ],
    "70-camera.js": [
-    "saveShot"
+    "saveShot",
+    "setView"
    ],
    "70-combat.js": [
     "_tickDamage",
@@ -2304,7 +2306,7 @@
 ## 70-loop.js
 
 - **提供**: clock, loop
-- **依赖**: 00-utils.js（DEG, TAU, clamp, damp, easeInOut, lerp, smoothstep）；01-host.js（HOST, toast）；05-config.js（RPM_NOMINAL, SPIN_DOWN_SEC, SPIN_UP_SEC, TAIL_RATIO）；45-flight.js（FLY, flyUpdate）；46-fpview.js（keys）；47-betty.js（betty）；70-app.js（S, W, _ctxLost, _kills, air, apache, arcade, audio, composer, disc, discMat, fp, killFeed, music, narrative, nlights, orbit, refl, rescue, rig, samvis, shotPending, targets, washfx, weather）；70-camera.js（saveShot）；70-combat.js（_tickDamage, _tickEnemyAir, _tickResources, _tickSamwar）；70-hud.js（_tickHud, _tickModeChip, _tickPostFx）；70-labels.js（updateLabels）；70-mission.js（_tickMission, _tickMissionMaps）
+- **依赖**: 00-utils.js（DEG, PI, TAU, clamp, damp, easeInOut, lerp, smoothstep）；01-host.js（HOST, toast）；05-config.js（RPM_NOMINAL, SPIN_DOWN_SEC, SPIN_UP_SEC, TAIL_RATIO）；45-flight.js（FLY, flyUpdate）；46-fpview.js（keys）；47-betty.js（betty）；70-app.js（S, W, _ctxLost, _kills, air, apache, arcade, audio, composer, disc, discMat, fp, killFeed, music, narrative, nlights, orbit, refl, rescue, rig, samvis, shotPending, targets, washfx, weather）；70-camera.js（saveShot, setView）；70-combat.js（_tickDamage, _tickEnemyAir, _tickResources, _tickSamwar）；70-hud.js（_tickHud, _tickModeChip, _tickPostFx）；70-labels.js（updateLabels）；70-mission.js（_tickMission, _tickMissionMaps）
 - **调用时机**: 动画循环 loop()：旋翼/雷达/姿态/蹬舵/峡谷碰撞/稳定度派生/救援，然后依次调用 _tickMission → _tickMissionMaps → targets.update → _tickSamwar → _tickDamage → _tickEnemyAir → _tickResources → 其余子系统 update → 渲染 → _tickModeChip → _tickHud → NaN 兜底 → 截图。
 
 ## 70-mission.js
