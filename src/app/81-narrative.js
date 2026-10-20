@@ -313,7 +313,14 @@ class NarrativeFX {
       { key: 'ammo',  group: this._ammoGroup,  hp: 1, hp0: 1, alive: true,
         label: '弹药库',     pos: { x: BC.x - 11, z: BC.z - 2 }, radius: 1.4 },
     ];
-    this.killEvent = null;      // 玩家摧毁设施事件（70-app 消费后置 null）：{key,type,label,x,z}
+    // opt1（2026-10-20）：killEvent 改为事件队列——同一帧连毁两个设施时第二个不再被覆盖丢分。
+    // 对外语义不变：读 killEvent = 队首（无则 null）；消费方写 null = 出队一个；写对象 = 入队。
+    this._kq = [];
+    Object.defineProperty(this, 'killEvent', {
+      get() { return this._kq.length ? this._kq[0] : null; },
+      set(v) { if (v == null) this._kq.shift(); else this._kq.push(v); },
+      configurable: true,
+    });   // 事件：{key,type,label,x,z}
     this._radarStopped = false; // 雷达毁后停转标记
     this._waves = [];           // Phase 21.2：摧毁冲击波环（瞬时件，update 推进到期自毁）
 
@@ -424,7 +431,7 @@ class NarrativeFX {
     });
   }
 
-  // 摧毁：隐藏该组 + 爆炸粒子 + 置 killEvent（单槽，70-app 消费后 null）。
+  // 摧毁：隐藏该组 + 爆炸粒子 + 入 killEvent 队列（70-app 每帧消费一个）。
   // 弹药库殉爆（复用 barrel 语义：置延迟二次爆标记，update 触发）；雷达毁后停转。
   _destroy(s, power = 2) {
     s.alive = false;
@@ -578,7 +585,7 @@ class NarrativeFX {
   resetStrikes() {
     this._ammoBoom = null;
     this._radarStopped = false;
-    this.killEvent = null;
+    this._kq.length = 0;          // 清空摧毁事件队列
     // Phase 21.2：先清瞬时视觉件（辉光先从残骸组摘除并释放材质，再走残骸清理——
     // 残骸遍历只认 isMesh，Sprite 不在内，漏这步会漏释放 SpriteMaterial）
     this._purgeFx();
