@@ -204,23 +204,28 @@ const VARIANT_LABEL = { ifv: 'BMP-2 步战车', apc: 'BTR-80 装甲车', ural: '
 function pickVariant(type, n, pool = TARGET_VARIANTS) { const v = pool[type]; return v ? v[n % v.length] : null; }
 // 目标用哪个壳：变体优先（t.mdl），否则按类型
 function targetModelKey(t) { return t.mdl && TARGET_MODELS[t.mdl] ? t.mdl : t.type; }
-let _targetModelCache = null;
-function loadTargetModels(scene) {
-  if (_targetModelCache) return _targetModelCache;
-  const loader = new THREE.GLTFLoader();
-  const out = {};
-  _targetModelCache = new Promise((resolve) => {
-    let pending = Object.keys(TARGET_MODELS).length;
-    for (const [key, def] of Object.entries(TARGET_MODELS)) {
-      loader.load(def.url, (gltf) => {
-        const m = gltf.scene;
-        m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-        out[key] = m;
-        if (--pending === 0) resolve(out);
-      }, undefined, () => { if (--pending === 0) resolve(out); });
-    }
+// 2026-10-21 资产懒加载：按需逐个下载（旧实现启动时 10 个载具全部并发拉取，
+// 展示线只用到基地停放的几种）。keys 省略 = 全部（兼容旧调用）；同一 url 只下载一次。
+const _tmByUrl = {};
+function _loadTargetModel(key) {
+  const def = TARGET_MODELS[key];
+  if (!def) return Promise.resolve(null);
+  if (!_tmByUrl[def.url]) {
+    _tmByUrl[def.url] = new Promise((res) => new THREE.GLTFLoader().load(def.url, (gltf) => {
+      const m = gltf.scene;
+      m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      res(m);
+    }, undefined, () => res(null)));
+  }
+  return _tmByUrl[def.url];
+}
+function loadTargetModels(scene, keys) {
+  const ks = keys ? [...new Set(keys)].filter(k => TARGET_MODELS[k]) : Object.keys(TARGET_MODELS);
+  return Promise.all(ks.map(_loadTargetModel)).then(ms => {
+    const out = {};
+    ks.forEach((k, i) => { if (ms[i]) out[k] = ms[i]; });
+    return out;
   });
-  return _targetModelCache;
 }
 
 // 用 GLB 替换程序化模型：保留原 group 的位置/朝向，清空子节点换壳

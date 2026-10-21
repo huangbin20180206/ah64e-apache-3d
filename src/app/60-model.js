@@ -570,10 +570,12 @@ class Apache {
             mesh.material.alphaTest = 0.5;   // 底色已透明：只留星和横条，不再是一块灰方牌
             mesh.material.needsUpdate = true;
           }
-        } else if (n.startsWith('Decal_Text')) {
-          applyDecalTex(mesh, makeDecalText(mesh, 'U.S. ARMY'));
         } else {
-          applyDecalTex(mesh, makeDecalText(mesh, '03-05377'));
+          applyDecalTex(mesh, makeDecalText(mesh, n.startsWith('Decal_Text') ? 'U.S. ARMY' : '03-05377'));
+          // 2026-10-21：画布底是透明的，但材质不读透明度 → 字后面显出一块深色底板。
+          // 真机是字直接喷在机身上，这里按透明度裁掉底板，只留字。
+          mesh.material.alphaTest = 0.5;
+          mesh.material.needsUpdate = true;
         }
       }
       this._subduedDone = true;

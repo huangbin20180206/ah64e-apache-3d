@@ -67,7 +67,7 @@ class TargetRange {
     scene.add(this._dmgSmoke);
     this.build();
     // AI 高模渐进替换（GLB 就位后换壳；程序化模型作为加载期兜底）
-    loadTargetModels(this.scene).then(models => {
+    loadTargetModels(this.scene, this.targets.map(targetModelKey)).then(models => {
       for (const t of this.targets) {
         if (models[targetModelKey(t)]) applyModelToTarget(t, models[targetModelKey(t)]);
       }

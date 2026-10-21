@@ -229,7 +229,7 @@ class TownDistrict {
       this.ambush.push(t);
     }
     this._resetAmbush();
-    loadTargetModels(this.scene).then(models => {
+    loadTargetModels(this.scene, this.ambush.map(targetModelKey)).then(models => {
       for (const t of this.ambush) if (models[targetModelKey(t)]) applyModelToTarget(t, models[targetModelKey(t)]);
     });
     // 损伤烟：与 range 同款 sprite（range._tgtSmokes 每帧纯派生，激活时挂入）

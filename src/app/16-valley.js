@@ -185,7 +185,7 @@ class CanyonRun {
       mergeTargetStatics(t);
       this.units.push(t);
     }
-    loadTargetModels(this.scene).then(models => {
+    loadTargetModels(this.scene, this.units.map(targetModelKey)).then(models => {
       for (const t of this.units) if (models[targetModelKey(t)]) applyModelToTarget(t, models[targetModelKey(t)]);
     });
     this._smokes = this.units.map(t => {

@@ -102,17 +102,21 @@ function _rigPropAnim(inst, kind) {
   };
   for (const n of [a, b]) n.traverse(o => { if (o.isMesh) o.onBeforeRender = tick; });
 }
-let _propCache = null;
-function _loadPropModels() {
-  if (_propCache) return _propCache;
+// 2026-10-21 资产懒加载：按 key 用到才下载（旧实现第一次调用就把全部道具/城镇楼
+// GLB 并发拉下来，展示线也会白下城镇的清真寺、商铺等）。返回值仍是 {key: Promise}，
+// 调用方写法不变；同一文件只下载一次（村落 6 栋共用一个 GLB）。
+const _propByUrl = {};
+const _propCache = {};
+function _propPromise(k) {
+  if (_propCache[k]) return _propCache[k];
+  const d = PROP_DEFS[k];
+  if (!d) return (_propCache[k] = Promise.resolve(null));
   const loader = new THREE.GLTFLoader();
-  _propCache = {};
-  const byUrl = {};   // 同一文件只下载一次（村落 6 栋共用一个 GLB）
-  for (const [k, d] of Object.entries(PROP_DEFS)) {
-    _propCache[k] = byUrl[d.url] || (byUrl[d.url] = new Promise((res) => loader.load(d.url, (g) => { if (d.fix) try { d.fix(g.scene); } catch (e) { console.error('[props] fix ' + k + ': ' + e.message); } res(g.scene); }, undefined, () => res(null))));
-  }
-  return _propCache;
+  _propCache[k] = _propByUrl[d.url] || (_propByUrl[d.url] = new Promise((res) => loader.load(d.url, (g) => { if (d.fix) try { d.fix(g.scene); } catch (e) { console.error('[props] fix ' + k + ': ' + e.message); } res(g.scene); }, undefined, () => res(null))));
+  return _propCache[k];
 }
+const _propLazy = new Proxy({}, { get: (_, k) => (typeof k === 'string' ? _propPromise(k) : undefined) });
+function _loadPropModels() { return _propLazy; }
 
 // 椰枣树 v2 原模型两处不合理（polish2 2026-10-19 用户指出）：
 // ① 树干顶 8.2m 高过叶冠中心 ~8.0m，树干尖从叶丛中间戳出来 → 把 7.75m 以上的树干顶点压到 7.75m，
