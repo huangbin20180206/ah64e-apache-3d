@@ -128,7 +128,8 @@ function finish() {
   air.onToast = toast;
   rig.airTargets = air;
   // 打击反馈闭环：音效回调 + 命中标记 + 击杀确认（统一计数+信息流）
-  rig.onSfx = (t, p) => audio.playSfx(t, p);
+  rig.onSfx = (t, p, pos) => audio.playSfx(t, p, pos);
+  audio.ear = () => W.camera.position;   // sfx3 声音距离感的"耳朵"
   // P5-G2 敌方步兵小队（27-infantry）：机炮逐弹检测 + 爆炸波及 + 击毙计分
   infantry = new Infantry(W.scene);
   infantry.range = targets; infantry.fx = rig; infantry.onToast = toast;

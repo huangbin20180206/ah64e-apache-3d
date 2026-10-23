@@ -360,7 +360,7 @@ class WeaponRig {
   }
 
   explosion(x, y, z, tier = 2) {
-    if (this.onSfx) this.onSfx('explo', tier);
+    if (this.onSfx) this.onSfx('explo', tier, { x, y, z });   // sfx3：带位置 → 远处爆炸声音晚到、变闷
     {
       const peak = tier >= 3 ? 260 : tier <= 1 ? 70 : 150;
       const L = this._xl;

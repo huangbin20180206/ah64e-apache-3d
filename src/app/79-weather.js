@@ -7,7 +7,7 @@
 //         单 draw，沿风向量高速漂移）+ 天空橙化（sky shader uSand）+ wind 样本
 //         增益（A1 风声层）+ M3 体积光加成（70-app 按 S.weather 乘 1.8）
 //   storm 夜雷暴：闪电随机调度（2.5~6.5s 间隔，sky shader uLflash 白闪+二次
-//         小闪双脉冲），雷声延迟 0.6~2.2s（audio.playSfx('thunder')，雷距感）
+//         小闪双脉冲），雷声按闪电距离 0.2~1.6km 延迟 0.6~4.7s（sfx3，越远越小越闷）
 // 性能预算（约束 A2）：沙尘=1 个 InstancedMesh（1 draw）、雷暴=0 draw
 //（纯 shader uniform），均不触发生成/销毁（对象池原则，visible 开关）。
 // ============================================================
@@ -118,7 +118,8 @@ class WeatherFX {
       if (this._nextFlash <= 0 && this._flashT <= 0) {
         this._flashT = 0.16;               // 主闪脉冲
         this._flash2 = 0.07;               // 0.07s 后二次小闪
-        this._thunderD = 0.6 + rnd() * 1.6; // 雷声延迟（雷距感）
+        // sfx3 雷距：闪电在 0.2~1.6 公里外 → 雷声按声速晚 0.6~4.7 秒到，越远越小越闷（上一声没响完就不覆盖）
+        if (this._thunderD <= 0) { this._thunderKm = 0.2 + rnd() * 1.4; this._thunderD = this._thunderKm / 0.343; }
         this.flashCount++;
         this._nextFlash = 2.5 + rnd() * 4.0;
       }
@@ -134,7 +135,8 @@ class WeatherFX {
       if (this._thunderD > 0) {
         this._thunderD -= dt;
         if (this._thunderD <= 0) {
-          if (this.audio) this.audio.playSfx('thunder', 0.7 + rnd() * 0.6);
+          if (this.audio && this.audio.playSfxFar) this.audio.playSfxFar('thunder', 1.6, this._thunderKm * 1000);
+          else if (this.audio) this.audio.playSfx('thunder', 0.7 + rnd() * 0.6);
           this._thunderD = 0;
         }
       }

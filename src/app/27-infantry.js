@@ -374,7 +374,7 @@ class Infantry {
     r.g.visible = true;
     if (this.fx) {
       this.fx._puff(sx, sy, sz, { color: 0xd8cfc0, s0: 0.3, s1: 1.4, life: 0.9, base: 0.45, rise: 0.3 });   // 后喷烟
-      if (this.fx.onSfx) this.fx.onSfx('rocket', 1);
+      if (this.fx.onSfx) this.fx.onSfx('rocket', 1, { x: sx, y: sy, z: sz });   // sfx3：敌方火箭弹从远处传来
     }
     if (!this._rpgWarned && this.onToast) { this._rpgWarned = true; this.onToast('⚠ 火箭弹来袭！保持机动，别悬停'); }
   }

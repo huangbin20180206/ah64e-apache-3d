@@ -399,8 +399,43 @@ class RotorAudio {
   // —— 武器/事件一次性音效（机炮/爆炸优先真实录音，其余程序化合成，播完自毁）——
   // type: gun 机炮哒哒 | rocket 火箭啸声 | explo 爆炸轰(power 1/2/3 分级)
   //       hit 命中叮 | hf 地狱火低嘶 | shoot? 由 65-weapons/16-targets 回调触发
-  playSfx(type, power = 1) {
+  // sfx3 声音距离感：传入发声位置 pos（世界坐标，1 单位 = 2.27 米）时，
+  //   ① 按声速 343m/s 推迟（1 公里约晚 2.9 秒：先见火光、后闻爆响）
+  //   ② 150 米外按距离衰减音量（最低 12%）③ 越远高频越少（低通，远处爆炸只剩"闷雷"）
+  //   耳朵 = 当前相机位置（this.ear() 由 70-start 注入）。不传 pos 的（机炮、本机发射、锁定音）照旧
+  playSfx(type, power = 1, pos = null) {
     if (!this.started || !this.ctx || !this.enabled) return;
+    const ear = pos && this.ear ? this.ear() : null;
+    if (ear) {
+      const dm = Math.hypot(pos.x - ear.x, pos.y - ear.y, pos.z - ear.z) * 2.27;
+      const delay = dm / 343;
+      this._lastDist = { dm: Math.round(dm), delay: +delay.toFixed(2) };
+      const go = () => this.playSfxFar(type, power, dm);
+      if (delay > 0.03) setTimeout(go, delay * 1000); else go();
+      return;
+    }
+    this._playSfxNow(type, power);
+  }
+  // 已知距离（米）直接播：远处衰减 + 变闷（雷声由天气按闪电距离调用，延迟它自己算）
+  playSfxFar(type, power, dm) {
+    const vol = dm < 150 ? 1 : Math.max(0.12, Math.pow(150 / dm, 0.7));
+    const lpHz = Math.max(700, Math.min(18000, 18000 * Math.exp(-dm / 700)));
+    this._lastFar = { type, dm: Math.round(dm), vol: +vol.toFixed(2), lpHz: Math.round(lpHz) };
+    this._playSfxAt(type, power, vol, lpHz);
+  }
+  // 临时把 dry/wet 两路换成"衰减+低通"总线，原合成/录音代码不用改
+  _playSfxAt(type, power, vol, lpHz) {
+    if (!this.started || !this.ctx || !this.enabled) return;
+    const ctx = this.ctx, dry0 = this.dry, wet0 = this.wet;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = lpHz;
+    const gd = ctx.createGain(); gd.gain.value = vol;
+    const gw = ctx.createGain(); gw.gain.value = Math.min(1, vol * 1.6);   // 远处混响占比相对更大
+    gd.connect(lp).connect(dry0); gw.connect(wet0);
+    this.dry = gd; this.wet = gw;
+    try { this._playSfxNow(type, power); } finally { this.dry = dry0; this.wet = wet0; }
+    setTimeout(() => { try { gd.disconnect(); gw.disconnect(); lp.disconnect(); } catch (e) { /* 已断开 */ } }, 12000);
+  }
+  _playSfxNow(type, power) {
     const ctx = this.ctx, t = ctx.currentTime;
     try {
       if (type === 'gun' && this._playBuf(['gun1', 'gun2', 'gun3'], 0.5, 0.05, 0)) {
