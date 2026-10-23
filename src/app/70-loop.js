@@ -286,6 +286,7 @@ function _frame(dt, doRender) {
         && !(targets.town && targets.town.active) && !(targets.canyon && targets.canyon.active));
       IE.fire = IE.can && m.phase === 'active';
       IE.rate = cd ? cd.aaRate : 1; IE.dmg = cd ? cd.aaDmg : 1;
+      IE.yaw = FLY.yaw; IE.now = S.time;   // game6：RPG 来袭报钟点方位
       infantry.update(IE);
       // 2026-10-18 战场活物（27-life）：基地摩托与步兵同条件；城镇平民/摩托随城镇关
       if (life) {

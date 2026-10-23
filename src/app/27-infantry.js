@@ -248,6 +248,19 @@ class Infantry {
       const dx = pos.x - p.x, dz = pos.z - p.z;
       if (dx * dx + dz * dz < 0.42 * 0.42) { this._kill(p, pos); return true; }
     }
+    // game6 压制火力：机炮打在身边 1.6u（约 3.6 米）内没打中 → 趴开/跑开 1.2~2 秒，
+    // 这段时间不开火、射击冷却再推迟 2 秒（RPG 兵 3 秒）。真实步兵挨着弹着点不会站着还击，
+    // 玩家也因此多一种打法：先扫一串把人压住，再从容瞄
+    for (const p of this.men) {
+      if (!p.alive || p.st === 'flee') continue;
+      const dx = p.x - pos.x, dz = p.z - pos.z, d = Math.hypot(dx, dz);
+      if (d < 1.6) {
+        p.st = 'flee'; p.flee = rnd(1.2, 2);
+        p.fx = dx / (d || 1); p.fz = dz / (d || 1);
+        p.cd = Math.max(p.cd, 0) + (p.rpg ? 3 : 2);
+        this.suppressed = (this.suppressed || 0) + 1;
+      }
+    }
     return false;
   }
 
@@ -286,6 +299,14 @@ class Infantry {
     }
     if (!this.active) return;
     const dt = env.dt, H = env.heli;
+    // game6 直升机速度（给 RPG 提前量用）：逐帧位置差，平滑一下防抖动
+    if (this._hp && dt > 0) {
+      const hv = this._hv || (this._hv = new THREE.Vector3());
+      const k = Math.min(1, dt * 4);
+      hv.x += ((H.x - this._hp.x) / dt - hv.x) * k; hv.y += ((H.y - this._hp.y) / dt - hv.y) * k; hv.z += ((H.z - this._hp.z) / dt - hv.z) * k;
+      if (hv.lengthSq() > 900) hv.setLength(30);    // 瞬移（重置/传送）不当真
+    }
+    (this._hp || (this._hp = new THREE.Vector3())).copy(H);
     const R = this.range;
     for (const p of this.men) {
       p.t += dt;
@@ -366,8 +387,12 @@ class Infantry {
     if (!r) return;
     const sx = p.x, sy = INF_H * 0.75, sz = p.z;
     r.g.position.set(sx, sy, sz);
-    // 瞄直升机当前位置（不提前量）：直升机一直在动就能躲开
-    r.v.set(H.x - sx, H.y - sy, H.z - sz).normalize().multiplyScalar(24);
+    // 瞄准：新手不打提前量（一直动就躲得开）；game6 起难度越高越会"打提前量"——
+    // 按直升机当前速度预估弹到时的位置，标准约算 35%、老兵约 70%。直线匀速飞会被打中，要变向/变速才躲得开
+    const lead = Math.min(0.7, Math.max(0, ((env.rate || 1) - 0.35) / 1.15 * 0.7));
+    const vh = this._hv || _ifV2.set(0, 0, 0);
+    const tFly = Math.hypot(H.x - sx, H.y - sy, H.z - sz) / 24;
+    r.v.set(H.x + vh.x * tFly * lead - sx, H.y + vh.y * tFly * lead - sy, H.z + vh.z * tFly * lead - sz).normalize().multiplyScalar(24);
     r.t = 0; r.smk = 0; r.dmg = 1.6 * (env.dmg || 1); r.from = { x: sx, y: sy, z: sz };
     _ifV.copy(r.g.position).add(r.v);
     r.g.lookAt(_ifV);
@@ -377,6 +402,13 @@ class Infantry {
       if (this.fx.onSfx) this.fx.onSfx('rocket', 1, { x: sx, y: sy, z: sz });   // sfx3：敌方火箭弹从远处传来
     }
     if (!this._rpgWarned && this.onToast) { this._rpgWarned = true; this.onToast('⚠ 火箭弹来袭！保持机动，别悬停'); }
+    // game6 每次发射都报方位（钟点：12 点=机头正前，3 点=右侧），6 秒内只报一次防刷屏
+    else if (this.onToast && env.yaw != null && (env.now || 0) - (this._rpgCallT || -99) > 6) {
+      this._rpgCallT = env.now || 0;
+      const brg = Math.atan2(sx - H.x, sz - H.z) - env.yaw;           // 发射点相对机头的方位（左为正）
+      let clk = Math.round(-brg / (TAU / 12)) % 12; if (clk <= 0) clk += 12;
+      this.onToast('⚠ 火箭弹！' + clk + ' 点方向');
+    }
   }
 
   _updateProjectiles(dt, H, env) {
