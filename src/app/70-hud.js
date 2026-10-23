@@ -182,7 +182,7 @@ function _tickHud(dt, s, rpm) {
       }
     }
     UI('hud-draw').textContent = String(composer.drawCalls || 0);
-    UI('hud-alt').textContent = (FLY.alt * 2).toFixed(0);   // 1u ≈ 2m
+    UI('hud-alt').textContent = (FLY.alt * 2.27).toFixed(0);   // 1u = 2.27m（phys2 统一比例）
     // P8：威胁 HUD（节流随 0.5s 刷新块）——等级文字 + 最近受击闪红
     if (targets) {
       const t = targets._threat || 0;

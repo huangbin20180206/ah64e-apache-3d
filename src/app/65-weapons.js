@@ -194,7 +194,8 @@ class WeaponRig {
     this.frags = [];
     const frGeo = new THREE.BoxGeometry(0.14, 0.10, 0.18);
     const frMat = new THREE.MeshStandardMaterial({ color: 0x2b2620, roughness: 0.9 });
-    for (let i = 0; i < 14; i++) {
+    // phys2：真实重力下碎块滞空更久（4~16 米/秒抛出要 1~3 秒才落地），寿命加长 → 池 14→24 防连发火箭时抢光
+    for (let i = 0; i < 24; i++) {
       const m = new THREE.Mesh(frGeo, frMat);
       m.visible = false;
       this.scene.add(m);
@@ -405,8 +406,8 @@ class WeaponRig {
       const a = rnd(TAU);
       f.v.set(Math.cos(a) * rnd(2, 7), rnd(2.5, 6.5), Math.sin(a) * rnd(2, 7));
       f.w.set(rnd(-12, 12), rnd(-12, 12), rnd(-12, 12));
-      f.t = 0;
-      f.life = rnd(1.6, 2.4);
+      f.t = 0; f.rest = false;
+      f.life = rnd(3.2, 4.0);   // phys2：旧 1.6~2.4 秒，真实重力下会在半空缩没
       n--;
     }
   }
@@ -983,10 +984,17 @@ class WeaponRig {
       if (!f.m.visible) continue;
       f.t += dt;
       if (f.t >= f.life) { f.m.visible = false; continue; }
-      if (f.m.position.y > 0.06) {
+      if (!f.rest) {
         f.v.y -= G_U * dt;   // phys1 统一真实重力
         f.m.position.addScaledVector(f.v, dt);
-        if (f.m.position.y <= 0.05) { f.m.position.y = 0.05; f.v.set(0, 0, 0); f.w.multiplyScalar(0.1); }
+        // phys2 落地：按实际地面高度（沙丘/峡谷不再悬空或埋进地里）；
+        //   砸地快的弹一下（保留 25% 竖直速度、水平摩擦掉一半、翻滚减慢），慢了就停住
+        const gy = this._groundH(f.m.position.x, f.m.position.z) + 0.05;
+        if (f.m.position.y <= gy) {
+          f.m.position.y = gy;
+          if (f.v.y < -1.6) { f.v.y *= -0.25; f.v.x *= 0.5; f.v.z *= 0.5; f.w.multiplyScalar(0.5); }
+          else { f.v.set(0, 0, 0); f.w.multiplyScalar(0.1); f.rest = true; }
+        }
       }
       f.m.rotation.x += f.w.x * dt;
       f.m.rotation.y += f.w.y * dt;

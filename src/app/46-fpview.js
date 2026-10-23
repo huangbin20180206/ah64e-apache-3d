@@ -397,10 +397,22 @@ class FPView {
     // 前向速度：W/S；俯冲加速：机头下俯 + W 推杆 → 重力势能转化（最高 ~1.9×）
     const spdT = (k['w'] ? this.SPD_MAX : k['s'] ? -this.SPD_REV : 0) * _pen.speedMul;
     const diveK = k['w'] ? clamp(FLY.pitch, 0, 0.9) : 0;
-    this.spd += (spdT * (1 + diveK * 0.9) - this.spd) * Math.min(1, dt * 1.6);
+    // phys2 惯性：加速时间常数 0.6→1.0 秒，松杆减速更慢（1.4 秒，机体有冲劲往前滑），不再"一松就停"
+    const _spd0 = this.spd, _vs0 = this.vSide;
+    const _spdTT = spdT * (1 + diveK * 0.9);
+    const _slow = Math.abs(_spdTT) < Math.abs(this.spd);
+    this.spd += (_spdTT - this.spd) * Math.min(1, dt * (_slow ? 0.7 : 1.0));
     // 侧飞速度：Z 左 / X 右（悬停侧飞，速度为前向的 60%——侧飞比前飞慢）
     const sT = (k['x'] ? 1 : 0) - (k['z'] ? 1 : 0);
-    this.vSide += (sT * this.SPD_MAX * 0.6 * _pen.speedMul - this.vSide) * Math.min(1, dt * 2.2);
+    this.vSide += (sT * this.SPD_MAX * 0.6 * _pen.speedMul - this.vSide) * Math.min(1, dt * 1.5);
+    // phys2 姿态跟加速度：真直升机靠倾斜旋翼盘加速——向前加速低头、刹车抬头（"拉头减速"），
+    // 侧向加速往那边压坡度。最多约 7°，写进与环绕模式同一组"倾斜"槽（70-loop 叠加到机体姿态）
+    if (HOST.S && dt > 0) {
+      const aF = (this.spd - _spd0) / dt, aS = (this.vSide - _vs0) / dt;
+      const S_ = HOST.S, kL = Math.min(1, dt * 4);
+      S_._leanP = (S_._leanP || 0) + (clamp(aF * 0.012, -0.12, 0.12) - (S_._leanP || 0)) * kL;
+      S_._leanR = (S_._leanR || 0) + (clamp(-aS * 0.012, -0.12, 0.12) - (S_._leanR || 0)) * kL;
+    }
 
     // 机体缓追视线（指数趋近，手感稳）；侧倾跟转向输入+侧飞输入，压坡度感
     const kk = Math.min(1, dt * 7);
@@ -408,7 +420,9 @@ class FPView {
     // 俯仰极限：下俯扩到 -49°（俯冲攻击机动），上仰 +0.35 保持
     // 2026-10-14：下俯极限 0.85→1.0（≈57°），便于俯冲对地攻击
     FLY.pitch += (clamp(this.vPitch * 0.55, -0.6, 1.0) - FLY.pitch) * kk;
-    FLY.roll += (clamp(-yawRate * 0.22 - this.vSide * 0.03, -0.35, 0.22) - FLY.roll) * kk;
+    // phys2 协调转弯：悬停原地蹬舵几乎不压坡度，速度越快转弯坡度越大（真机转弯靠压坡度）
+    const _bankK = 0.06 + 0.16 * Math.min(1, Math.abs(this.spd) / this.SPD_MAX);
+    FLY.roll += (clamp(-yawRate * _bankK - this.vSide * 0.03, -0.35, 0.22) - FLY.roll) * kk;
 
     // 位移：机体前向 × 前向速度 + 右向 × 侧飞速度 + 垂直（写入 FLY.x/z——
     // loop 每帧用它们重建 root.position，直接写 root.position 会被下一帧的
@@ -451,8 +465,8 @@ class FPView {
     this._hudT = (this._hudT || 0) + dt;
     if (this._hudT > 0.15) {
       this._hudT = 0;
-      UI('fp-spd').textContent = (this.spd * 2 * 3.6).toFixed(0);
-      UI('fp-alt').textContent = (FLY.alt * 2).toFixed(0);
+      UI('fp-spd').textContent = (this.spd * 2.27 * 3.6).toFixed(0);   // phys2：1 单位 = 2.27 米（旧按 2 米，读数偏小 12%）
+      UI('fp-alt').textContent = (FLY.alt * 2.27).toFixed(0);
       UI('fp-hdg').textContent = (((FLY.yaw * 180 / Math.PI) % 360 + 360) % 360).toFixed(0).padStart(3, '0');
       // P7：稳定度读数（由 70-app loop 派生写入 S._stability；悬停=100%，机动中下降）
       const stab = (HOST.S && HOST.S._stability != null) ? Math.round(HOST.S._stability * 100) : 100;
