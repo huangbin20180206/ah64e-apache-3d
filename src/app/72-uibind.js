@@ -120,6 +120,14 @@ function bindUI() {
   const toggleFly = () => {
     if (FLY.state === 'ground') {
       if (!S.running || S.spin < FLY.MIN_SPIN) {
+        // 第二轮 A（2026-10-23）：游戏关卡里按 T 不用先记"先空格"——旋翼没开就顺手启动，
+        // 转速到 92% 由 70-loop 自动起飞（S._autoTO）。展示/旧全功能模式保持原提示。
+        if (appState.mode === 'play' && S.mode === 'mission') {
+          if (!S.running) setRun(true);
+          S._autoTO = true;
+          toast('旋翼启动中——转速够了自动起飞');
+          return;
+        }
         toast('旋翼转速不足，先启动并等待转速达到 92% 以上');
         return;
       }

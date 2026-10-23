@@ -676,7 +676,8 @@ function startMission(variant, levelIdx, levelId) {
   const isNewRound = prevPhase === null || prevPhase === 'done' || prevPhase === 'failed';
   if (isNewRound) S._missionRound = (S._missionRound || 0) + 1;   // 新轮次 ID（round 制）
   S._rescueCut = false; S._winchCam = false;   // game5：新一轮清绞车镜头标记
-  if (HOST.cutsceneState) HOST.cutsceneState.maybe('mission', S._missionRound);
+  // 第二轮 A：训练关（train_*）没有敌方基地，不播"接近敌方基地后锁定开火"的基地过场——新手直接上手
+  if (HOST.cutsceneState && !_isTrainVariant()) HOST.cutsceneState.maybe('mission', S._missionRound);
   // 弹药恢复满 + 按变体应用（受限弹药减半、切回标准即满弹）——重试不累积
   applyVariantAmmo();
   // Phase 20-A：A2A 敌机编队进场——巡逻锚=敌方基地方位（靶场基地外延环）。
@@ -737,12 +738,14 @@ function retryMission() {
 
 // ---------- 帧逻辑（70-loop.js loop() 在 if (apache) 段内调用） ----------
 // 任务过场重试 / 接近基地触发 / 面板刷新与胜负判定 / 训练步骤推进
+function _isTrainVariant() { return !!(S._mission && /^train_/.test(S._mission.variant || '')); }
+
 function _tickMission(dt) {
   // 最终闭环修复（mission cutscene owner 冲突闭环）：startMission 时若
   // cinematic 等序列持有 HOST.camSeq，maybe('mission', round) 被拒并保留
   // pendingRound——此处每帧重试，owner 释放后自动取得并播放；幂等（已播
   // 返回 true 零副作用）。同轮最多播一次，retry 新轮重新具备资格。
-  if (S._mission && S._missionRound && HOST.cutsceneState) {
+  if (S._mission && S._missionRound && HOST.cutsceneState && !_isTrainVariant()) {
     HOST.cutsceneState.maybe('mission', S._missionRound);
   }
   // 接近敌方基地的叙事节点（寻找→锁定→攻击→摧毁）：接近到 30u 内

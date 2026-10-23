@@ -20,7 +20,7 @@ const _coachTouch = (typeof matchMedia === 'function') && matchMedia('(pointer:c
 const _CK = _coachTouch
   ? { start: '「启旋」', fly: '「起降」', gun: '按住「机炮」', rk: '按住「火箭」', hf: '「地狱火」', hoist: '「绞车」',
       move: '左摇杆', yaw: '右摇杆左右' }
-  : { start: '空格', fly: 'T', gun: '按住 G（或鼠标左键）', rk: '按住 X', hf: 'F', hoist: 'K',
+  : { start: '空格', fly: 'T', gun: '按住 G', rk: '按住 X', hf: 'F', hoist: 'K',
       move: '方向键', yaw: 'A/D' };
 
 function _coachAlive(type) {
@@ -38,18 +38,20 @@ function levelCoachTip() {
   if (!train) {
     // Q2：作战关（2-1 起）只给通用操作速查，替换展示模式的「切场地与环境」说法
     if (!S._mission.levelId) return '';
-    if (FLY.state === 'ground' && !S.running) return '按 ' + K.start + ' 启动旋翼';
-    if (FLY.state === 'ground' && S.spin < FLY.MIN_SPIN) return '旋翼加速中…转速 92% 后按 ' + K.fly + ' 起飞';
+    if (FLY.state === 'ground' && S._autoTO) return '旋翼加速中…转速够了自动起飞';
+    if (FLY.state === 'ground' && !S.running) return '按 ' + K.fly + ' 起飞（旋翼会自动启动）';
+    if (FLY.state === 'ground' && S.spin < FLY.MIN_SPIN) return '旋翼加速中…按 ' + K.fly + ' 转速够了自动起飞';
     if (FLY.state === 'ground') return '按 ' + K.fly + ' 起飞';
     if (FLY.state !== 'hover') return '';
     const chaff = (v === 'sead_strike' || v === 'finale' || v === 'canyon_run') ? (_coachTouch ? ' ·「干扰弹」躲导弹' : ' · J 干扰弹') : '';
     return _coachTouch
       ? '按住「机炮」「火箭」开火 ·「地狱火」打坦克' + chaff
-      : 'G/左键 机炮 · X 火箭 · F 地狱火' + chaff + ' · C 第一人称 · ' + K.fly + ' 降落';
+      : ((fp && fp.active) ? '左键/G 机炮 · 右键/X 火箭' : 'G 机炮 · X 火箭') + ' · F 地狱火' + chaff + ' · C 第一人称 · ' + K.fly + ' 降落';
   }
   // 共用起步两步：启动旋翼 → 起飞
   if (FLY.state === 'ground' && !S.running) return '第 1 步：按 ' + K.start + ' 启动旋翼';
-  if (FLY.state === 'ground' && S.spin < FLY.MIN_SPIN) return '旋翼加速中…等转速到 92%';
+  if (FLY.state === 'ground' && S._autoTO) return '旋翼加速中…转速够了自动起飞';
+  if (FLY.state === 'ground' && S.spin < FLY.MIN_SPIN) return '旋翼加速中…等转速到 92%（也可以直接按 ' + K.fly + '，到了自动起飞）';
   const onGround = FLY.state === 'ground';
 
   if (v === 'train_flight') {

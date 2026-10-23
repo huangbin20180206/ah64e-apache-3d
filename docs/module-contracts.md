@@ -1260,7 +1260,12 @@
    "70-hud.js": [
     "_tickHud",
     "_tickModeChip",
-    "_tickPostFx"
+    "_tickPostFx",
+    "syncFlyText"
+   ],
+   "70-killcam.js": [
+    "KC",
+    "killcamUpdate"
    ],
    "70-labels.js": [
     "updateLabels"
@@ -1271,10 +1276,6 @@
    ],
    "70-nightops.js": [
     "_tickNightOps"
-   ],
-   "70-killcam.js": [
-    "KC",
-    "killcamUpdate"
    ],
    "70-radio.js": [
     "radioTick"
@@ -1687,6 +1688,9 @@
     "washfx",
     "weather"
    ],
+   "70-appmode.js": [
+    "appState"
+   ],
    "70-camera.js": [
     "setView"
    ],
@@ -1740,8 +1744,20 @@
    "70-app.js": [
     "S",
     "course",
+    "fp",
     "rescue",
     "targets"
+   ]
+  }
+ },
+ "73-keycard.js": {
+  "provides": [
+   "keycardGoal",
+   "showKeycard"
+  ],
+  "depends": {
+   "01-host.js": [
+    "HOST"
    ]
   }
  },

@@ -53,7 +53,7 @@ const S = {
   time: 0, view: 0,
   _fa: 0, _ft: 0, _rpmShown: -1,
   _slow: 0, _qManual: false, _qAuto: false, _qCool: 0, _qAutoOff: false,   // 自动降档：连续低帧计数 / 手动选档 / 已自动降档 / 冷却倒计时 / 用户停用
-  _alt: 0, _ga: -1, _ha: -1, _rk: -1, _fs: '', _guide: 0,   // 首访引导步骤（0=关）
+  _alt: 0, _ga: -1, _ha: -1, _rk: -1, _fs: '', _guide: 0, _autoTO: false,   // 首访引导步骤（0=关）
   _slowmo: 0, _flash: 0, _shake: 0,   // 电影镜头包 S3：击毁慢动作计时/白闪/震屏
   _train: 0, _trainFp: false, _trainOrbit: false, _trainRescue: false, _trainGun0: 0,
   // Phase 11 训练引导步骤（1..5，0=关）：与首访引导 S._guide 同属 S 状态源但互不混用

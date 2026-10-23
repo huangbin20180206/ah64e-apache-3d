@@ -100,6 +100,7 @@ function startLevel(id) {
   startMission(L.variant, null, id);
   syncPlayActions();
   toast(L.id + ' ' + L.name + '——按 T 起飞出发');
+  if (HOST.showKeycard) HOST.showKeycard(id);   // 第二轮 A：第一次进关卡弹按键图 + 一句话目标（73-keycard）
   try { history.replaceState(null, '', location.pathname + location.search + '#play/' + id); } catch (e) {}
   return true;
 }

@@ -72,6 +72,15 @@ function _frame(dt, doRender) {
   if (S._slowmo > 0 && KC.allow) dt *= 0.25;
   S.time += dt;
 
+  // 第二轮 A：游戏关卡按 T 排队起飞——转速到位自动离地；关旋翼/已离地即取消
+  if (S._autoTO) {
+    if (FLY.state !== 'ground' || !S.running) S._autoTO = false;
+    else if (S.spin >= FLY.MIN_SPIN) {
+      S._autoTO = false;
+      FLY.state = 'up';
+      syncFlyText();
+    }
+  }
   // 转速：启停各按自己的时间常数线性趋近
   const target = S.running ? 1 : 0;
   const rate = S.running ? 1 / SPIN_UP_SEC : 1 / SPIN_DOWN_SEC;
