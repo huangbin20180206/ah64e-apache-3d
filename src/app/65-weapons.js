@@ -255,7 +255,7 @@ class WeaponRig {
       t.dir.copy(dir)
         .add(_W_SPREAD.set((rnd() - 0.5) * sp, (rnd() - 0.5) * sp, 0))
         .normalize();
-      t.vel = 260;
+      t.vel = 355;   // phys1：M230 炮口初速 805m/s ≈ 355u/s（旧 260 偏慢）；射程 213u
       // 【射程修正（2026-09-15，用户反馈"空中飞行目标永远打不到"）】
       // 旧值 vel=95 / life=0.55 ⇒ 射程硬上限 ≈52u，曳光到点即消失——
       // 实测（精确瞄准、3s 连发）：30u 与 45u 稳定击落；60u 与 75u **0 命中**。
@@ -732,57 +732,61 @@ class WeaponRig {
       r.life -= dt;
       if (r.life <= 0) { r.g.visible = false; continue; }
       if (r.vel < ROCKET.VMAX) r.vel += ROCKET.ACC * dt;
-      // 无控弹道的轻微重力下坠
-      r.dir.y -= 0.06 * dt;
+      // phys1 无控弹道重力下坠：航向每秒下压 g·cosθ/v 弧度（越快越平直，同真实弹道）
+      r.dir.y -= G_U * Math.sqrt(Math.max(0, 1 - r.dir.y * r.dir.y)) / Math.max(1, r.vel) * dt;
       r.dir.normalize();
-      r.g.position.addScaledVector(r.dir, r.vel * dt);
+      // phys1 分段推进：提速后单帧位移可达 ~2.7u，按 ≤1.5u 小步走并逐步判定，防止穿过目标
+      const _rkLen = r.vel * dt, _rkN = Math.max(1, Math.ceil(_rkLen / 1.5));
+      let _rkHit = false;
+      for (let _k = 0; _k < _rkN && !_rkHit; _k++) {
+      r.g.position.addScaledVector(r.dir, _rkLen / _rkN);
       // 命中检测：火箭威力中（卡车/油桶一发，装甲车两发）
       if (this.targets && this.targets.hitTest(r.g.position, 2)) {
         this.explosion(r.g.position.x, Math.max(0.4, r.g.position.y), r.g.position.z, 2);
-        r.g.visible = false;
-        continue;
+        r.g.visible = false; _rkHit = true; break;
       }
       // 空中目标掠过命中（无控弹道碰上气球/靶机也算）
       if (this.airTargets && this.airTargets.enabled && this.airTargets.hitTest(r.g.position, 2)) {
         this._puff(r.g.position.x, r.g.position.y, r.g.position.z,
           { color: 0xffe9a8, s0: 0.2, s1: 0.8, life: 0.2, base: 0.9, add: true });
-        r.g.visible = false;
-        continue;
+        r.g.visible = false; _rkHit = true; break;
       }
       // Phase 20-A：敌机掠过命中（无控火箭碰上也算——威力 2 足以重创）
       if (this.enemyAir && this.enemyAir.enabled && this.enemyAir.hitTest(r.g.position, 2)) {
         this._puff(r.g.position.x, r.g.position.y, r.g.position.z,
           { color: 0xffe9a8, s0: 0.25, s1: 0.9, life: 0.22, base: 0.9, add: true });
-        r.g.visible = false;
-        continue;
+        r.g.visible = false; _rkHit = true; break;
       }
       // Phase 21：基地设施命中（雷达/防空车/弹药库；hitTest 内按 radius 限域，只在基地扇区生效）
       if (this.narrative && this.narrative.enabled && this.narrative.hitTest(r.g.position, 2)) {
         this._puff(r.g.position.x, r.g.position.y, r.g.position.z,
           { color: 0xffe9a8, s0: 0.25, s1: 0.9, life: 0.22, base: 0.9, add: true });
-        r.g.visible = false;
-        continue;
+        r.g.visible = false; _rkHit = true; break;
       }
       // 触地：扬起尘土后消失（不用等到 life 耗尽）
       if (r.g.position.y <= 0.03) {
         const p = r.g.position;
         this._puff(p.x, 0.05, p.z, { color: 0x9a8f7c, s0: 0.3, s1: 1.7, life: 0.8, base: 0.55, rise: 0.6 });
         this._puff(p.x, 0.05, p.z, { color: 0xc9b896, s0: 0.15, s1: 0.6, life: 0.4, base: 0.5, rise: 0.8 });
-        r.g.visible = false;
-        continue;
+        r.g.visible = false; _rkHit = true; break;
       }
+      }
+      if (_rkHit) continue;
       r.g.quaternion.setFromUnitVectors(HF_FWD, r.dir);
       // 自旋（Hydra 出巢后高速旋转稳定）
       r.spin += dt * 30;
       r.g.rotateZ(r.spin);
       // 尾烟：白灰烟 + 火焰核心
-      r.smoke -= dt;
-      if (r.smoke <= 0) {
-        r.smoke = 0.024;
-        const p = r.g.position;
-        this._puff(p.x, p.y, p.z, { color: 0xd8dde0, s0: 0.06, s1: 0.55, life: 0.55, base: 0.38 });
-        this._puff(p.x, p.y, p.z, { color: 0xffb15a, s0: 0.06, s1: 0.2, life: 0.12, base: 0.8, add: true });
+      // phys1：按飞行距离吐烟——每 1.4u 一团，一帧最多 3 团沿弹道往回补（提速后尾烟不断成虚线）
+      r.smoke -= r.vel * dt;
+      for (let _s = 0; r.smoke <= 0 && _s < 3; _s++) {
+        const back = -r.smoke, p = r.g.position;
+        r.smoke += 1.4;
+        const px = p.x - r.dir.x * back, py = p.y - r.dir.y * back, pz = p.z - r.dir.z * back;
+        this._puff(px, py, pz, { color: 0xd8dde0, s0: 0.06, s1: 0.55, life: 0.55, base: 0.38 });
+        if (_s === 0) this._puff(p.x, p.y, p.z, { color: 0xffb15a, s0: 0.06, s1: 0.2, life: 0.12, base: 0.8, add: true });
       }
+      if (r.smoke < 0) r.smoke = 0;
     }
 
     // ---- 炮管后坐恢复 ----
@@ -912,18 +916,21 @@ class WeaponRig {
         const p = f.tgt.pos;
         const to = (f.air ? _HF_TO.set(p.x, p.y, p.z)
                           : _HF_TO.set(p.x, 0.9, p.z)).sub(f.g.position).normalize();
-        f.dir.lerp(to, Math.min(1, dt * 2.4)).normalize();
+        f.dir.lerp(to, Math.min(1, dt * 4.5)).normalize();   // phys1：弹速提高后导引加快，转弯半径不变大
       }
-      f.v += (34 - f.v) * dt * 1.7;            // 加速到巡航
-      f.g.position.addScaledVector(f.dir, f.v * dt);
-      // 弹体朝向逐帧对齐飞行方向（比例导引会让 dir 转向，弹体外观必须跟随）
-      f.g.quaternion.setFromUnitVectors(HF_FWD, f.dir);
+      // phys1：AGM-114 实弹约 425m/s（1.3 倍音速）≈187u/s；取 150u/s（约 340m/s），
+      // 离轨后约 1 秒加到巡航。旧值 34u/s（77m/s）像慢悠悠的无人机
+      f.v += (150 - f.v) * dt * 2.6;
+      const _hfLen = f.v * dt, _hfN = Math.max(1, Math.ceil(_hfLen / 1.5));
+      let _hfHit = false;
+      for (let _k = 0; _k < _hfN && !_hfHit; _k++) {
+      f.g.position.addScaledVector(f.dir, _hfLen / _hfN);
       // 命中检测：地狱火威力大（一发毁任何地面靶标）
       if (this.targets && this.targets.hitTest(f.g.position, 3)) {
         this.explosion(f.g.position.x, f.g.position.y, f.g.position.z, 3);
         this.scene.remove(f.g);
         this.flying.splice(i, 1);
-        continue;
+        _hfHit = true; break;
       }
       // 空中目标掠过命中（大威力对气球/靶机同样是毁灭性的一击）。
       // 余量 0.6：弹速 34u/s，逐帧步进 ~0.55u，零余量会在两帧间穿过小目标。
@@ -931,7 +938,7 @@ class WeaponRig {
         this.explosion(f.g.position.x, f.g.position.y, f.g.position.z, 3);
         this.scene.remove(f.g);
         this.flying.splice(i, 1);
-        continue;
+        _hfHit = true; break;
       }
       // Phase 20-A：敌机命中（地狱火 3 伤——标准 3 发击落；比例导引对规避
       // 机动敌机同样有效——导引转向率 0.95 远高于敌机机动率）
@@ -939,7 +946,7 @@ class WeaponRig {
         this.explosion(f.g.position.x, f.g.position.y, f.g.position.z, 3);
         this.scene.remove(f.g);
         this.flying.splice(i, 1);
-        continue;
+        _hfHit = true; break;
       }
       // Phase 21：基地设施命中（地狱火 3 伤——雷达/弹药库一发毁、防空车一发毁；
       // hitTest 内按 radius 限域，只在基地扇区生效）
@@ -947,9 +954,13 @@ class WeaponRig {
         this.explosion(f.g.position.x, f.g.position.y, f.g.position.z, 3);
         this.scene.remove(f.g);
         this.flying.splice(i, 1);
-        continue;
+        _hfHit = true; break;
       }
-      f.smoke -= dt;
+      }
+      if (_hfHit) continue;
+      // 弹体朝向逐帧对齐飞行方向（比例导引会让 dir 转向，弹体外观必须跟随）
+      f.g.quaternion.setFromUnitVectors(HF_FWD, f.dir);
+      f.smoke -= dt * Math.max(1, f.v / 34);   // phys1：按飞行距离吐烟
       if (f.smoke <= 0 && f.t < 2.6) {
         f.smoke = 0.028;
         const r = f.g.position;
@@ -973,7 +984,7 @@ class WeaponRig {
       f.t += dt;
       if (f.t >= f.life) { f.m.visible = false; continue; }
       if (f.m.position.y > 0.06) {
-        f.v.y -= 9.8 * 0.6 * dt;
+        f.v.y -= G_U * dt;   // phys1 统一真实重力
         f.m.position.addScaledVector(f.v, dt);
         if (f.m.position.y <= 0.05) { f.m.position.y = 0.05; f.v.set(0, 0, 0); f.w.multiplyScalar(0.1); }
       }

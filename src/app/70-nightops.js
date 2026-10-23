@@ -125,7 +125,7 @@ function _tickNightOps(dt) {
   if (!F || !F.on) return;
   F.t += dt;
   if (F.ph === 'up') {
-    F.v.y -= 9.8 * dt;
+    F.v.y -= G_U * dt;   // phys1：旧值 9.8 是按"米"算的，本项目 1 单位=2.27 米 → 重了 2.3 倍
     F.v.x *= 1 - dt * 0.6; F.v.z *= 1 - dt * 0.6;
     F.p.addScaledVector(F.v, dt);
     F.smk -= dt;

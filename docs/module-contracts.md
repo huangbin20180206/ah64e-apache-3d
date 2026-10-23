@@ -78,7 +78,8 @@
    "WATER_Y",
    "WIND",
    "qualityPreset",
-   "windVec"
+   "windVec",
+   "G_U"
   ],
   "depends": {
    "00-utils.js": [
@@ -469,7 +470,8 @@
     "tex"
    ],
    "05-config.js": [
-    "WATER_Y"
+    "WATER_Y",
+    "G_U"
    ]
   }
  },
@@ -506,6 +508,9 @@
    "16-targetmodels.js": [
     "addBox",
     "mergeTargetStatics"
+   ],
+   "05-config.js": [
+    "G_U"
    ]
   }
  },
@@ -865,7 +870,8 @@
    ],
    "05-config.js": [
     "GUN",
-    "ROCKET"
+    "ROCKET",
+    "G_U"
    ],
    "15-terrain.js": [
     "duneFarH"
@@ -1398,6 +1404,9 @@
     "narrative",
     "rig",
     "targets"
+   ],
+   "05-config.js": [
+    "G_U"
    ]
   }
  },
@@ -2050,6 +2059,9 @@
    ],
    "01-host.js": [
     "HOST"
+   ],
+   "05-config.js": [
+    "G_U"
    ]
   }
  },

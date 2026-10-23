@@ -434,7 +434,7 @@ class SpraySurfaceFX {
     for (const d of this.dropP) {
       if (!d.alive) continue;
       d.t += dt;
-      d.vy -= 9.8 * 0.5 * dt;           // 重力（模型尺度折算）
+      d.vy -= G_U * dt;                 // 重力（phys1 统一：9.8m/s² ÷ 2.27）
       d.vx += wx * 1.1 * dt; d.vz += wz * 1.1 * dt;   // 风推（P3-⑧）
       d.x += d.vx * dt; d.y += d.vy * dt; d.z += d.vz * dt;
       if (d.y <= 0.02 || d.t > d.life) {

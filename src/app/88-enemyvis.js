@@ -245,7 +245,7 @@ class EnemyVis {
     for (const c of this.crashes) {
       if (!c.on) continue;
       c.t += dt;
-      c.vy -= 9.8 * 0.55 * dt;
+      c.vy -= G_U * dt;   // phys1 统一真实重力
       c.g.position.y += c.vy * dt;
       c.g.rotation.z = Math.min(c.g.rotation.z + dt * 2.0, 1.1);
       c.g.rotation.y += dt * 1.6;

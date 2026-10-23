@@ -299,7 +299,7 @@ class AirTargets {
         ? duneH(g.position.x, g.position.z) : 0;   // 仅沙漠沙丘贴地
       if (t.mode === 'fall') {
         // 无人机：翻滚坠落 + 断续黑烟
-        t.vy -= 9.8 * 0.7 * dt;
+        t.vy -= G_U * dt;   // phys1 统一真实重力（旧 9.8×0.7 偏重 1.6 倍）
         g.position.y += t.vy * dt;
         g.rotation.x += dt * 5.5;
         g.rotation.z += dt * 3.5;
@@ -329,7 +329,7 @@ class AirTargets {
         }
       } else if (t.mode === 'crash') {
         // 靶机：坡度陡增 + 螺旋俯冲拖烟
-        t.vy -= 9.8 * 0.6 * dt;
+        t.vy -= G_U * dt;   // phys1 统一真实重力
         g.position.y += t.vy * dt;
         g.rotation.z = Math.min(g.rotation.z + dt * 2.2, 1.2);
         g.rotation.y += dt * 1.4;
