@@ -123,7 +123,15 @@ class ArcadeModule {
   coeffs(m) {
     const mm = m || (HOST.S && HOST.S._mission);
     const d = (mm && mm.difficulty) || this.difficulty || 'standard';
-    return DIFFICULTIES[d] || DIFFICULTIES.standard;
+    const base = DIFFICULTIES[d] || DIFFICULTIES.standard;
+    // 第二轮 B：关卡威胁系数（91-levels 的 threat，缺省 1）——只调敌方开火频率，
+    // 用来把 13 关难度曲线拉平（脚本实测：受伤速度随关卡逐步上升，不再忽高忽低）
+    const L = mm && mm.levelId && HOST.levels ? HOST.levels.byId(mm.levelId) : null;
+    const th = (L && L.threat) || 1;
+    if (th === 1) return base;
+    const k = d + '@' + th;
+    if (!this._thc) this._thc = {};
+    return this._thc[k] || (this._thc[k] = Object.assign({}, base, { aaRate: base.aaRate * th }));
   }
   // —— 16-targets 系数读取口（每帧/结算时经 HOST.arcade 调，非逐帧扫描）——
   aaIntervalMul(m) { return this.coeffs(m).aaRate; }      // AA 开火间隔除以此值

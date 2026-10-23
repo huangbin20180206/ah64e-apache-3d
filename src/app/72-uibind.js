@@ -547,7 +547,7 @@ function bindUI() {
   window.__dbg = { S, W, HOST, orbit, composer, renderer, FLY, VIEWS, LABELS,
     step: stepFrames,            // 批 E：测试同步步进游戏时间（70-loop.js），正常运行不调用
     get apache() { return apache; }, get rig() { return rig; }, get targets() { return targets; },
-    get washfx() { return washfx; },
+    get washfx() { return washfx; }, get samwar() { return samwar; },
     get audio() { return audio; },
     get betty() { return betty; },
     get rescue() { return rescue; },
