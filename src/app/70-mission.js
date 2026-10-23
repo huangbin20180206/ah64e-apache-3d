@@ -498,6 +498,38 @@ function completeMission() {
       (arcade._lastSeadBonus > 0 ? '<div class="mrow"><span>SEAD 压制奖励</span><b>+' + arcade._lastSeadBonus + '</b></div>' : '') +
       '<div class="mrow"><span>总分 / 最高分</span><b>' + arcade.score + ' / ' + arcade.hi(m.difficulty) + '</b></div>' +
       '<div class="mrow"><span>难度</span><b>' + arcade.diffName(m.difficulty) + '</b></div>');
+    // C：战绩分享卡（本地画 canvas，可复制/保存，不接任何外部服务）
+    try {
+      const card = {
+        title: V.name, score: arcade.score, hi: arcade.hi(m.difficulty), time: fmtMissionTime(el),
+        kills: targets ? (targets.totalCount - targets.aliveCount) : 0, total: targets ? targets.totalCount : 0,
+        grade: grade, diff: arcade.diffName(m.difficulty),
+      };
+      const draw = () => {
+        const c = document.createElement('canvas'); c.width = 900; c.height = 480;
+        const g = c.getContext('2d');
+        const bg = g.createLinearGradient(0, 0, 900, 480); bg.addColorStop(0, '#0b1a12'); bg.addColorStop(1, '#1d2b1a');
+        g.fillStyle = bg; g.fillRect(0, 0, 900, 480);
+        g.strokeStyle = '#8fd16a'; g.lineWidth = 4; g.strokeRect(14, 14, 872, 452);
+        g.fillStyle = '#8fd16a'; g.font = 'bold 30px sans-serif'; g.fillText('AH-64E 阿帕奇 · 任务完成', 44, 70);
+        g.fillStyle = '#e8f0e0'; g.font = '26px sans-serif'; g.fillText(card.title + '（' + card.diff + '）', 44, 115);
+        g.font = 'bold 120px sans-serif'; g.fillStyle = '#ffd24a'; g.fillText(String(card.score), 44, 250);
+        g.font = '24px sans-serif'; g.fillStyle = '#b8c8b0'; g.fillText('总分（最高 ' + card.hi + '）', 48, 285);
+        g.font = 'bold 150px sans-serif'; g.fillStyle = '#8fd16a'; g.fillText(String(card.grade), 700, 250);
+        g.font = '24px sans-serif'; g.fillStyle = '#b8c8b0'; g.fillText('评级', 720, 285);
+        g.fillStyle = '#e8f0e0'; g.font = '34px sans-serif';
+        g.fillText('用时 ' + card.time, 48, 370);
+        g.fillText('击毁 ' + card.kills + (card.total ? ' / ' + card.total : ''), 48, 420);
+        g.font = '20px sans-serif'; g.fillStyle = '#7f8f78'; g.fillText('huangbin20180206.github.io/ah64e-apache-3d', 420, 440);
+        return c;
+      };
+      const row = document.createElement('div'); row.className = 'mhint'; row.style.pointerEvents = 'auto';
+      const mk = (txt, fn) => { const a = document.createElement('span'); a.className = 'chip'; a.textContent = txt; a.style.cssText = 'margin-right:8px;cursor:pointer;pointer-events:auto'; a.onclick = fn; row.appendChild(a); return a; };
+      const saveBtn = mk('保存战绩图', () => { draw().toBlob(b => { const u = URL.createObjectURL(b); const l = document.createElement('a'); l.href = u; l.download = 'apache-score.png'; l.click(); setTimeout(() => URL.revokeObjectURL(u), 3000); }); });
+      const cpBtn = mk('复制战绩图', () => { draw().toBlob(async b => { try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]); cpBtn.textContent = '已复制'; } catch (e) { cpBtn.textContent = '复制不了，请用保存'; } }); });
+      UI('mission-body').appendChild(row);
+      window.__shareCard = () => draw();   // 测试用
+    } catch (e) { /* 分享卡失败不影响结算 */ }
     // Phase 20-D：战役记档——仅关卡局（startCampaign 选关）；自由局（直接
     // startMission 无 levelIdx）不入档。最高分/评级保留最优、成就并集、
     // 累计机务损伤；前关达 B 解锁下一关（90-campaign complete）。
