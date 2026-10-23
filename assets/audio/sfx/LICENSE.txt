@@ -12,4 +12,12 @@ assets/audio/sfx/*.mp3 — 真实录音音效（P5-G1，2026-10-16）
   explo_s.mp3   ← R11-55 Large Blasts（第 1 声）   （机炮高爆弹等小爆炸）
   explo_s2.mp3  ← R11-55 Large Blasts（第 2 声）
   gun1-3.mp3    ← R12-33 Large Automatic Artillery（单发，3 个变体轮换）
+  （sfx2，2026-10-21 加，同为 CC0）
+  rocket1.mp3   ← Red_Library_Aircraft_Misc R19-41 Rocket Fly By（0–2.8s，飞离段）  火箭弹；地狱火放快 1.3 倍复用
+  rocket2.mp3   ← Red_Library_Aircraft_Misc R19-38 Rocket Fly By（1.7–4.5s，过顶后飞离）
+  thunder1.mp3  ← Red_Library_Nature_Rain R30-29 Classic Thunder Clap
+  thunder2.mp3  ← Red_Library_Nature_Rain R30-30 Classic Thunder Clap
+  thunder3.mp3  ← Red_Library_Nature_Rain R30-28 Classic Thunder Clap
+    https://archive.org/details/Red_Library_Aircraft_Misc
+    https://archive.org/details/Red_Library_Nature_Rain
 剪辑脚本：仓库外 /workspace/work/sfx/mk.py（Hark 沙盒）

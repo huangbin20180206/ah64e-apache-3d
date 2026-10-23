@@ -158,7 +158,9 @@ class RotorAudio {
     if (this.sfxBuf) return;
     this.sfxBuf = {};
     this._sfxRR = 0;
-    for (const n of ['gun1', 'gun2', 'gun3', 'explo_s', 'explo_s2', 'explo_m', 'explo_l']) {
+    // sfx2（2026-10-21）：再加火箭飞离 ×2、雷声 ×3（同为 Red Library CC0 真实录音）
+    for (const n of ['gun1', 'gun2', 'gun3', 'explo_s', 'explo_s2', 'explo_m', 'explo_l',
+                     'rocket1', 'rocket2', 'thunder1', 'thunder2', 'thunder3']) {
       fetch('assets/audio/sfx/' + n + '.mp3')
         .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
         .then(buf => this.ctx.decodeAudioData(buf))
@@ -167,7 +169,7 @@ class RotorAudio {
     }
   }
   // 播一段录音（多变体轮换 + 轻微变速防"复读机"）；成功返回 true
-  _playBuf(names, gain, jit, wetMix) {
+  _playBuf(names, gain, jit, wetMix, rate = 1) {
     const B = this.sfxBuf;
     if (!B) return false;
     const list = names.filter(n => B[n]);
@@ -175,7 +177,7 @@ class RotorAudio {
     const ctx = this.ctx, t = ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = B[list[(this._sfxRR++) % list.length]];
-    src.playbackRate.value = 1 + (rnd() - 0.5) * 2 * jit;
+    src.playbackRate.value = rate * (1 + (rnd() - 0.5) * 2 * jit);
     const g = ctx.createGain();
     g.gain.value = gain;
     src.connect(g).connect(this.dry);
@@ -419,6 +421,9 @@ class RotorAudio {
         ng.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
         nb.out.connect(ng).connect(this.dry);
         nb.src.start(t); nb.src.stop(t + 0.05);
+      } else if (type === 'rocket' && this._playBuf(['rocket1', 'rocket2'], 0.42, 0.06, 0.3)) {
+        // sfx2：真实火箭飞离录音（尾焰咆哮渐远）替代合成噪声扫频；保留合成的出巢闷响 + 次声推力
+        this._launchThump(t, 0.42, 300, 0.06, 0.18);
       } else if (type === 'rocket') {
         // Hydra-70 真实声学（DVIDS/军演实拍频谱分析）：出巢闷响→宽频尾焰咆哮渐远
         // 真实特征：出巢 165-180dB 全频段冲击→尾焰宽频噪声主能 200-2000Hz→无任何音调成分
@@ -451,6 +456,9 @@ class RotorAudio {
         og.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
         o.connect(og).connect(this.dry);
         o.start(t); o.stop(t + 0.3);
+      } else if (type === 'hf' && this._playBuf(['rocket1', 'rocket2'], 0.34, 0.04, 0.25, 1.3)) {
+        // sfx2：地狱火用同一批火箭录音、放快 1.3 倍（导弹更快、尾音更短更尖）；保留弹射"砰"
+        this._launchThump(t, 0.3, 350, 0.05, 0);
       } else if (type === 'hf') {
         // AGM-114 地狱火：两级发射（弹射电机弹出发射轨→主电机在安全距离点火）
         // 比火箭更短更快消失（导弹飞得更快）；宽频尾焰低通扫频（无音调成分）
@@ -524,6 +532,17 @@ class RotorAudio {
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
         o.connect(g).connect(this.dry);
         o.start(t); o.stop(t + 0.085);
+      } else if (type === 'thunder' && this._playBuf(['thunder1', 'thunder2', 'thunder3'], 0.75 * power, 0.08, 0.4)) {
+        // sfx2：真实雷声录音（3 种轮换）；远雷 power 小 → 音量小。保留合成次声（胸腔震感）
+        const o = ctx.createOscillator(), og = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(46, t);
+        o.frequency.exponentialRampToValueAtTime(26, t + 0.5);
+        og.gain.setValueAtTime(0.22 * power, t);
+        og.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+        o.connect(og).connect(this.dry);
+        o.start(t); o.stop(t + 0.6);
+        this['sampPlay_thunder'] = (this['sampPlay_thunder'] || 0) + 1;
       } else if (type === 'thunder') {
         // 雷声（M4 夜雷暴）：低频隆隆噪声 300→70Hz 扫频 2.4s + 40Hz 次声冲击。
         // 距离衰减由调用方（WeatherFX）传 power 控制音量；送到混响营造空间感
@@ -552,6 +571,27 @@ class RotorAudio {
         this['sampPlay_thunder'] = (this['sampPlay_thunder'] || 0) + 1;
       }
     } catch (e) { /* 音效失败不静默影响主流程 */ }
+  }
+
+  // sfx2：发射闷响（低通噪声"砰"）+ 可选次声推力，录音版火箭/地狱火共用
+  _launchThump(t, g0, lpHz, dur, sub) {
+    const ctx = this.ctx;
+    const nl = this._noiseSrc(dur);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = lpHz;
+    const lg = ctx.createGain();
+    lg.gain.setValueAtTime(g0, t);
+    lg.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    nl.connect(lp).connect(lg).connect(this.dry);
+    nl.start(t); nl.stop(t + dur + 0.01);
+    if (sub > 0) {
+      const o = ctx.createOscillator(), og = ctx.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(52, t);
+      o.frequency.exponentialRampToValueAtTime(28, t + 0.25);
+      og.gain.setValueAtTime(sub, t);
+      og.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      o.connect(og).connect(this.dry);
+      o.start(t); o.stop(t + 0.3);
+    }
   }
 
   // 一次性噪声源（预接低通滤波器），供短音效使用
