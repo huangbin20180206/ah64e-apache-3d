@@ -440,6 +440,55 @@ function buildWorldScenery(W) {
     g.setAttribute('color', new THREE.BufferAttribute(c, 3));
     const m = new THREE.MeshLambertMaterial({ vertexColors: true, alphaMap: am, transparent: true, depthWrite: false,
       polygonOffset: true, polygonOffsetFactor: -1 });
+    // vis1 2026-10-23 近景地面：旧版只有顶点色，基地车辆脚下近看是一整块平涂绿。
+    // 加一张 4u 一格的草皮细节图（草叶/枯草/土斑/碎石，自带种子不动全局 rnd），
+    // 着色器里按均值归一（整体明暗不变），20~80u 外渐隐回纯顶点色（远看不出平铺）。
+    {
+      const N = 512, cv2 = document.createElement('canvas'); cv2.width = cv2.height = N;
+      const x = cv2.getContext('2d');
+      let sd = 20261023;
+      const r = (a = 1, b) => { sd = (sd * 16807) % 2147483647; const v = sd / 2147483647; return b === undefined ? v * a : a + v * (b - a); };
+      x.fillStyle = '#b8b8b0'; x.fillRect(0, 0, N, N);
+      // 低频斑驳（明暗团块，三遍平铺保证四边无缝）
+      const blot = (px, py, rr, col) => { for (const ox of [-N, 0, N]) for (const oy of [-N, 0, N]) {
+        const gr = x.createRadialGradient(px + ox, py + oy, 0, px + ox, py + oy, rr);
+        gr.addColorStop(0, col); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(px + ox - rr, py + oy - rr, rr * 2, rr * 2); } };
+      for (let i = 0; i < 40; i++) blot(r(N), r(N), r(30, 90), r() < 0.5 ? 'rgba(70,72,60,0.16)' : 'rgba(235,232,210,0.14)');
+      // 裸土斑（偏棕，乘上草色后读作土）
+      for (let i = 0; i < 26; i++) blot(r(N), r(N), r(10, 34), 'rgba(170,120,80,0.30)');
+      // 草叶短划：深/浅两色，密
+      x.lineCap = 'round';
+      for (let i = 0; i < 9000; i++) {
+        const px = r(N), py = r(N), ln = r(3, 9), a = r(Math.PI * 2), k = r();
+        x.strokeStyle = k < 0.45 ? 'rgba(60,66,48,0.32)' : k < 0.85 ? 'rgba(232,236,200,0.28)' : 'rgba(210,180,120,0.30)';
+        x.lineWidth = r(0.8, 1.6);
+        x.beginPath(); x.moveTo(px, py); x.lineTo(px + Math.cos(a) * ln, py + Math.sin(a) * ln); x.stroke();
+      }
+      // 碎石子：小亮点 + 下沿暗影
+      for (let i = 0; i < 260; i++) {
+        const px = r(N), py = r(N), rr = r(0.8, 2.2);
+        x.fillStyle = 'rgba(40,36,30,0.35)'; x.beginPath(); x.arc(px + 0.7, py + 0.8, rr, 0, Math.PI * 2); x.fill();
+        x.fillStyle = 'rgba(225,215,195,0.55)'; x.beginPath(); x.arc(px, py, rr, 0, Math.PI * 2); x.fill();
+      }
+      // 均值（线性空间）→ 归一增益：细节只加纹理，不改整体明暗
+      const d = x.getImageData(0, 0, N, N).data;
+      let sum = 0;
+      for (let i = 0; i < d.length; i += 64) { const v = (d[i] + d[i + 1] + d[i + 2]) / 765; sum += Math.pow(v, 2.2); }
+      const avg = sum / (d.length / 64);
+      const dt = new THREE.CanvasTexture(cv2);
+      dt.colorSpace = THREE.SRGBColorSpace;
+      dt.wrapS = dt.wrapT = THREE.RepeatWrapping;
+      dt.repeat.setScalar(1200 / 4);        // 环几何 UV 0..1 = 1200u → 一格 4u
+      dt.anisotropy = 8;
+      m.map = dt;
+      m.onBeforeCompile = (sh) => {
+        sh.uniforms.uDetGain = { value: 1 / Math.max(0.05, avg) };
+        sh.fragmentShader = 'uniform float uDetGain;\n' + sh.fragmentShader.replace('#include <map_fragment>',
+          '#ifdef USE_MAP\n  vec3 detC = texture2D( map, vMapUv ).rgb * uDetGain;\n' +
+          '  detC = mix( detC, vec3( 1.0 ), smoothstep( 20.0, 80.0, length( vViewPosition ) ) );\n' +
+          '  diffuseColor.rgb *= detC;\n#endif');
+      };
+    }
     S.padGrass = new THREE.Mesh(g, m);
     S.padGrass.name = 'scn-padgrass';
     S.padGrass.rotation.x = -Math.PI / 2;

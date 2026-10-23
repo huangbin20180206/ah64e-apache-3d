@@ -204,10 +204,21 @@ class WeaponRig {
 
     // ---- 冲击波环池（大威力爆炸的贴地扩张气浪圈）----
     this.shocks = [];
-    const shGeo = new THREE.RingGeometry(0.85, 1.0, 48);
+    // vis1 2026-10-23：旧版是实心奶白细环（近看像画上去的白圈）。改为软边尘土环：
+    // 径向渐变贴图（内淡→外缘最浓→外沿消散）+ 土黄色，读作冲击波掀起的一圈尘土。
+    const shCv = document.createElement('canvas'); shCv.width = shCv.height = 128;
+    {
+      const c2 = shCv.getContext('2d'), gr = c2.createRadialGradient(64, 64, 0, 64, 64, 64);
+      gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.55, 'rgba(255,255,255,0.10)');
+      gr.addColorStop(0.82, 'rgba(255,255,255,0.85)'); gr.addColorStop(0.9, 'rgba(255,255,255,0.55)');
+      gr.addColorStop(1, 'rgba(255,255,255,0)');
+      c2.fillStyle = gr; c2.fillRect(0, 0, 128, 128);
+    }
+    const shTex = new THREE.CanvasTexture(shCv);
+    const shGeo = new THREE.PlaneGeometry(2, 2);
     for (let i = 0; i < 2; i++) {
-      const m = new THREE.Mesh(shGeo, new THREE.MeshBasicMaterial({
-        color: 0xfff1d8, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+      const m = new THREE.Mesh(shGeo, new THREE.MeshBasicMaterial({ map: shTex,
+        color: 0xb8a483, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
       m.rotation.x = -PI / 2;
       m.visible = false; m.renderOrder = 9;
       this.scene.add(m);
@@ -420,7 +431,7 @@ class WeaponRig {
       s.m.position.set(x, y, z);
       s.t = 0;
       s.m.scale.setScalar(0.5);
-      s.m.material.opacity = 0.75;
+      s.m.material.opacity = 0.6;
       return;
     }
   }
@@ -1010,8 +1021,8 @@ class WeaponRig {
       s.t += dt;
       const k = s.t / 0.5;
       if (k >= 1) { s.m.visible = false; continue; }
-      s.m.scale.setScalar(0.5 + k * 7.5);
-      s.m.material.opacity = 0.75 * (1 - k);
+      s.m.scale.setScalar(0.5 + (1 - (1 - k) * (1 - k)) * 7.5);   // 先快后慢（气浪减速）
+      s.m.material.opacity = 0.6 * (1 - k) * (1 - k);
     }
 
     // ---- 烟尘 ----

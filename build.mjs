@@ -112,6 +112,7 @@ const loaderJs = [
   '// ===== meshopt_decoder.js（已内联）=====',
   meshopt.js,
   // 统一注入：app 里所有 new THREE.GLTFLoader() 自动具备 meshopt 解码能力，app 代码零改动
+  // 2026-10-23 vis1：loader.priority=true 的（目标车辆）插队到队首——车辆是画面主角，不该排在几十个道具后面。
   // 2026-10-21 首屏优先：机体 GLB 先下，其余 GLB 等机体就位（或 8 秒兜底）后排队、最多 4 个同时下载。
   // 旧行为是几十个目标/道具 GLB 与机体同时抢带宽，机体（首屏唯一必需）被拖慢。
   'const _GQ = { open: false, active: 0, q: [], MAX: 4 };',
@@ -125,7 +126,8 @@ const loaderJs = [
   '      return super.load(url, (g) => { _gqOpen(); if (onLoad) onLoad(g); }, onProgress, (e) => { _gqOpen(); if (onError) onError(e); else console.error(e); });',
   '    }',
   '    const done = () => { _GQ.active--; _gqPump(); };',
-  '    _GQ.q.push(() => super.load(url, (g) => { done(); if (onLoad) onLoad(g); }, onProgress, (e) => { done(); if (onError) onError(e); else console.error(e); }));',
+  '    const f = () => super.load(url, (g) => { done(); if (onLoad) onLoad(g); }, onProgress, (e) => { done(); if (onError) onError(e); else console.error(e); });',
+  '    if (this.priority) { f.p = 1; let i = 0; while (i < _GQ.q.length && _GQ.q[i].p) i++; _GQ.q.splice(i, 0, f); } else _GQ.q.push(f);',
   '    _gqPump();',
   '  }',
   '};',

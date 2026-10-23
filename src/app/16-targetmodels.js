@@ -211,7 +211,9 @@ function _loadTargetModel(key) {
   const def = TARGET_MODELS[key];
   if (!def) return Promise.resolve(null);
   if (!_tmByUrl[def.url]) {
-    _tmByUrl[def.url] = new Promise((res) => new THREE.GLTFLoader().load(def.url, (gltf) => {
+    const L = new THREE.GLTFLoader();
+    L.priority = true;   // vis1：目标车辆插队（build.mjs 下载队列），先于场景道具
+    _tmByUrl[def.url] = new Promise((res) => L.load(def.url, (gltf) => {
       const m = gltf.scene;
       m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       res(m);
@@ -419,6 +421,27 @@ function charMaterial(src) {
     emissive: 0xff4a12, emissiveIntensity: 0.0,
   });
 }
+// vis1：残骸碎片几何——薄钢板按固定种子弯折、边缘撕裂，三种形状所有残骸共用（不用全局 rnd）
+let _chunkGeos = null;
+function wreckChunkGeos() {
+  if (_chunkGeos) return _chunkGeos;
+  let sd = 4242;
+  const r = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+  _chunkGeos = [0, 1, 2].map(k => {
+    const g = new THREE.BoxGeometry(0.46, 0.035, 0.32, 4, 1, 3);
+    const P = g.attributes.position, bend = 0.3 + r() * 0.4, tw = (r() - 0.5) * 0.8;
+    for (let i = 0; i < P.count; i++) {
+      let x = P.getX(i), y = P.getY(i), z = P.getZ(i);
+      const edge = Math.abs(x) > 0.2 || Math.abs(z) > 0.14;
+      if (edge) { x *= 0.75 + r() * 0.45; z *= 0.75 + r() * 0.45; }   // 撕裂的参差边
+      y += bend * x * x * 1.6 + tw * x * z * 2 + (r() - 0.5) * 0.015;  // 弯折 + 扭曲
+      P.setXYZ(i, x, y, z);
+    }
+    g.computeVertexNormals();
+    return g;
+  });
+  return _chunkGeos;
+}
 function makeWreck(t) {
   const g = new THREE.Group();
   t.group.updateMatrixWorld(true);
@@ -430,6 +453,7 @@ function makeWreck(t) {
   mats.push(debrisMat);
   // 余烬碎片单独一份材质（红热），桶壳/车壳用暗材质
   const emberMat = debrisMat.clone(); emberMat.userData.ember = true; mats.push(emberMat);
+  emberMat.emissive.setHex(0xb8400f);   // vis1：旧 0xff4a12 近看像一张红纸，压成暗橙红的烧红铁皮
   if (t.type === 'barrel') {
     const geo = new THREE.CylinderGeometry(0.28, 0.28, 0.85, 12, 1, true);
     for (let i = 0; i < 2; i++) {
@@ -485,16 +509,18 @@ function makeWreck(t) {
     tilt.add(hull);
     g.add(tilt);
   }
-  // 扭曲碎片
-  const chunkGeo = new THREE.IcosahedronGeometry(0.2, 0);
+  // 扭曲碎片（vis1：旧版是正二十面体，近看是一排规整的红/黑六边形；改成弯折撕裂的薄钢板，
+  // 红热余烬只留每三块一块）
+  const geos = wreckChunkGeos();
   const n = t.type === 'tank' ? 6 : t.type === 'truck' ? 5 : 3;
   for (let i = 0; i < n; i++) {
-    const m = new THREE.Mesh(chunkGeo, i % 2 ? emberMat : debrisMat);
+    const m = new THREE.Mesh(geos[i % geos.length], i % 3 === 1 ? emberMat : debrisMat);
     const a = rnd(TAU), r = rnd(1.4, 3.2);
     m.position.set(Math.cos(a) * r, 0.04, Math.sin(a) * r);
-    m.scale.set(rnd(0.6, 1.8), rnd(0.25, 0.5), rnd(0.5, 1.4));
-    m.rotation.set(rnd(0.5), rnd(TAU), rnd(0.5));
+    m.scale.set(rnd(0.7, 1.5), rnd(0.8, 1.2), rnd(0.6, 1.2));
+    m.rotation.set(rnd(-0.2, 0.2), rnd(TAU), rnd(-0.2, 0.2));
     m.castShadow = false;
+    m.userData.noDispose = true;             // 碎片几何全局共用，复位时不释放
     g.add(m);
   }
   // 焦痕
@@ -580,5 +606,5 @@ function wreckEmber(wreck, frac, flick) {
   if (!ms) return;
   const k = Math.max(0, frac) * (wreck.userData.ember0 || 0.8) * flick;
   // 车壳只透一点暗红（整车发光像塑料），小碎片才是明显的红热余烬
-  for (const m of ms) if (m.emissive) m.emissiveIntensity = m.userData.ember ? k * 0.55 : 0;
+  for (const m of ms) if (m.emissive) m.emissiveIntensity = m.userData.ember ? k * 0.3 : 0;
 }
