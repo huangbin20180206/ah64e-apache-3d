@@ -39,10 +39,22 @@ function stepFrames(sec, h = 1 / 30, until = null) {
 // polish3c：展示模式右侧面板展开时，画面中心落在面板下面——小窗口（1024 宽）直升机尾桨被面板盖住。
 // 面板打开时把镜头画面整体左移半个面板宽（相机视口偏移，不动相机本身；拾取/标签投影用同一投影矩阵，自动一致）。
 // 只在展示模式 + 环绕镜头生效：游戏模式准星在屏幕正中、第一人称/航线/导览都不动。
-const _PS = { x: 0, w: 0, h: 0 };
+// 2026-10-25：面板/知识卡位置每秒只量 10 次（getBoundingClientRect 会逼浏览器立即排版，
+// 原先每帧量两次）；窗口尺寸变了立刻重量。镜头平移本身仍每帧平滑插值。
+const _PS = { x: 0, w: 0, h: 0, want: 0, acc: 1, mw: 0, mh: 0 };
 function _panelShift(dt) {
-  let want = 0;
   const w = innerWidth, h = innerHeight;
+  _PS.acc += dt;
+  if (_PS.acc >= 0.1 || w !== _PS.mw || h !== _PS.mh) { _PS.acc = 0; _PS.mw = w; _PS.mh = h; _PS.want = _panelWant(w); }
+  const want = _PS.want;
+  const nx = Math.abs(want - _PS.x) < 0.5 ? want : _PS.x + (want - _PS.x) * Math.min(1, dt * 6);
+  if (Math.abs(nx - _PS.x) < 0.01 && w === _PS.w && h === _PS.h) return;
+  _PS.x = nx; _PS.w = w; _PS.h = h;
+  if (Math.abs(nx) < 0.5) W.camera.clearViewOffset();
+  else W.camera.setViewOffset(w, h, nx, 0, w, h);
+}
+function _panelWant(w) {
+  let want = 0;
   if (S.app === 'show' && !(fp && fp.active) && w > 600 && !document.body.classList.contains('route-mode')) {
     let L = 0, R = w;
     const pn = document.getElementById('panel');
@@ -58,11 +70,7 @@ function _panelShift(dt) {
     }
     want = Math.round(w / 2 - (L + R) / 2);
   }
-  const nx = Math.abs(want - _PS.x) < 0.5 ? want : _PS.x + (want - _PS.x) * Math.min(1, dt * 6);
-  if (Math.abs(nx - _PS.x) < 0.01 && w === _PS.w && h === _PS.h) return;
-  _PS.x = nx; _PS.w = w; _PS.h = h;
-  if (Math.abs(nx) < 0.5) W.camera.clearViewOffset();
-  else W.camera.setViewOffset(w, h, nx, 0, w, h);
+  return want;
 }
 
 function _frame(dt, doRender) {

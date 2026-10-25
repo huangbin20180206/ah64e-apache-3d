@@ -115,7 +115,7 @@ const loaderJs = [
   // 2026-10-23 vis1：loader.priority=true 的（目标车辆）插队到队首——车辆是画面主角，不该排在几十个道具后面。
   // 2026-10-21 首屏优先：机体 GLB 先下，其余 GLB 等机体就位（或 8 秒兜底）后排队、最多 4 个同时下载。
   // 旧行为是几十个目标/道具 GLB 与机体同时抢带宽，机体（首屏唯一必需）被拖慢。
-  'const _GQ = { open: false, active: 0, q: [], MAX: 4 };',
+  'const _GQ = { open: false, active: 0, q: [], MAX: (() => { try { const c = navigator.connection; if (!c) return 4; if (c.saveData) return 2; const e = c.effectiveType; return e === "slow-2g" || e === "2g" ? 1 : e === "3g" ? 2 : 4; } catch (e) { return 4; } })() };',   // 2026-10-25：按网络档位定并发下载数（未知=4）
   'const _gqPump = () => { while (_GQ.open && _GQ.active < _GQ.MAX && _GQ.q.length) { const f = _GQ.q.shift(); _GQ.active++; f(); } };',
   'const _gqOpen = () => { if (!_GQ.open) { _GQ.open = true; _gqPump(); } };',
   'setTimeout(_gqOpen, 8000);',

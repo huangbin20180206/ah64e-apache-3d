@@ -483,6 +483,10 @@ function buildWorldScenery(W) {
       m.map = dt;
       m.onBeforeCompile = (sh) => {
         sh.uniforms.uDetGain = { value: 1 / Math.max(0.05, avg) };
+        // 2026-10-25：依赖 three 内部片段名 <map_fragment>/vMapUv（r151+）。three 升级若改名，
+        // 替换会静默落空——这里显式告警，便于升级时第一时间发现草地细节失效
+        if (sh.fragmentShader.indexOf('#include <map_fragment>') < 0 || sh.vertexShader.indexOf('vMapUv') < 0 && sh.fragmentShader.indexOf('vMapUv') < 0)
+          console.warn('[scenery] padGrass 细节纹理：three 着色器片段名已变，细节淡出失效（检查 three 版本）');
         sh.fragmentShader = 'uniform float uDetGain;\n' + sh.fragmentShader.replace('#include <map_fragment>',
           '#ifdef USE_MAP\n  vec3 detC = texture2D( map, vMapUv ).rgb * uDetGain;\n' +
           '  detC = mix( detC, vec3( 1.0 ), smoothstep( 20.0, 80.0, length( vViewPosition ) ) );\n' +

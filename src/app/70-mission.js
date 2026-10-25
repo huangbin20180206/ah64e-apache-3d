@@ -291,11 +291,11 @@ function setMissionDifficulty(k) {
 // 不应被强行挂回：判据 = 挂架里有节点 visible 且不在 launched 中（即"用户没关挂载"）。
 function applyVariantAmmo() {
   if (!rig) return;
-  const mountOn = (() => {
-    if (!apache || !apache.hellfire || !apache.hellfire.length) return true;
-    for (const o of apache.hellfire) if (o.visible && !rig.launched.has(o)) return true;
-    return false;
-  })();
+  // 2026-10-25 复核修正：挂载与否以面板勾选为准（与 V 键/装填按钮同源）。
+  // 旧判据"挂架里还有未发射的可见节点"在 8 发全打光后恒为 false → reload(false) 把挂架藏起，
+  // 新任务仍显示 8 发却打不出去（浏览器实测复现）。
+  const ck = UI('chk-hellfire');
+  const mountOn = ck ? ck.checked : true;
   rig.reload(mountOn);                     // 清 launched + 按 mountOn 恢复挂架可见性 + 弹药回满
   const m = S._mission;
   if (m && m.variant === 'limited_ammo') {
