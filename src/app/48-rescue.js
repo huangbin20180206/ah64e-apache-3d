@@ -73,7 +73,7 @@ class Rescue {
     this.strap = new THREE.Mesh(mergeGeos(ks.list), mat);
     this.strap.visible = false;
     fig.add(this.strap);
-    fig.scale.setScalar(1 / 2.27);
+    fig.scale.setScalar(U2M_INV);
     // 吊钩总成（照 Breeze-Eastern / LSC 救援钩：钢索压头 → 橙色防撞缓冲块 → 旋转节 → 带弹簧锁舌的银色锻钩）
     const HK = 0.48;                                                    // 缆端到钩底（米）
     const kh = vcKit();
@@ -89,10 +89,10 @@ class Rescue {
     kh.box(0.012, 0.075, 0.02, 0xc9cdd1, -0.038, -0.35, 0, 0, 0, -0.5); // 锁舌
     kh.box(0.02, 0.02, 0.012, 0xf2c419, 0.005, -0.3, 0.022);            // 黄色解锁钮
     this._hookMesh = new THREE.Mesh(mergeGeos(kh.list), vcMat(0.35, 0.6));
-    this._hookMesh.scale.setScalar(1 / 2.27);
-    this.HOOK_H = HK / 2.27;
-    this.SV = SV.map(v => v / 2.27);                                    // V 形环（u，人物本地）
-    this.HANG = (HK + SV[1]) / 2.27;                                    // 缆端到脚底（u）
+    this._hookMesh.scale.setScalar(U2M_INV);
+    this.HOOK_H = HK * U2M_INV;
+    this.SV = SV.map(v => v * U2M_INV);                                    // V 形环（u，人物本地）
+    this.HANG = (HK + SV[1]) * U2M_INV;                                    // 缆端到脚底（u）
     this._fig = fig;
     this.g = new THREE.Group();
     this.g.add(fig);
@@ -417,7 +417,7 @@ class Rescue {
       this.rope.position.set(bx + dx / 2, by + dy / 2, bz + dz / 2);
       this.rope.quaternion.setFromUnitVectors(_rsUp, _rsV.set(-dx / len, -dy / len, -dz / len));
       this.rope.scale.set(1, len, 1);
-      const el = Math.min(len, 6 / 2.27) / len;                         // 末端 6m 橙色段（局部坐标）
+      const el = Math.min(len, 6 * U2M_INV) / len;                         // 末端 6m 橙色段（局部坐标）
       this.ropeEnd.scale.set(1, el, 1);
       this.ropeEnd.position.y = -0.5 + el / 2;
       // 挂接后：人的 V 形环正好挂在钩底，绕钢索缓慢自转

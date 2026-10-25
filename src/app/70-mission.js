@@ -16,8 +16,9 @@ function fmtMissionTime(t) {
 function missionRating(elapsed, acc) {
   return HOST.baseGrade ? HOST.baseGrade(elapsed, acc) : 'C';
 }
-// 任务超时（秒）：超过即失败（P6 新增失败路径——此前只有成功无失败）
-const MISSION_TIMEOUT = 360;
+// 注：原 `const MISSION_TIMEOUT = 360` 已删除（审核 2026-10-25）——全库零引用，
+// 实际超时走 MISSION_VARIANTS[].timeout 与关卡表 layout/关卡级 timeout。
+// 留着会让人误以为改这里能调超时。
 // Phase 11 C1/C2：任务挑战变体——统一状态机 S._mission 上的 variant 标记，
 // 不新建第二套状态机/评级系统（missionRating() 全变体共用一条曲线）。
 // 各变体只改：简报文案、弹药初始、时限、完成条件四件事。
@@ -281,9 +282,21 @@ function setMissionDifficulty(k) {
 }
 // 受限弹药：机炮/火箭减半（地狱火不变）。先恢复满弹再按变体减半——
 // 重试/切回标准不会把弹药越减越少（startMission 也会先恢复满弹再应用）。
+// 审核 2026-10-25 修复：旧实现只写 rig.hfAmmo = 8，不动挂架节点与 launched 集合。
+// 而 launchHf() 挑选条件是 `o.visible && !this.launched.has(o)`——8 发打完后挂架全部
+// invisible 且全在 launched 里，于是新任务 HUD 显示 8 发、按 F 却永远失败并提示
+// "地狱火已打完或未挂载"（提示本身也是错的）。修法：改走 rig.reload() 通道，
+// 它会清 launched 并恢复挂架可见性。
+// 用户手动取消勾选"AGM-114 地狱火 ×8"（apache.setWeapons 把挂架置 invisible）时
+// 不应被强行挂回：判据 = 挂架里有节点 visible 且不在 launched 中（即"用户没关挂载"）。
 function applyVariantAmmo() {
   if (!rig) return;
-  rig.gunAmmo = GUN.AMMO; rig.rocketAmmo = ROCKET.AMMO; rig.hfAmmo = 8;
+  const mountOn = (() => {
+    if (!apache || !apache.hellfire || !apache.hellfire.length) return true;
+    for (const o of apache.hellfire) if (o.visible && !rig.launched.has(o)) return true;
+    return false;
+  })();
+  rig.reload(mountOn);                     // 清 launched + 按 mountOn 恢复挂架可见性 + 弹药回满
   const m = S._mission;
   if (m && m.variant === 'limited_ammo') {
     rig.gunAmmo = Math.floor(GUN.AMMO / 2);
@@ -428,7 +441,13 @@ function completeMission() {
   const ammoDry = resources
     ? resources.ammoDry(rig.gunAmmo, rig.rocketAmmo, rig.hfAmmo) : false;
   const gr = campaign ? campaign.grade({
-    elapsed: el / ((MISSION_VARIANTS[m.variant] || {}).par || 1), acc: acc / 100, fuelPct,   // P3：长关按 par 折算用时 ammoDry, damage: dmgLv,
+    // P3：长关按 par 折算用时
+    elapsed: el / ((MISSION_VARIANTS[m.variant] || {}).par || 1), acc: acc / 100, fuelPct,
+    // 审核 2026-10-25 修复：ammoDry / damage 此前被写在上一行的行尾注释里（"…折算用时 ammoDry,
+    // damage: dmgLv,"），等于从未传给 campaign.grade —— 90-campaign 里 `ctx.damage || 0` 恒为 0、
+    // `ctx.ammoDry` 恒为 undefined，导致「机体损伤降档」「弹药耗尽降档」两条评级规则静默失效，
+    // 连带下游 `dmgDrop`（依赖 gr.drops 含 damage 项）恒为 false。此处移出注释、独立成行。
+    ammoDry, damage: dmgLv,
     comboMax: arcade ? arcade.state().comboMax : 1, difficulty: m.difficulty,
   }) : { grade: missionRating(el, acc / 100), drops: [], kept: null, detail: [] };
   let grade = gr.grade;
@@ -525,10 +544,52 @@ function completeMission() {
       };
       const row = document.createElement('div'); row.className = 'mhint'; row.style.pointerEvents = 'auto';
       const mk = (txt, fn) => { const a = document.createElement('span'); a.className = 'chip'; a.textContent = txt; a.style.cssText = 'margin-right:8px;cursor:pointer;pointer-events:auto'; a.onclick = fn; row.appendChild(a); return a; };
-      const saveBtn = mk('保存战绩图', () => { draw().toBlob(b => { const u = URL.createObjectURL(b); const l = document.createElement('a'); l.href = u; l.download = 'apache-score.png'; l.click(); setTimeout(() => URL.revokeObjectURL(u), 3000); }); });
-      const cpBtn = mk('复制战绩图', () => { draw().toBlob(async b => { try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]); cpBtn.textContent = '已复制'; } catch (e) { cpBtn.textContent = '复制不了，请用保存'; } }); });
+      // 审核 2026-10-25 修复 BUG-2：旧实现把 navigator.clipboard.write 放在 canvas.toBlob 的
+      // 异步回调里 —— toBlob 回调已脱离用户手势的同步调用栈，Chrome 会直接拒写
+      // （NotAllowedError: Document is not focused），于是"复制战绩图"点了永远只显示
+      // "复制不了，请用保存"，是个摆设。
+      // 修法：结算时就**预先**把 Blob 备好（canvas 只画一次），点击时在同步栈里直接写入，
+      // 手势上下文不丢。另：非安全上下文（http、file://）下 navigator.clipboard 本身就是
+      // undefined，这种情况直接不出"复制"按钮，而不是给个点了必失败的按钮。
+      const _canCopyImg = typeof ClipboardItem !== 'undefined'
+        && !!(navigator.clipboard && navigator.clipboard.write);
+      let _cardBlob = null;
+      const _mkBlob = () => {   // 一次生成，多次复用（保存/复制共用同一张图）
+        if (_cardBlob) return _cardBlob;
+        try {
+          const c = draw();
+          const d = c.toDataURL('image/png');
+          const bin = atob(d.slice(d.indexOf(',') + 1));
+          const u8 = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+          _cardBlob = new Blob([u8], { type: 'image/png' });
+        } catch (e) { _cardBlob = null; }
+        return _cardBlob;
+      };
+      _mkBlob();   // 结算时预生成——点击时才来得及落进同步栈
+      const saveBtn = mk('保存战绩图', () => {
+        const b = _mkBlob();
+        if (!b) return;
+        const u = URL.createObjectURL(b);
+        const l = document.createElement('a'); l.href = u; l.download = 'apache-score.png'; l.click();
+        setTimeout(() => URL.revokeObjectURL(u), 3000);
+      });
+      if (_canCopyImg) {
+        // 点击 → 同步 write（Blob 已就绪，中间没有 await，手势上下文完整）
+        const cpBtn = mk('复制战绩图', () => {
+          const b = _mkBlob();
+          if (!b) return;
+          const ok = () => { cpBtn.textContent = '已复制'; setTimeout(() => { cpBtn.textContent = '复制战绩图'; }, 2000); };
+          const bad = () => { cpBtn.textContent = '复制失败，请用保存'; setTimeout(() => { cpBtn.textContent = '复制战绩图'; }, 2500); };
+          try {
+            const p = navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]);
+            if (p && p.then) p.then(ok, bad); else ok();
+          } catch (e) { bad(); }
+        });
+      }
       UI('mission-body').appendChild(row);
       window.__shareCard = () => draw();   // 测试用
+      window.__shareCardBlob = _mkBlob;    // 测试用（返回预生成的 PNG Blob）
     } catch (e) { /* 分享卡失败不影响结算 */ }
     // Phase 20-D：战役记档——仅关卡局（startCampaign 选关）；自由局（直接
     // startMission 无 levelIdx）不入档。最高分/评级保留最优、成就并集、
@@ -650,6 +711,32 @@ function failMission(reason) {
 // Phase 20-D：levelIdx（可选）= 战役关卡序号——startCampaign 经此进入，
 // completeMission 按它记档（最高分/评级/成就/累计损伤+解锁链）；自由局
 // 不传（levelIdx=null）→ 不入战役存档。
+// 审核 2026-10-25：把"清任务相关状态"抽成公共函数，供两条重开路径共用。
+// 背景：旧实现里 startMission 会复位树/步兵/平民/照明弹，而"重置靶场"按钮
+//（72-uibind 的 resetRange）不会——同一个"重置"语义两种行为，点重置靶场后
+// 上一局炸倒的树、死亡/开火中的步兵、打光的照明弹原地留着，与用户预期不符。
+// 抽出后此处为唯一事实来源，两条路径行为一致。
+// 由 72-uibind 经 HOST.resetScenario 调用（守拓扑：72 高编号可直接引用 70-* 的同级函数，
+// 但走 HOST 更稳，避免将来 70-mission 重命名时静默失联）。
+function resetScenarioState() {
+  if (targets) targets.reset();
+  if (scenery) scenery.resetTrees();   // 上一关被炸倒/烧焦的树复原
+  if (rig && rig.clearImpacts) rig.clearImpacts();   // P5-G1 清弹坑/爆闪
+  if (air) air.reset();
+  if (infantry) infantry.reset();   // P5-G2 步兵归位复活
+  if (life) life.reset();             // 2026-10-18 平民/摩托归位
+  resetNightOps();                  // P5-G3 照明弹补满
+  if (samwar) samwar.reset();   // Phase 19：清 SAM 状态（干扰弹补满/导弹清空/相位复位）
+  if (damageSys) damageSys.reset();   // Phase 19：清机务损伤（系统归零/卡壳过热处置全清）
+  if (enemyAir) enemyAir.reset();   // Phase 20：清 A2A 状态
+  if (narrative) narrative.resetStrikes();   // Phase 21：清基地设施打击层（防跨局残留）
+  if (enemyVis) enemyVis.clearVisual();
+  if (resources) resources.start();   // Phase 20：满油开局（补给窗计时/告警 latch 复位）
+  if (rig) { rig.clearTransient(); rig._dmgPenalty = 0; }   // P8：清受损散布惩罚
+  _kills = 0; updateTargetHUD(null);
+}
+HOST.resetScenario = resetScenarioState;
+
 function startMission(variant, levelIdx, levelId) {
   // 最终闭环修复（唯一相机所有权）：FPV 激活时经 exitNormalized 显式退出并
   // 完整规范化（camera.up/速度/输入累积/userAlt/S._alt/pitch/roll 全清）——
@@ -666,26 +753,14 @@ function startMission(variant, levelIdx, levelId) {
   const tk = W.terrainKey;                        // 最终场地键（desert）
   S._rescueTerr = tk;                             // 同步救援场地检测，防下帧重复触发
   // 清任务相关状态：靶场/空中目标复位、武器瞬态清空、救援重生成、HUD/击毁计数清零
-  if (targets) targets.reset();
-  if (scenery) scenery.resetTrees();   // 上一关被炸倒/烧焦的树复原
-  if (rig && rig.clearImpacts) rig.clearImpacts();   // P5-G1 清弹坑/爆闪
-  if (air) air.reset();
-  if (infantry) infantry.reset();   // P5-G2 步兵归位复活
-  if (life) life.reset();             // 2026-10-18 平民/摩托归位
-  resetNightOps();                  // P5-G3 照明弹补满
-  if (samwar) samwar.reset();   // Phase 19：新任务清 SAM 状态（干扰弹补满/导弹清空/相位复位）
-  if (damageSys) damageSys.reset();   // Phase 19：新任务清机务损伤（系统归零/卡壳过热处置全清）
-  if (enemyAir) enemyAir.reset();   // Phase 20：清 A2A 状态（spawn 在下方统一做）
-  if (narrative) narrative.resetStrikes();   // Phase 21：清基地设施打击层（hp/alive/雷达停转标记复位，避免跨局残留）
-  if (enemyVis) enemyVis.clearVisual();
-  if (resources) resources.start();   // Phase 20：满油开局（补给窗计时/告警 latch 复位）
-  if (rig) { rig.clearTransient(); rig._dmgPenalty = 0; }   // P8：重置清受损散布惩罚
+  // 审核 2026-10-25：改调公共 resetScenarioState()（与"重置靶场"共用同一份清理逻辑）
+  resetScenarioState();
   // 最终闭环修复（救援状态跨任务泄漏）：用 resetRound 清 delivered/aboard 等
   // 终态并重新生成幸存者——setTerrain 会保留 delivered（同局切地形语义），
   // 但新任务轮次必须真正重置，否则 timed_rescue 上一局 delivered 泄漏使
   // 完成条件在未重新救援时即满足。
   if (rescue) rescue.resetRound(tk);
-  _kills = 0; updateTargetHUD(null);
+  // （_kills / updateTargetHUD 的清零已在 resetScenarioState() 内完成，此处不重复）
   // P14-A（幂等）：round 递增需在重建前捕获上一任务轮次阶段——简报/进行中
   // 重复点击"开始/重试"属同一轮，不得 roll（否则 cutscene 重排、power 重复播放）。
   // 仅"全新任务 / 上一轮已结算（done/failed）"才递增轮次（retry=新轮合法）。

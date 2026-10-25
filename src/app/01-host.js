@@ -27,6 +27,8 @@ const HOST = {
   setPlayMode: null,// P1：玩法模式切换（72-uibind bindUI 注册 setMode；70-appmode 调用）
   coachTip: null,  // Q1：训练关实时教练提示函数（73-coach 注册；70-hud 提示条取用）
   onLevelResult: null, // P2：关卡结算回调（70-play 注册；70-mission 结算后调用，刷新面板按钮区）
+  resetScenario: null, // 审核 2026-10-25：任务场景清理（70-mission resetScenarioState 注册；
+                       //   72-uibind 的"重置靶场"与 70-mission 的 startMission 共用，保证两条重开路径一致）
   levels: null,     // P2：关卡表（91-levels 注册；70 层只经此取用）
   appMode: null,    // P1：产品层模式（70-appmode 注册；menu/show/play/all 只读状态 + 测试出口）
   tourState: null,  // 导览状态对象（74-tour 声明后注册；72-uibind __dbg 经此读取，P2-B4）

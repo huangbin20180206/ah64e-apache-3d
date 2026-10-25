@@ -54,6 +54,13 @@ const GUN = { RPM: 625, AMMO: 1200 };
 // phys1（2026-10-23）统一重力：真实 9.8 米/秒² ÷ 1 单位 2.27 米 = 4.32 单位/秒²
 const G_U = 4.32;
 
+// 审核 2026-10-25：全库唯一的世界单位→米换算常量。
+// 背景：基准取自 AC 旋翼直径 6.4583u = 14.63m ⇒ 1u ≈ 2.27m（见 16-targetmodels.js 的尺寸比例真实化）。
+// 历史上存在 1u≈2m 的旧值残留，导致同一块 HUD 上"离地高度"（按 2.27）与"到目标距离"
+// （按 2）用了两把尺子、差 12%。此后所有 u→m 显示/换算一律引用此常量，不得再写字面量。
+const U2M = 2.27;
+const U2M_INV = 1 / U2M;   // m→u：资产按真实米制建模时用它缩放（等价于 /2.27）
+
 // Hydra 70 火箭参数（M261 火箭巢 ×2，每巢 19 管 = 38 发；
 // 实弹出巢 45m/s、约 1.1 秒燃尽到 739m/s。phys1：出巢 20u/s（=45m/s，同实弹），
 // 1.1 秒内加到 160u/s（≈360m/s，取实弹一半——再快肉眼看不清弹体和尾烟）。旧值 12→58u/s 太慢像"飘"）
@@ -69,15 +76,47 @@ const TAIL_RATIO = -4.9;
 // 渲染质量统一配置：低档位同时降低像素、后处理和高密度特效成本。
 // 高清档不直接把设备 DPR 再乘两倍，避免高分屏上出现平方级像素开销。
 // P0 扩展：shadow=阴影贴图尺寸 / shadowRadius=PCF 半径 / reflect=倒影更新模式
-//   （0=关 1=低频每3帧 2=实时每帧）/ particles=粒子池上限系数 / aniso=各向异性
+//   （0=关 1=低频每3帧 2=实时每帧）
+// 审核 2026-10-25 订正：
+//   · effects = 高密度特效统一系数——经 applyQuality → washfx.setQualityEffects →
+//     各粒子系统的 setQuality 真实收口「活跃粒子上限」（涡环/草地/水花/碎屑/沙尘）。
+//     低档降粒子量走的就是这个字段，不要另立一个重复的系数。
+//   · aniso 于 2026-10-25 起**真正下发**：applyQuality 调 applySceneAniso() 遍历场景
+//     统一设置各贴图各向异性。此前该字段无消费（各贴图硬编码 8），是死配置。
 const QUALITY_PRESETS = {
-  '0.75': { scale: 0.75, levels: 2, effects: 0.55, shadow: 1024, shadowRadius: 1.0, reflect: 0, particles: 0.45, aniso: 4 },
-  '1':    { scale: 1.00, levels: 4, effects: 1.00, shadow: 2048, shadowRadius: 1.4, reflect: 1, particles: 0.75, aniso: 6 },
-  '1.5':  { scale: 1.25, levels: 4, effects: 1.00, shadow: 4096, shadowRadius: 1.6, reflect: 2, particles: 1.00, aniso: 8 },
-  '2':    { scale: 1.50, levels: 4, effects: 1.00, shadow: 4096, shadowRadius: 1.6, reflect: 2, particles: 1.00, aniso: 16 },
+  '0.75': { scale: 0.75, levels: 2, effects: 0.55, shadow: 1024, shadowRadius: 1.0, reflect: 0, aniso: 4 },
+  '1':    { scale: 1.00, levels: 4, effects: 1.00, shadow: 2048, shadowRadius: 1.4, reflect: 1, aniso: 6 },
+  '1.5':  { scale: 1.25, levels: 4, effects: 1.00, shadow: 4096, shadowRadius: 1.6, reflect: 2, aniso: 8 },
+  '2':    { scale: 1.50, levels: 4, effects: 1.00, shadow: 4096, shadowRadius: 1.6, reflect: 2, aniso: 16 },
 };
 function qualityPreset(q) {
   return QUALITY_PRESETS[String(q)] || QUALITY_PRESETS['1'];
+}
+
+// 审核 2026-10-25：把画质档的 aniso 真正下发到场景贴图（此前该字段无消费）。
+// 遍历场景与常用资源，给所有带 map 的材质贴图设置各向异性；受 GPU 上限钳制。
+// 幂等：可重复调用（切档时再走一遍即可）。不重建材质，只改 texture.anisotropy。
+function applySceneAniso(renderer, scene, aniso) {
+  if (!renderer || !scene || !aniso) return 0;
+  const maxA = renderer.capabilities ? renderer.capabilities.getMaxAnisotropy() : aniso;
+  const a = Math.max(1, Math.min(aniso, maxA));
+  const seen = new Set();
+  let n = 0;
+  const once = t => {
+    if (!t || seen.has(t)) return;
+    seen.add(t);
+    if (t.anisotropy !== a) { t.anisotropy = a; t.needsUpdate = true; n++; }
+  };
+  scene.traverse(o => {
+    const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : null);
+    if (!mats) return;
+    for (const m of mats) {
+      if (!m) continue;
+      once(m.map); once(m.normalMap); once(m.roughnessMap);
+      once(m.metalnessMap); once(m.emissiveMap); once(m.alphaMap); once(m.aoMap);
+    }
+  });
+  return n;
 }
 
 // ---------- P3-⑦ 湖面倒影 ----------

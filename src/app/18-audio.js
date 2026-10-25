@@ -407,7 +407,7 @@ class RotorAudio {
     if (!this.started || !this.ctx || !this.enabled) return;
     const ear = pos && this.ear ? this.ear() : null;
     if (ear) {
-      const dm = Math.hypot(pos.x - ear.x, pos.y - ear.y, pos.z - ear.z) * 2.27;
+      const dm = Math.hypot(pos.x - ear.x, pos.y - ear.y, pos.z - ear.z) * U2M;
       const delay = dm / 343;
       this._lastDist = { dm: Math.round(dm), delay: +delay.toFixed(2) };
       const go = () => this.playSfxFar(type, power, dm);

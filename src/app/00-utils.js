@@ -15,7 +15,9 @@ const smin = (a, b, k) => { const h = clamp(0.5 + 0.5 * (b - a) / k, 0, 1); retu
 const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 const easeOut = t => 1 - Math.pow(1 - t, 3);
 // 与帧率无关的指数阻尼：每帧衰减率按 60fps 基准换算
-const damp = (rate, dt) => 1 - Math.pow(1 - rate, dt * 60);
+// 审核 2026-10-25：clamp rate 到 [0, 0.999]——rate ≥ 1 会得负底数的非整数次幂 = NaN，
+// 曾靠注释口头约定（70-loop.js 明确警告过），现在改成代码层硬守卫。
+const damp = (rate, dt) => 1 - Math.pow(1 - clamp(rate, 0, 0.999), dt * 60);
 
 // 固定种子的 PRNG，保证每次刷新贴图完全一致
 function mulberry32(a) {

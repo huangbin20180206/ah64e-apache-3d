@@ -248,11 +248,21 @@ function finish() {
   // roundA2（2026-10-23）：第一帧之前先把场景里看得见的材质"预编译"成显卡程序。
   // 以前第一帧当场编译，整页卡住十几秒（软渲染实测 15 秒）且画面已露出，看着像死机；
   // 现在编译期间加载条停在"准备画面…"，支持并行编译的显卡（多数 Windows 版 Chrome/Edge）
-  // 会在后台编译、页面不卡。最多等 12 秒，超时或出错照常开画（第一帧再补编，和以前一样）。
+  // 会在后台编译、页面不卡。
+  //
+  // 审核 2026-10-25 修复 BUG-3：three r160 的 compileAsync 内部是
+  //   `setTimeout(轮询, 10)` + `program.isReady()`，**既不 resolve 也不 reject 直到全部就绪，且无超时**。
+  // 驱动不支持 KHR_parallel_shader_compile（SwiftShader / 老 Intel 驱动典型）时可能长期不就绪，
+  // 于是 Promise 挂着不动，只能靠下面 12 秒兜底——代价是白等 12 秒 + 每秒 100 次轮询遍历
+  // program 集合（纯烧 CPU）。现加一条 3 秒探测线：编译没在 3 秒内完成就先开画（第一帧再补编，
+  // 与旧版行为一致），成功路径会清掉探测线，不影响正常快机。
   prog(1, '准备画面…');
   let _go = false;
+  let _probeTimer = 0, _hardTimer = 0;   // 先声明再被 _start 引用（避免 TDZ）
   const _start = () => {
     if (_go) return; _go = true;
+    clearTimeout(_probeTimer);
+    clearTimeout(_hardTimer);
     requestAnimationFrame(loop);
     // 第一帧画完（可能还要补编译、上传贴图）后才写"就绪"并淡出加载层，免得停在"就绪"却半天不动
     requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -260,7 +270,8 @@ function finish() {
       setTimeout(() => loading.classList.add('done'), 260);
     }));
   };
-  setTimeout(_start, 12000);
+  _hardTimer = setTimeout(_start, 12000);   // 硬兜底：无论如何都要开画
+  _probeTimer = setTimeout(_start, 3000);   // 软探测：编译迟迟不就绪就别干等
   try {
     if (renderer.compileAsync) renderer.compileAsync(W.scene, W.camera).then(_start, _start);
     else _start();

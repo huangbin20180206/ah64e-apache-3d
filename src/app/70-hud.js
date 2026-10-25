@@ -93,7 +93,11 @@ function _tickPostFx(rawDt) {
   composer.chroma = S._photo ? 0.3 : _show ? 0.45 : 1.0;
   composer.flash = S._flash || 0;
   composer.shake = (S._shake || 0) * 0.012;
-  return ts;   // 调用方 dt *= 返回值（慢动作 timeScale）
+  // 审核 2026-10-25 订正注释：此前写"调用方 dt *= 返回值"，但 70-loop 的
+  // `_tickPostFx(rawDt)` 调用处**丢弃了返回值**——慢动作缩放实际在帧首
+  // （70-loop 开头 `if (S._slowmo > 0 && KC.allow) dt *= 0.25;`）完成。
+  // 保留返回值供其他消费方/调试读取，勿据此认为它驱动了 dt。
+  return ts;   // 慢动作 timeScale（只读派生量）
 }
 
   // P14-B+E：模式/输入状态徽标——每帧只读派生，状态翻转才写 DOM（dataset 缓存
@@ -182,7 +186,7 @@ function _tickHud(dt, s, rpm) {
       }
     }
     UI('hud-draw').textContent = String(composer.drawCalls || 0);
-    UI('hud-alt').textContent = (FLY.alt * 2.27).toFixed(0);   // 1u = 2.27m（phys2 统一比例）
+    UI('hud-alt').textContent = (FLY.alt * U2M).toFixed(0);   // U2M（审核 2026-10-25：原为字面量 2.27）
     // P8：威胁 HUD（节流随 0.5s 刷新块）——等级文字 + 最近受击闪红
     if (targets) {
       const t = targets._threat || 0;

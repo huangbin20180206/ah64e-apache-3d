@@ -18,12 +18,12 @@ const PROP_DEFS = {
   gas:      { url: 'assets/targets/prop_gas.glb', len: 6.2 },        // 小加油站（带棚）≈14m
   // 沙漠平顶民房套件：一个文件里叠放了 6 栋（展示用堆叠摆法），按节点名逐栋取出、
   // 各自贴地摆成村落（three 加载时节点名空格变下划线）；模型单位=米 → k=1/2.27 即真实尺寸（2 层楼 ≈6.8m 高）
-  house1:   { url: 'assets/targets/prop_village.glb', pick: 'Concrete_House_001', k: 1 / 2.27 },
-  house2:   { url: 'assets/targets/prop_village.glb', pick: 'Concrete_House_002', k: 1 / 2.27 },
-  house3:   { url: 'assets/targets/prop_village.glb', pick: 'Concrete_House_003', k: 1 / 2.27 },
-  house4:   { url: 'assets/targets/prop_village.glb', pick: 'Concrete_House_004', k: 1 / 2.27 },
-  house5:   { url: 'assets/targets/prop_village.glb', pick: 'Concrete_House_005', k: 1 / 2.27 },
-  house6:   { url: 'assets/targets/prop_village.glb', pick: 'Concrete_House_006', k: 1 / 2.27 },
+  house1:   { url: 'assets/targets/prop_village.glb', pick: 'Concrete_House_001', k: U2M_INV },
+  house2:   { url: 'assets/targets/prop_village.glb', pick: 'Concrete_House_002', k: U2M_INV },
+  house3:   { url: 'assets/targets/prop_village.glb', pick: 'Concrete_House_003', k: U2M_INV },
+  house4:   { url: 'assets/targets/prop_village.glb', pick: 'Concrete_House_004', k: U2M_INV },
+  house5:   { url: 'assets/targets/prop_village.glb', pick: 'Concrete_House_005', k: U2M_INV },
+  house6:   { url: 'assets/targets/prop_village.glb', pick: 'Concrete_House_006', k: U2M_INV },
   sedan:    { url: 'assets/targets/prop_sedanwreck.glb', len: 2.0 }, // 废弃轿车 ≈4.5m
   van:      { url: 'assets/targets/prop_van.glb', len: 2.15 },       // 旧厢式货车 ≈4.9m
   // 越野摩托：文件里 7 辆一排（不同颜色），按节点名取两辆停在街边；车长 ≈2.1m

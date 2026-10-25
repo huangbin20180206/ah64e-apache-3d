@@ -206,6 +206,11 @@ function pickVariant(type, n, pool = TARGET_VARIANTS) { const v = pool[type]; re
 function targetModelKey(t) { return t.mdl && TARGET_MODELS[t.mdl] ? t.mdl : t.type; }
 // 2026-10-21 资产懒加载：按需逐个下载（旧实现启动时 10 个载具全部并发拉取，
 // 展示线只用到基地停放的几种）。keys 省略 = 全部（兼容旧调用）；同一 url 只下载一次。
+// 审核 2026-10-25 修复：失败时不再把 null 永久缓存进 _tmByUrl——否则一次网络抖动会让
+// 该模型在整个会话里永远拿不到（后续所有请求都命中那个已 resolve(null) 的 Promise，
+// 再没有重试机会）。改为"失败即删缓存项"，下次调用会重新发起下载。
+// 注意删除时机：必须在 res(null) **之前**、且确认缓存里仍是本 Promise（防止并发重入时
+// 误删别人刚建立的新条目）。
 const _tmByUrl = {};
 function _loadTargetModel(key) {
   const def = TARGET_MODELS[key];
@@ -213,11 +218,15 @@ function _loadTargetModel(key) {
   if (!_tmByUrl[def.url]) {
     const L = new THREE.GLTFLoader();
     L.priority = true;   // vis1：目标车辆插队（build.mjs 下载队列），先于场景道具
-    _tmByUrl[def.url] = new Promise((res) => L.load(def.url, (gltf) => {
-      const m = gltf.scene;
-      m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-      res(m);
-    }, undefined, () => res(null)));
+    const self = new Promise((res) => {
+      const drop = () => { if (_tmByUrl[def.url] === self) delete _tmByUrl[def.url]; };
+      L.load(def.url, (gltf) => {
+        const m = gltf.scene;
+        m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        res(m);
+      }, undefined, () => { drop(); res(null); });
+    });
+    _tmByUrl[def.url] = self;
   }
   return _tmByUrl[def.url];
 }

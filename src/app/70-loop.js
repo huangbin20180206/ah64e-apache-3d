@@ -158,6 +158,18 @@ function _frame(dt, doRender) {
     // 的目标在武器锥外打不到、锥缘目标的导引弹道又歪——悬停蹬舵是真实直升机
     // 的标准机动；地面停放不允许（轮式起落架被地面约束）。
     const yawBefore = FLY.yaw;
+    // 审核 2026-10-25 修复 BUG-1：倾斜槽（_leanP/_leanR）有两个写入方——
+    //   · 46-fpview（FPV 活跃时）：按加速度写入，表达"低头加速/压坡度"
+    //   · 本处（环绕模式）：按方向键平移输入写入
+    // 旧实现的问题：本处的复位语句被 `if ((!fp||!fp.active) && running && !ground)`
+    // 整块包住，FPV 退出瞬间 46-fpview 留下的残留值（最多 0.12rad ≈ 6.9°）无人接手，
+    // 直接叠到机体姿态上，表现为"切回环绕视角时机身抽一下"。
+    // 修法：明确"FPV 活跃 = 归 FPV 管"这一条唯一真相来源，非 FPV 帧无条件由本处
+    // 收敛回 0；下面的按键分支再把目标值 lerp 过去。
+    if (!fp || !fp.active) {
+      S._leanP = lerp(S._leanP || 0, 0, damp(0.10, dt));
+      S._leanR = lerp(S._leanR || 0, 0, damp(0.10, dt));
+    }
     if ((!fp || !fp.active) && S.running && FLY.state !== 'ground') {
       if (keys['a']) FLY.yaw += 0.9 * (S._pen ? S._pen.yawMul : 1) * dt;    // 左转（战损降航向响应）
       if (keys['d']) FLY.yaw -= 0.9 * (S._pen ? S._pen.yawMul : 1) * dt;    // 右转

@@ -240,7 +240,7 @@ class FPView {
     const bc = this.targets && this.targets.baseCenter;
     if (bc) {
       const dx = bc.x - FLY.x, dz = bc.z - FLY.z;
-      const dist = Math.round(Math.hypot(dx, dz) * 2);        // u→m（1u≈2m）
+      const dist = Math.round(Math.hypot(dx, dz) * U2M);        // u→m（U2M：1u≈2.27m，见 05-config）
       // 方位判定用机体前向/右向量投影（与 update 位移用的同一套约定，符号不会反）：
       //   前向 fwd=(sin yaw, cos yaw)；右向 right=(-cos yaw, sin yaw)。
       // toBase 在 fwd 上的投影>0=前方，在 right 上的投影>0=右侧。
@@ -267,8 +267,8 @@ class FPView {
     if (el._on !== on) { el._on = on; el.classList.toggle('show', on); }
     if (!on) return;
     const p = cy.probe(FLY, this._gp || (this._gp = {}));
-    const rim = Math.round(p.rimGap * 2);
-    const txt = '离地 ' + Math.max(0, Math.round(p.agl * 2)) + 'm · ' +
+    const rim = Math.round(p.rimGap * U2M);
+    const txt = '离地 ' + Math.max(0, Math.round(p.agl * U2M)) + 'm · ' +
       (rim >= 0 ? '崖顶下 ' + rim + 'm' : '已露头 ' + (-rim) + 'm') +
       (p.warn === 2 ? ' · ⚠ 拉起' : p.warn === 1 ? ' · 前方贴壁' : '');
     if (el._t !== txt) { el._t = txt; el.textContent = txt; }
@@ -406,7 +406,9 @@ class FPView {
     const sT = (k['x'] ? 1 : 0) - (k['z'] ? 1 : 0);
     this.vSide += (sT * this.SPD_MAX * 0.6 * _pen.speedMul - this.vSide) * Math.min(1, dt * 1.5);
     // phys2 姿态跟加速度：真直升机靠倾斜旋翼盘加速——向前加速低头、刹车抬头（"拉头减速"），
-    // 侧向加速往那边压坡度。最多约 7°，写进与环绕模式同一组"倾斜"槽（70-loop 叠加到机体姿态）
+    // 侧向加速往那边压坡度。最多约 7°，写进与环绕模式同一组"倾斜"槽（70-loop 叠加到机体姿态）。
+    // 审核 2026-10-25（BUG-1）：本槽位的归属判据是 fp.active，本文件只在活跃时写入；
+    // 退出后由 70-loop 无条件收敛回 0（本文件不负责清零，避免两处互相打架）。
     if (HOST.S && dt > 0) {
       const aF = (this.spd - _spd0) / dt, aS = (this.vSide - _vs0) / dt;
       const S_ = HOST.S, kL = Math.min(1, dt * 4);
@@ -465,8 +467,8 @@ class FPView {
     this._hudT = (this._hudT || 0) + dt;
     if (this._hudT > 0.15) {
       this._hudT = 0;
-      UI('fp-spd').textContent = (this.spd * 2.27 * 3.6).toFixed(0);   // phys2：1 单位 = 2.27 米（旧按 2 米，读数偏小 12%）
-      UI('fp-alt').textContent = (FLY.alt * 2.27).toFixed(0);
+      UI('fp-spd').textContent = (this.spd * U2M * 3.6).toFixed(0);   // U2M：1 单位 = 2.27 米（u→m→km/h）
+      UI('fp-alt').textContent = (FLY.alt * U2M).toFixed(0);          // U2M（审核 2026-10-25：原为字面量 2.27）
       UI('fp-hdg').textContent = (((FLY.yaw * 180 / Math.PI) % 360 + 360) % 360).toFixed(0).padStart(3, '0');
       // P7：稳定度读数（由 70-app loop 派生写入 S._stability；悬停=100%，机动中下降）
       const stab = (HOST.S && HOST.S._stability != null) ? Math.round(HOST.S._stability * 100) : 100;
@@ -558,7 +560,7 @@ class FPView {
       const py = Math.round((-v.y * 0.5 + 0.5) * innerHeight);
       if (px !== C.x) { C.x = px; lockEl.style.left = px + 'px'; }
       if (py !== C.y) { C.y = py; lockEl.style.top = py + 'px'; }
-      const dm = Math.round(lockD * 2);
+      const dm = Math.round(lockD * U2M);
       if (dm !== C.d) { C.d = dm; UI('fp-lock-d').textContent = dm + ' m'; }
     } else {
       // 屏外：边缘方位箭头（绕屏心旋转指向，距离屏心 170px）+ 目标标签

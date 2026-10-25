@@ -177,6 +177,9 @@ function applyQuality(q) {
   // P0-② 阴影/倒影/各向异性按质量档统一下发
   if (W.setShadowQuality) W.setShadowQuality(P.shadow, P.shadowRadius);
   if (refl) refl.setUpdateRate(P.reflect);
+  // 审核 2026-10-25 修复 P1-3：aniso 此前是死配置（定义了但全库无消费，各贴图硬编码 8）。
+  // 现在真正下发到场景各贴图；W.scene 未就绪时静默跳过（finish 阶段会再走一次 applyQuality）。
+  if (W && W.scene) applySceneAniso(renderer, W.scene, P.aniso);
   // P10：重点部件细节件跟随质量档（低档加载路径降级——不加载；切档联动显隐）
   if (dp) dp.setQuality(q);
   resize();

@@ -37,7 +37,7 @@ const ANIMAL_DEF = {
   m: { url: 'assets/targets/camel.glb', walk: 0.35, run: 1.3, hw: 0.13, hit: 0.5 },
   d: { url: 'assets/targets/donkey_cart.glb', walk: 0.5, run: 1.2, hw: 0.1, hit: 0.55 },
 };
-const ANIMAL_K = 1 / 2.27;
+const ANIMAL_K = U2M_INV;
 const ANIMAL_IDLE = [0, 0.25, 0.5, 0.75].map((t, i) => ['i' + i, 'Idle', t]);
 const MOTO_LEN = 0.95;               // 2.1m
 const CIV_PENALTY = 150;

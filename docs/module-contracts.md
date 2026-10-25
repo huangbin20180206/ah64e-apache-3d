@@ -79,7 +79,10 @@
    "WIND",
    "qualityPreset",
    "windVec",
-   "G_U"
+   "G_U",
+   "U2M",
+   "U2M_INV",
+   "applySceneAniso"
   ],
   "depends": {
    "00-utils.js": [
@@ -208,6 +211,9 @@
    "skinTownBuilding"
   ],
   "depends": {
+   "05-config.js": [
+    "U2M_INV"
+   ],
    "00-utils.js": [
     "PI",
     "TAU",
@@ -387,6 +393,9 @@
    "RotorAudio"
   ],
   "depends": {
+   "05-config.js": [
+    "U2M"
+   ],
    "00-utils.js": [
     "mulberry32",
     "rnd"
@@ -547,6 +556,8 @@
    ],
    "05-config.js": [
     "BASE_C"
+   ,
+    "U2M_INV"
    ],
    "16-town.js": [
     "TOWN_CENTER"
@@ -761,6 +772,8 @@
    ],
    "05-config.js": [
     "FLY_BOUND"
+   ,
+    "U2M"
    ]
   }
  },
@@ -783,6 +796,9 @@
    "Rescue"
   ],
   "depends": {
+   "05-config.js": [
+    "U2M_INV"
+   ],
    "00-utils.js": [
     "mergeGeos",
     "vcKit",
@@ -935,6 +951,8 @@
    ],
    "05-config.js": [
     "qualityPreset"
+   ,
+    "applySceneAniso"
    ],
    "30-world.js": [
     "buildWorld"
@@ -1081,6 +1099,9 @@
    "syncFlyText"
   ],
   "depends": {
+   "05-config.js": [
+    "U2M"
+   ],
    "00-utils.js": [
     "clamp",
     "lerp"

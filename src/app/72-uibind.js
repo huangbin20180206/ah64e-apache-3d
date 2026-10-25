@@ -200,19 +200,16 @@ function bindUI() {
   };
   ck('chk-targets', v => syncTargetsVis());
   // P6：重置升级为完整清理（air 空中目标/rescue 救援重生成/武器瞬态/任务状态一并复位）
+  // 审核 2026-10-25：清理项改由 HOST.resetScenario（70-mission 的 resetScenarioState）
+  // 统一提供——此前本函数漏了 scenery.resetTrees / infantry.reset / life.reset /
+  // resetNightOps 四项，导致"重置靶场"后上一局炸倒的树、死亡/开火中的步兵、打光的
+  // 照明弹原地残留，与 startMission 行为不一致。现两条路径共用同一份逻辑。
   const resetRange = () => {
-    if (targets) targets.reset();
-    if (air) air.reset();
-    if (rig) { rig.clearTransient(); rig._dmgPenalty = 0; }   // P8：重置清受损散布惩罚
-    if (samwar) samwar.reset();          // Phase 19：清 SAM 状态（干扰弹补满/导弹清空）
+    if (HOST.resetScenario) HOST.resetScenario();
+    else if (targets) targets.reset();    // 兜底：极端时序下宿主槽位未注册
     if (samvis) samvis.clearVisual();    // Phase 19：兜底隐藏导弹/干扰弹网格
-    if (damageSys) damageSys.reset();     // Phase 19：清机务损伤/卡壳/过热/处置状态
-    if (enemyAir) enemyAir.reset();       // Phase 20：清 A2A 状态（相位/弹药/在场全清）
-    if (narrative) narrative.resetStrikes();   // Phase 21：清基地设施打击层（hp/alive/雷达停转复位）
-    if (enemyVis) enemyVis.clearVisual(); // Phase 20：兜底隐藏敌机/曳光/坠毁动画
-    if (resources) resources.start();     // Phase 20：燃油复位满（告警 latch 清零）
     if (rescue && W) rescue.setTerrain(W.terrainKey);
-    _kills = 0; updateTargetHUD(null); syncTargetsVis(); toast('靶场已重置');
+    syncTargetsVis(); toast('靶场已重置');
     S._mission = null; S._baseFound = false;
     if (music) music.setMode('ambient');   // Phase 13-S4：清场回落氛围垫乐
     { const mp = document.getElementById('mission'); if (mp) mp.classList.remove('show'); }
