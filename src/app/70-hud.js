@@ -172,6 +172,9 @@ function _tickHud(dt, s, rpm) {
       const cur = STEPS.reduce((b, v) => (S.quality >= v ? v : b), 0.75);
       const i = STEPS.indexOf(cur);
       if (S._qCeil === undefined) S._qCeil = 1.5;
+      // 护栏（2026-10-26 审核）：_qCeil 被压低后，唯一重置回 1.5 的路径是
+      // 72-uibind.js pickQ('auto')（用户手动切回自动画质）。若未来新增"开启自动"
+      // 的入口，必须同步重置 S._qCeil，否则自动升档会被旧上限永久卡住。
       if (S._qCool <= 0 && S._slow >= 3 && i > 0) {
         S._slow = 0; S._up = 0; S._qAuto = true; S._qCool = 10;
         S._qCeil = STEPS[i - 1];

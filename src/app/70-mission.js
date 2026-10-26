@@ -287,8 +287,12 @@ function setMissionDifficulty(k) {
 // invisible 且全在 launched 里，于是新任务 HUD 显示 8 发、按 F 却永远失败并提示
 // "地狱火已打完或未挂载"（提示本身也是错的）。修法：改走 rig.reload() 通道，
 // 它会清 launched 并恢复挂架可见性。
-// 用户手动取消勾选"AGM-114 地狱火 ×8"（apache.setWeapons 把挂架置 invisible）时
-// 不应被强行挂回：判据 = 挂架里有节点 visible 且不在 launched 中（即"用户没关挂载"）。
+// 挂载与否应尊重用户手动取消勾选"AGM-114 地狱火 ×8"（apache.setWeapons 把挂架置
+// invisible）——不应被强行挂回。
+// 【历史方案，已废弃，勿据此类推】曾按"挂架里有节点 visible 且不在 launched 中"
+// 判断是否挂载：该判据与 294-298 行的现行实现矛盾，且在 8 发全打光后恒为 false
+// （Hark 305dc4f 实测：第二局显示 8 发却打不出去）。现行唯一判据 = 面板勾选
+// chk-hellfire（与 V 键/装填按钮/武备面板四路同源），见函数内注释。
 function applyVariantAmmo() {
   if (!rig) return;
   // 2026-10-25 复核修正：挂载与否以面板勾选为准（与 V 键/装填按钮同源）。

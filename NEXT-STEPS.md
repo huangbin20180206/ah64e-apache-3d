@@ -11,10 +11,10 @@ cd ah64e-apache-3d
 
 已经有过这个仓库的，`git pull` 就行。
 
-**你要看的是最新提交**：
+**你要看的是最新提交**（以下数字会随新提交前移，以下面 `git log` 实际输出为准）：
 
 ```
-b7926c7  审核另一个 AI 的 13 提交 + 全库体检：修 10 个问题 + 回归守护 38 项
+git log --oneline -1    # 此文档写作时为 305dc4f（Hark 接手批）
 ```
 
 ## 二、先跑这三条，确认基线是绿的
@@ -22,7 +22,7 @@ b7926c7  审核另一个 AI 的 13 提交 + 全库体检：修 10 个问题 + �
 ```bash
 node build.mjs                     # 应输出：拓扑检查无反向引用 / id 契约 195-170 / 死引用 0
 node --check dist/app-check.mjs    # 应 Exit 0
-python -m pytest tools/tests_pure/ # 应 135 passed
+python -m pytest tools/tests_pure/ # 应 ≥139 passed（此文档写作时为 139；只增不减）
 ```
 
 **三条不绿就别往下做**，先把环境问题解决。
