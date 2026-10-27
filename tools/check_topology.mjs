@@ -204,7 +204,10 @@ function analyzeFile(src) {
         continue;
       }
       if (v === '[') { parenDepth++; continue; }
-      if (v === ')' || v === ']') { parenDepth--; declMode = false; expectingTarget = false; continue; }
+      if (v === ')' || v === ']') { parenDepth--; continue; }   // 2026-10-27：不清 declMode——
+      // `const a = f(1), b = f(2)` 第 2+ 声明目标需要逗号处 declMode 存活。防溢出：
+      // declareTop 由此获得的"括号内伪顶层声明"以 parenDepth 守卫（见 declareTop 定义），
+      // 不会进 fileSymbols 制造影跨文件边（真实仓库 loadTxt 假边教训）。
       if (v === '{') {
         pushScope(false);
         braceStack.push(true);
@@ -251,9 +254,15 @@ function analyzeFile(src) {
       if (w === 'catch') continue; // catch(e) 的 e 由通用 '(' 前瞻 + '{' 注入
       continue;
     }
-    // 方法名：前驱是类体层 '{'/';'/',' 且后继是 '(' → 是方法定义而非引用。
-    // 需与调用语句区分：方法名的 '(' 配对 ')' 后紧跟 '{'（函数体），调用则不是。
-    if (prev && prev.t === 'punc' && ['{', ';', ','].includes(prev.v) && next && next.t === 'punc' && next.v === '(') {
+    // 方法名 / 访问器键：前驱是类体层 '{'/';'/','/'  }'（或 get/set 关键字）且后继是
+    // '(' → 是方法定义而非引用。需与调用语句区分：方法名的 '(' 配对 ')' 后紧跟
+    // '{'（函数体），调用则不是。
+    // 2026-10-27：'}' 补入白名单——`} _advance(u, dt) {`（多方法挤一行）的方法定义名
+    // 曾被当引用上抛，是影子检查 538 嫌疑的主要来源；'(' 配对后必须跟 '{'（函数体）
+    // 才吞，调用语句不满足此形态，无假阳风险。
+    // 2026-10-27：get/set 前驱补入——`get arcSlot() {...}` 的键名同理漏判。
+    const prevIsAccessor = prev && prev.t === 'id' && (prev.v === 'get' || prev.v === 'set');
+    if ((prevIsAccessor || (prev && prev.t === 'punc' && ['{', ';', ',', '}'].includes(prev.v))) && next && next.t === 'punc' && next.v === '(') {
       const close = matchParen(idx + 1);
       if (close > 0) {
         const after = toks[close + 1];
@@ -263,7 +272,12 @@ function analyzeFile(src) {
     // 声明目标 vs 引用
     if (declMode) {
       const afterKeyword = prev && prev.t === 'id' && (prev.v === 'const' || prev.v === 'let' || prev.v === 'var');
-      const afterComma = prev && prev.t === 'punc' && prev.v === ',' && parenDepth === 0;
+      // 2026-10-27：afterComma 去掉 parenDepth===0 门槛——`const a = f(1), b = f(2)`
+      // 的第 2+ 声明目标此前因括号卡 depth 漏登记（"--dump" 少 1 边的根因：
+      // 70-start.js loadTxt/loading 慢性漏登记，还被对消成假绿）。安全性：declMode
+      // 只在声明语句内为真；对象字面量键（prev=','且 next=':'）已被键判定提前跳过；
+      // 函数实参逗号不进入本分支（调用语句 declMode 为 false）。
+      const afterComma = prev && prev.t === 'punc' && prev.v === ',';
       // 解构模式 { a, b } / [a, b] 的目标由 expectingTarget/afterComma 路径自然
       // 覆盖（'{' 压栈与 '}' 弹栈保持配对，不做任何索引跳跃——跳跃会吞掉配对
       // 令牌造成 braceStack/parenDepth 失衡，实测教训）

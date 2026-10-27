@@ -32,6 +32,7 @@ python -m pytest tools/tests_pure/ # 应 ≥139 passed（此文档写作时为 1
 1. `HANDOVER-2026-10-25.md` —— 交接文档，先读这个，里面有全部改动说明
 2. `docs/module-contracts.md` —— 拓扑契约（改代码必读，构建会强校验）
 3. `AGENTS.md` —— 仓库操作纪律
+4. `docs/FILE-MAP.md` —— 76 个源文件职责地图（改哪个功能去哪个文件，2026-10-27 新增）
 
 ## 四、接手的活儿：先验证，再开发
 

@@ -1035,6 +1035,11 @@
     "apache",
     "canvas",
     "orbit"
+   ],
+   "70-start.js": [
+    "loadFill",
+    "loadTxt",
+    "loading"
    ]
   }
  },
@@ -1480,6 +1485,8 @@
    "boot",
    "finish",
    "loadFill",
+   "loadTxt",
+   "loading",
    "prog"
   ],
   "depends": {
@@ -2331,7 +2338,7 @@
 ## 70-camera.js
 
 - **提供**: buildViewBar, saveShot, setView
-- **依赖**: 01-host.js（UI）；45-flight.js（FLY）；50-controls.js（VIEWS）；70-app.js（S, apache, canvas, orbit）
+- **依赖**: 01-host.js（UI）；45-flight.js（FLY）；50-controls.js（VIEWS）；70-app.js（S, apache, canvas, orbit）；70-start.js（loadFill, loadTxt, loading）
 - **调用时机**: 机位条 buildViewBar / setView（以机体位置与航向为参照）/ saveShot（render 后同帧取像素，由 loop 末尾 shotPending 触发）。
 
 ## 70-combat.js
@@ -2366,7 +2373,7 @@
 
 ## 70-start.js
 
-- **提供**: boot, finish, loadFill, prog
+- **提供**: boot, finish, loadFill, loadTxt, prog
 - **依赖**: 00-utils.js（STATS, clamp, countScene, fmtK）；01-host.js（HOST, UI, toast）；05-config.js（AC, WATER_Y, qualityPreset）；16-targets.js（TargetRange）；16-town.js（TownDistrict）；16-valley.js（CanyonRun）；18-audio.js（RotorAudio）；19-reflect.js（WaterReflection）；20-scene.js（ENV_PRESETS）；24-navlights.js（NightLights）；26-airtargets.js（AirTargets）；28-washfx.js（WashFX）；32-envpreset.js（applyPreset）；46-fpview.js（FPView）；47-betty.js（betty）；48-rescue.js（Rescue）；50-controls.js（VIEWS）；60-model.js（Apache, makeRotorDisc）；62-detailparts.js（DetailParts）；65-weapons.js（WeaponRig）；70-app.js（S, W, _kills, air, apache, applyQuality, arcade, audio, campaign, canvas, damageSys, disc, discMat, dp, enemyAir, enemyVis, fp, hitMark, killFeed, music, narrative, nlights, orbit, refl, renderer, rescue, resources, rig, samvis, samwar, targets, updateTargetHUD, washfx, weather）；70-camera.js（buildViewBar）；70-combat.js（_dmgApply）；70-loop.js（loop）
 - **调用时机**: 载入与装配：prog 进度条、boot 载 GLB、finish 装配子系统并注册 HOST.rig；文件末尾调用 boot()——必须是 70-* 组按文件名排序的最后一个（boot 同步段要求 70-* 顶层 const 已初始化）。
 
