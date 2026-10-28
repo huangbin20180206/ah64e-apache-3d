@@ -48,6 +48,11 @@ class Betty {
       if (alt < 4 && vy < -1.0 && HOST.S.running && FLY.state !== 'ground') this.warn('ALTITUDE', 8);
     }
     this._prevAlt = alt;
+    // VRS / 坠落特情：涡环失速告警（PULL UP，间隔 3 秒）
+    if (FLY.vrs && HOST.S && HOST.S.running) {
+      this.warn('PULL UP', 3.0);
+    }
+
     // AMMO：总弹药 < 初始 20%（gun 1200 + hf 8 ≈ 1208 → 阈值 ~242）
     if (HOST.rig && HOST.rig.gunAmmo !== undefined) {
       const total = (HOST.rig.gunAmmo || 0) + (HOST.rig.hfAmmo || 0);

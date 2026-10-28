@@ -11,9 +11,9 @@ class Composer {
     this.levels = 4;
     this.activeLevels = 4;
     this.enabled = true;
-    this.uThresh = 1.42;
-    this.uKnee = 0.60;
-    this.strength = 0.55;
+    this.uThresh = 1.08;
+    this.uKnee = 0.65;
+    this.strength = 0.62;
     this.exposure = 1.0;
     this.chroma = 1.0;
     this.grain = 1.0;

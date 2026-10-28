@@ -15,6 +15,9 @@ const FLY = {
   userAlt: null,        // P4-A 移动端右摇杆接管的高度（null=未接管，悬停钉回 HOVER+沉浮；
                         // 触地/FPV 退出同步——见 46-fpview exit）
   comp: 0,              // 停放俯仰带来的 root 高度补偿（地面时非零）
+  vrs: false,           // 涡环状态（Vortex Ring State）失速标志
+  vrsBuffet: 0,         // VRS 剧烈抖动量
+  ige: 1.0,             // 地面效应（In-Ground Effect）升力增益系数
   HOVER: 14,            // 悬停高度 u
   VY: 2.3,              // 垂直速度 u/s
   MIN_SPIN: 0.92,       // 起飞所需转速比（额定 289 RPM 的 92%）

@@ -391,9 +391,25 @@ class FPView {
     // 未建时的前几帧可能触发，稳态零分配）
     const _pen = (HOST.S && HOST.S._pen) || { speedMul: 1, yawMul: 1 };
     this.vYaw += yawRate * 1.1 * _pen.yawMul * dt;
+    // 拟真微气动：地面效应（IGE）与涡环状态（VRS）
+    // 1. 地面效应：距地 < 4.5u 时形成气垫，阻挡旋翼下洗外泄，提供额外缓冲，悬停更平稳
+    const ige = FLY.alt < 4.5 ? 1.0 + Math.max(0, (4.5 - FLY.alt) / 4.5) * 0.35 : 1.0;
+    FLY.ige = ige;
+
     // 升降：R 升 / Q 降（F 保留给地狱火，与环绕模式键位一致）
     const vyT = (k['r'] ? 1 : 0) - (k['q'] ? 1 : 0);
     this.vy += (vyT * 6 - this.vy) * Math.min(1, dt * 3.2);
+
+    // 2. 涡环状态（VRS）：低水平空速 + 大下沉率（直升机坠入自身下洗乱流导致升力骤降与振颤）
+    const hSpd = Math.hypot(this.spd, this.vSide);
+    const isVRS = FLY.alt > 3.5 && this.vy < -2.6 && hSpd < 4.5;
+    FLY.vrs = isVRS;
+    if (isVRS) {
+      this.vy -= dt * 2.2;   // 升力恶化
+      FLY.vrsBuffet = Math.sin(performance.now() * 0.045) * 0.018 + (Math.random() - 0.5) * 0.012;   // 旋翼失速振颤
+    } else {
+      FLY.vrsBuffet = 0;
+    }
     // 前向速度：W/S；俯冲加速：机头下俯 + W 推杆 → 重力势能转化（最高 ~1.9×）
     const spdT = (k['w'] ? this.SPD_MAX : k['s'] ? -this.SPD_REV : 0) * _pen.speedMul;
     const diveK = k['w'] ? clamp(FLY.pitch, 0, 0.9) : 0;
@@ -421,10 +437,10 @@ class FPView {
     FLY.yaw += shortestAngle(FLY.yaw, this.vYaw) * kk;
     // 俯仰极限：下俯扩到 -49°（俯冲攻击机动），上仰 +0.35 保持
     // 2026-10-14：下俯极限 0.85→1.0（≈57°），便于俯冲对地攻击
-    FLY.pitch += (clamp(this.vPitch * 0.55, -0.6, 1.0) - FLY.pitch) * kk;
+    FLY.pitch += (clamp(this.vPitch * 0.55, -0.6, 1.0) - FLY.pitch) * kk + (FLY.vrsBuffet || 0);
     // phys2 协调转弯：悬停原地蹬舵几乎不压坡度，速度越快转弯坡度越大（真机转弯靠压坡度）
     const _bankK = 0.06 + 0.16 * Math.min(1, Math.abs(this.spd) / this.SPD_MAX);
-    FLY.roll += (clamp(-yawRate * _bankK - this.vSide * 0.03, -0.35, 0.22) - FLY.roll) * kk;
+    FLY.roll += (clamp(-yawRate * _bankK - this.vSide * 0.03, -0.35, 0.22) - FLY.roll) * kk + (FLY.vrsBuffet || 0) * 0.6;
 
     // 位移：机体前向 × 前向速度 + 右向 × 侧飞速度 + 垂直（写入 FLY.x/z——
     // loop 每帧用它们重建 root.position，直接写 root.position 会被下一帧的
@@ -434,7 +450,8 @@ class FPView {
     const fx = Math.sin(FLY.yaw), fz = Math.cos(FLY.yaw);
     FLY.x = clamp(FLY.x + (fx * this.spd - Math.cos(FLY.yaw) * this.vSide) * dt, -FLY_BOUND, FLY_BOUND);
     FLY.z = clamp(FLY.z + (fz * this.spd + Math.sin(FLY.yaw) * this.vSide) * dt, -FLY_BOUND, FLY_BOUND);
-    FLY.alt = clamp(FLY.alt + (this.vy - Math.sin(FLY.pitch) * this.spd) * dt, 1.2, 40);
+    const vyEff = this.vy < 0 ? this.vy / ige : this.vy * ige;
+    FLY.alt = clamp(FLY.alt + (vyEff - Math.sin(FLY.pitch) * this.spd) * dt, 1.2, 40);
 
     // 相机：眼位 + 机体姿态（不加额外偏角——所见即机头）。
     // matrixWorld 要在本帧手动刷新（渲染器在 render 时才更新，直接用会滞后一帧）

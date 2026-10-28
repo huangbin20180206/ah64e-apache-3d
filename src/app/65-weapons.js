@@ -97,7 +97,7 @@ class WeaponRig {
     const tmat = {
       body: new THREE.MeshStandardMaterial({ color: 0x8a6a35, roughness: 0.35, metalness: 0.6 }),
       tip: new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.3, metalness: 0.4 }),
-      burn: new THREE.MeshBasicMaterial({ color: 0xffb043 }),     // 曳光火焰不受光照
+      burn: new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.4, 0.45) }),     // 曳光火焰不受光照（HDR 激发 Bloom 辉光）
     };
     for (let i = 0; i < 20; i++) {
       const g = new THREE.Group();
@@ -120,7 +120,7 @@ class WeaponRig {
     const fg = new THREE.PlaneGeometry(1, 1);
     for (let i = 0; i < 6; i++) {
       const m = new THREE.Mesh(fg, new THREE.MeshBasicMaterial({
-        map: this.glow, color: 0xffc27a, transparent: true, opacity: 0, depthWrite: false,
+        map: this.glow, color: new THREE.Color(2.4, 1.8, 1.1), transparent: true, opacity: 0, depthWrite: false,
         blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
       m.visible = false; m.renderOrder = 9;
       this.scene.add(m);
@@ -216,7 +216,7 @@ class WeaponRig {
     }
     const shTex = new THREE.CanvasTexture(shCv);
     const shGeo = new THREE.PlaneGeometry(2, 2);
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 6; i++) {
       const m = new THREE.Mesh(shGeo, new THREE.MeshBasicMaterial({ map: shTex,
         color: 0xb8a483, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
       m.rotation.x = -PI / 2;
@@ -241,6 +241,7 @@ class WeaponRig {
       p.lin = !!opt.lin;
       p.m.material.map = p.lin ? this.smokeTex : this.glow;   // E3：烟柱用线性淡出（默认平方淡出太快，浓烟看不见）
       p.m.material.color.setHex(opt.color ?? 0x8b949c);
+      if (opt.add && opt.hdr) p.m.material.color.multiplyScalar(opt.hdr);
       // Q3 烟尘受环境光：烟/尘是不发光的材质，黄昏偏暖、夜里压暗，
       // 不再在夜空里发灰白光（火光/闪光这类叠加发光的不受影响）
       if (!opt.add) { const k = SMOKE_TINT[(HOST.S && HOST.S.env) || 'day'] || SMOKE_TINT.day; p.m.material.color.multiply(_SMOKE_C.setRGB(k[0], k[1], k[2])); }
@@ -385,9 +386,9 @@ class WeaponRig {
     }
     if (this.onBlast) this.onBlast(x, y, z, tier);   // 31-scenery：附近树木摇晃/折倒/起火
     const T = tier >= 3 ? 1.45 : tier <= 1 ? 0.55 : 1.0;
-    // 三层爆闪
-    this._puff(x, y, z, { color: 0xffffff, s0: 0.6 * T, s1: 2.6 * T, life: 0.18, base: 0.95, add: true });
-    this._puff(x, y, z, { color: 0xffb054, s0: 0.8 * T, s1: 3.4 * T, life: 0.4, base: 0.85, add: true });
+    // 三层爆闪（HDR 超亮辉光核）
+    this._puff(x, y, z, { color: 0xffffff, s0: 0.6 * T, s1: 2.6 * T, life: 0.18, base: 0.95, add: true, hdr: 2.6 });
+    this._puff(x, y, z, { color: 0xffb054, s0: 0.8 * T, s1: 3.4 * T, life: 0.4, base: 0.85, add: true, hdr: 1.8 });
     this._puff(x, y + 0.3 * T, z, { color: 0xd8651e, s0: 1.0 * T, s1: 4.2 * T, life: 0.65, base: 0.55, rise: 0.8 });
     // 黑烟柱（威力越大越厚越长）
     const col = tier >= 3 ? 8 : tier <= 1 ? 2 : 5;
@@ -404,7 +405,7 @@ class WeaponRig {
     }
     // 实体破片 + 冲击波环（火箭以上）
     this.spawnFrags(x, y, z, tier >= 3 ? 10 : tier <= 1 ? 2 : 5);
-    if (tier >= 3) this._shock(x, Math.max(0.06, y * 0.25), z);
+    if (tier >= 2) this._shock(x, Math.max(0.06, y * 0.25), z, tier);
   }
 
   // 抛射 n 块实体破片（径向散开 + 重力 + 翻滚，落地停留至寿命结束）
@@ -424,14 +425,15 @@ class WeaponRig {
   }
 
   // 大威力爆炸的贴地冲击波环
-  _shock(x, y, z) {
+  _shock(x, y, z, tier = 2) {
     for (const s of this.shocks) {
       if (s.m.visible) continue;
       s.m.visible = true;
       s.m.position.set(x, y, z);
+      s.tier = tier;
       s.t = 0;
       s.m.scale.setScalar(0.5);
-      s.m.material.opacity = 0.6;
+      s.m.material.opacity = tier >= 3 ? 0.85 : 0.65;
       return;
     }
   }
@@ -1019,10 +1021,12 @@ class WeaponRig {
     for (const s of this.shocks) {
       if (!s.m.visible) continue;
       s.t += dt;
-      const k = s.t / 0.5;
+      const maxT = (s.tier >= 3 ? 0.65 : 0.45);
+      const k = s.t / maxT;
       if (k >= 1) { s.m.visible = false; continue; }
-      s.m.scale.setScalar(0.5 + (1 - (1 - k) * (1 - k)) * 7.5);   // 先快后慢（气浪减速）
-      s.m.material.opacity = 0.6 * (1 - k) * (1 - k);
+      const maxR = (s.tier >= 3 ? 10.5 : 5.8);
+      s.m.scale.setScalar(0.5 + (1 - (1 - k) * (1 - k)) * maxR);   // 先快后慢（气浪减速）
+      s.m.material.opacity = (1 - k) * (1 - k) * (s.tier >= 3 ? 0.85 : 0.65);
     }
 
     // ---- 烟尘 ----
