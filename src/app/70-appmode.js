@@ -60,7 +60,31 @@ function _kItem(cls, key, num, title, fn) {
   });
   return el;
 }
+// 键盘左右方向键无缝翻页浏览知识卡
+if (!window._knowKeyBound) {
+  window._knowKeyBound = true;
+  addEventListener('keydown', e => {
+    if (appState.mode !== 'show' || appState.tab !== 'know' || appState.know < 0) return;
+    if (e.target && /input|textarea/i.test(e.target.tagName)) return;
+    if (e.key === 'ArrowLeft' || e.key === '[') {
+      e.preventDefault();
+      focusKnow((appState.know - 1 + KNOW_CARDS.length) % KNOW_CARDS.length);
+    } else if (e.key === 'ArrowRight' || e.key === ']') {
+      e.preventDefault();
+      focusKnow((appState.know + 1) % KNOW_CARDS.length);
+    }
+  });
+}
+
 function buildKnowList() {
+  if (!document.getElementById('p5-kcnav-css')) {
+    const st = document.createElement('style'); st.id = 'p5-kcnav-css';
+    st.textContent = '.kc-nav{display:flex;gap:6px;margin-top:10px;padding-top:8px;border-top:1px solid rgba(159,212,184,.2)}' +
+      '.kc-nb{flex:1;padding:5px 8px;font-size:11px;background:rgba(255,255,255,.05);border:1px solid rgba(159,212,184,.3);color:#d0e6dc;border-radius:3px;cursor:pointer;transition:all .18s ease}' +
+      '.kc-nb:hover{background:rgba(159,212,184,.15);border-color:#9fd4b8;color:#fff}' +
+      '.kc-nb.on{background:#00e6a8;color:#000;font-weight:700;border-color:#00e6a8}';
+    document.head.appendChild(st);
+  }
   const box = UI('know-list');
   if (box && !box.childElementCount) {
     KNOW_CARDS.forEach((c, i) => box.appendChild(_kItem('kcard', String(i), String(i + 1).padStart(2, '0'), c.title, () => focusKnow(i))));
@@ -81,6 +105,20 @@ function _knowFly(node) {
   const d = Math.min(14, Math.max(5.5, r * 1.6 + 3.5));
   orbit.flyTo({ target: [c.x, c.y, c.z], theta: orbit.theta, phi: Math.min(orbit.phi, 1.32), dist: d, fov: 32 }, 1.1);
   const ck = UI('chk-auto'); if (ck) ck.checked = false;
+  // 战术聚焦高光脉冲：选定部件瞬时高亮微光淡出反馈
+  o.traverse(m => {
+    if (m.isMesh && m.material && m.material.emissive) {
+      const orig = m.material.emissive.clone();
+      m.material.emissive.setHex(0x00e6a8);
+      let step = 0;
+      const pulse = () => {
+        step += 0.06;
+        if (step < 1) { m.material.emissive.lerp(orig, 0.14); requestAnimationFrame(pulse); }
+        else { m.material.emissive.copy(orig); }
+      };
+      pulse();
+    }
+  });
 }
 function _knowExplode(v) {
   const e = UI('explode');
@@ -115,6 +153,25 @@ function focusKnow(i) {
   }
   labelInfo.querySelector('p').textContent = C.body;
   labelInfo.querySelector('small').textContent = '资料：' + C.src;
+  // 交互增强：上一张/下一张切换 + 360° 围绕当前部件环视
+  let navBox = labelInfo.querySelector('.kc-nav');
+  if (!navBox) {
+    navBox = document.createElement('div');
+    navBox.className = 'kc-nav';
+    labelInfo.appendChild(navBox);
+  }
+  navBox.innerHTML = '<button class="kc-nb kc-prev">⟵ 上一项</button>' +
+    '<button class="kc-nb kc-spin">360° 环视</button>' +
+    '<button class="kc-nb kc-next">下一项 ⟶</button>';
+  navBox.querySelector('.kc-prev').onclick = (e) => { e.stopPropagation(); focusKnow((i - 1 + KNOW_CARDS.length) % KNOW_CARDS.length); };
+  navBox.querySelector('.kc-next').onclick = (e) => { e.stopPropagation(); focusKnow((i + 1) % KNOW_CARDS.length); };
+  const spinBtn = navBox.querySelector('.kc-spin');
+  spinBtn.onclick = (e) => {
+    e.stopPropagation();
+    orbit.auto = !orbit.auto;
+    spinBtn.textContent = orbit.auto ? '停止环视' : '360° 环视';
+    spinBtn.classList.toggle('on', orbit.auto);
+  };
   labelInfo.style.display = 'block';
   labelInfo.dataset.cur = C.title;
   return true;

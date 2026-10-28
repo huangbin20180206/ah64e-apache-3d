@@ -65,6 +65,7 @@ const ARM_CSS = `
 @keyframes armKen{from{transform:scale(1.06)}to{transform:scale(1)}}
 #armory .arm-scan{position:absolute;top:0;bottom:0;width:3px;left:-4px;background:#9fd4b8;box-shadow:0 0 18px 4px rgba(159,212,184,.55);opacity:0;pointer-events:none}
 #armory .arm-scan.go{animation:armScan .7s cubic-bezier(.2,.7,.2,1) both}
+#armory .arm-frame.arm-img-fallback::before{content:'【 战术装备图像档案归档调取中 】';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;letter-spacing:.3em;color:#9fd4b8;background:radial-gradient(ellipse at center,rgba(18,52,60,.4) 0%,rgba(5,8,10,.9) 70%);z-index:1}
 @keyframes armScan{0%{left:0;opacity:1}90%{opacity:1}100%{left:100%;opacity:0}}
 #armory .arm-frame::after{content:'';position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(0deg,rgba(3,6,7,.88) 0%,rgba(3,6,7,0) 42%),
@@ -380,6 +381,14 @@ function _armShow(i) {
   back.dataset.i = String(i);
   back.alt = it.title;
   const src = ARM_DIR + it.img + '.webp';
+  const fr = el.querySelector('.arm-frame');
+  back.onerror = () => {
+    if (fr) fr.classList.add('arm-img-fallback');
+  };
+  back.onload = () => {
+    if (fr) fr.classList.remove('arm-img-fallback');
+    _armImgLoaded(back);
+  };
   if (back.getAttribute('src') === src && back.complete) _armImgLoaded(back);
   else back.src = src;
   // 标题

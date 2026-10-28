@@ -45,8 +45,31 @@ function renderLevelMap() {
     }
     html += '</div>';
   }
-  html += '</div><div class="lm-foot">上一关拿到 1 颗星即解锁下一关 · 评级达标 2 星 · 再完成附加目标 3 星</div>';
+  html += '</div>' +
+    '<div class="lm-endless-wrap">' +
+    '<button class="lm-endless-btn" >' +
+    '<span class="leb-tag">SPECIAL OP</span>' +
+    '<div class="leb-main"><b>战区无尽生存 · ENDLESS DEFENSE</b><span>动态多波次攻防 · 海陆空协同协同进犯 · 支持前线 FARP 野战停机坪补给与抢修</span></div>' +
+    '<span class="leb-act">出击 ➔</span></button></div>' +
+    '<div class="lm-foot">上一关拿到 1 颗星即解锁下一关 · 评级达标 2 星 · 再完成附加目标 3 星</div>';
   box.innerHTML = html;
+  const btnEndless = box.querySelector('.lm-endless-btn');
+  if (btnEndless) {
+    btnEndless.onclick = () => {
+      hideLevelMap();
+      if (HOST.setPlayMode && S.mode !== 'mission') HOST.setPlayMode('mission');
+      startMission('endless');
+    };
+  }
+  if (!document.getElementById('p5-endless-css')) {
+    const s = document.createElement('style'); s.id = 'p5-endless-css';
+    s.textContent = '.lm-endless-wrap{padding:10px 20px 0}.lm-endless-btn{width:100%;display:flex;align-items:center;gap:14px;padding:12px 18px;background:linear-gradient(90deg,rgba(255,165,0,.15),rgba(255,80,0,.08));border:1px solid rgba(255,180,60,.4);border-radius:6px;color:#fff;cursor:pointer;text-align:left;transition:all .2s ease}' +
+      '.lm-endless-btn:hover{background:linear-gradient(90deg,rgba(255,165,0,.25),rgba(255,80,0,.18));border-color:#ffa500;box-shadow:0 0 16px rgba(255,165,0,.35)}' +
+      '.leb-tag{background:#ff9800;color:#000;font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;letter-spacing:1px}' +
+      '.leb-main{flex:1}.leb-main b{display:block;font-size:14px;letter-spacing:1px;color:#ffe082}.leb-main span{font-size:11px;opacity:.75}' +
+      '.leb-act{font-size:13px;font-weight:700;color:#ffd54f;padding:4px 10px;border:1px solid rgba(255,213,79,.4);border-radius:4px}';
+    document.head.appendChild(s);
+  }
   if (!document.getElementById('p5-lvbest-css')) {
     const s = document.createElement('style'); s.id = 'p5-lvbest-css';
     s.textContent = '.lm-lv .lv-best{display:block;grid-column:1/-1;font-size:11px;opacity:.72;margin-top:2px;color:var(--accent2,#ffd27a)}';

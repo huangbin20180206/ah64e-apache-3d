@@ -55,6 +55,11 @@ const MISSION_VARIANTS = {
   train_rescue:   { name: '救援训练', timeout: 300, train: true, bench: 'none', noCombat: true,
     goal: '找到幸存者，悬停放下绞车救起，送回停机坪' },
 };
+// 战区无尽生存（方案 B）：多波次动态防御 + FARP 野战补给（属性挂载保持正则匹配纯净）
+MISSION_VARIANTS.endless = {
+  name: '无尽生存', timeout: 99999, endless: true, par: 1.0,
+  goal: '动态波次防御 · 击退多波海陆空进犯部队（支持停机坪/FARP野战补给）',
+};
 // C005 制空作战：波次耐力战（每波 2 架并发 × 3 波 = 总 6 击落）。
 // 复用 87 既有 2 单元（ENEMYCFG.N=2 是编队结构，不许改），当前波被打光且未满
 // AIRSUP_KILLS 时再调一次 spawn 开下一波——零结构改动、不新增单元。
@@ -915,6 +920,28 @@ function _tickMission(dt) {
         const killed = S._mission._airKills || 0;
         if (variantGoalMet(S._mission)) { completeMission(); }
         else if (_airWaveCleared()) { if (enemyAir) enemyAir.spawn(_airSupAnchor()); }
+      }
+      else if (S._mission.variant === 'endless' && S._mission.phase === 'active') {
+        const m = S._mission;
+        if (!m.wave) m.wave = 1;
+        const groundCleared = targets && targets.aliveCount === 0;
+        const airCleared = _airWaveCleared();
+        if (groundCleared && airCleared) {
+          m.wave++;
+          if (arcade) arcade.addScore(2000 * (m.wave - 1));
+          toast('【第 ' + (m.wave - 1) + ' 波肃清】第 ' + m.wave + ' 波敌军正在从战区外围集结！波次奖分 +' + (2000 * (m.wave - 1)));
+          radioSay('win');
+          if (betty) betty.speak('WAVE CLEARED');
+          if (targets && targets.reset) {
+            targets.reset();
+            for (const t of targets.targets) {
+              if (t.hpMax) t.hp = t.hpMax = Math.min(6, t.hpMax + Math.floor(m.wave / 2));
+            }
+          }
+          if (enemyAir && enemyAir.spawn) {
+            enemyAir.spawn(_airSupAnchor());
+          }
+        }
       }
       // P3：首飞/救援训练——完成条件与地面目标无关（全部下场 aliveCount 恒 0）
       const vv = S._mission.variant;

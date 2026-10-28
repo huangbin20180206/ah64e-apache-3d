@@ -263,7 +263,13 @@ function _tickResources(dt) {
       if (ev.type === 'warn1') { if (betty) betty.warn('LOW FUEL', 6); toast('燃油告急——规划返场补给'); }
       else if (ev.type === 'warn2') { if (betty) betty.warn('FUEL CRITICAL', 6); toast('燃油严重不足——立即返场！'); }
       else if (ev.type === 'fuelOut') { toast('燃油耗尽——迫降'); if (S._mission && !S._mission.frozen && S._mission.phase === 'active') failMission('fuel'); }
-      else if (ev.type === 'resupplied') { applyVariantAmmo(); toast('补给完成——燃油弹药已恢复'); if (betty) betty.speak('REARM COMPLETE'); }
+      else if (ev.type === 'resupplied') {
+        applyVariantAmmo();
+        if (targets) targets._heliDmg = Math.max(0, (targets._heliDmg || 0) - 6);
+        if (damageSys) damageSys.reset();
+        toast('【FARP 野战补给站】弹药满载 · 燃油注满 · 关键机务抢修完成！');
+        if (betty) betty.speak('REARM COMPLETE');
+      }
     }
     resources.events.length = 0;
   }
