@@ -182,10 +182,13 @@ class EnemyVis {
     const c = this.crashes[u.i];
     c.on = true; c.t = 0;
     c.x = u.x; c.y = u.y; c.z = u.z;
-    c.vy = 0;
+    c.vy = 2.0;                      // 初始被击中向上震颤
+    c.vx = (u.hx || 0) * 6.0;        // 继承前向与侧滑速度
+    c.vz = (u.hz || 0) * 6.0;
+    c.spinRate = (u.i === 0 ? 1 : -1) * (14.0 + Math.random() * 4.0); // 尾桨损毁疯狂反扭矩自旋
+    c.smokeT = 0;
     if (c.g) { c.g.visible = true; c.g.position.set(u.x, u.y, u.z); }
     else {
-      // 坠毁视觉体：借用该机 mesh 组（detached 驱动，落地后隐藏）
       const ud = this.units[u.i];
       c.g = ud.g;
       c.g.visible = true;
@@ -241,23 +244,31 @@ class EnemyVis {
       }
       if (tr.t >= (tr.hit ? 0.45 : 0.3)) tr.m.visible = false;
     }
-    // 坠毁动画：螺旋下坠 + 拖烟，触地 fx 爆炸后隐藏
+    // 电影级战损特写：尾桨失效反扭矩超高速自旋 + 尾梁起火爆燃 + 坠地殉爆
     for (const c of this.crashes) {
       if (!c.on) continue;
       c.t += dt;
-      c.vy -= G_U * dt;   // phys1 统一真实重力
+      c.vy -= G_U * dt * 1.15;
       c.g.position.y += c.vy * dt;
-      c.g.rotation.z = Math.min(c.g.rotation.z + dt * 2.0, 1.1);
-      c.g.rotation.y += dt * 1.6;
-      c.g.translateX(dt * 7);
-      if (this.fx && rnd() < 0.4) {
-        this.fx._puff(c.g.position.x, c.g.position.y + 0.4, c.g.position.z,
-          { color: 0x2f2f2f, s0: 0.14, s1: 0.6, life: 0.5, base: 0.5 });
+      c.g.position.x += (c.vx || 0) * dt;
+      c.g.position.z += (c.vz || 0) * dt;
+      c.g.rotation.y += (c.spinRate || 14.0) * dt;
+      c.g.rotation.x = Math.min(c.g.rotation.x + dt * 1.6, 1.3);
+      c.g.rotation.z += dt * 2.5;
+
+      c.smokeT = (c.smokeT || 0) + dt;
+      if (this.fx && c.smokeT >= 0.04) {
+        c.smokeT = 0;
+        const rx = (Math.random() - 0.5) * 0.5, rz = (Math.random() - 0.5) * 0.5;
+        this.fx._puff(c.g.position.x + rx, c.g.position.y + 0.3, c.g.position.z + rz,
+          { color: 0xff5511, s0: 0.25, s1: 0.9, life: 0.28, base: 0.95, add: true, hdr: 2.2 });
+        this.fx._puff(c.g.position.x + rx * 1.5, c.g.position.y + 0.5, c.g.position.z + rz * 1.5,
+          { color: 0x181614, s0: 0.45, s1: 2.4, life: 1.4, base: 0.7, rise: 0.8, lin: true });
       }
-      if (c.g.position.y <= 0.35) {
+      if (c.g.position.y <= 0.4) {
         c.on = false;
         c.g.visible = false;
-        if (this.fx) this.fx.explosion(c.g.position.x, 0.6, c.g.position.z, 2);
+        if (this.fx) this.fx.explosion(c.g.position.x, 0.5, c.g.position.z, 3);
       }
     }
   }

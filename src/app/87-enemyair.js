@@ -204,14 +204,14 @@ class EnemyAirModule {
       return;
     }
     if (u.phase === 'attack') {
-      // 站位保持：远逼近/近拉远（僚机侧翼分散=编队协同）
+      // 双机钳形协同：长机(0)正面牵制吸引视线，僚机(1)大侧偏包抄至盲区发动突袭
       const dx = hx - u.x, dy = hy - u.y, dz = hz - u.z;
       const l = Math.max(1e-4, Math.hypot(dx, dy, dz));
       const sgn = dist > C.ATK_FAR ? 1 : dist < C.ATK_NEAR ? -1 : 0;
-      const flank = (u.i === 0 ? 1 : -1) * C.ATK_FLANK;
+      const flank = (u.i === 0 ? 8 : -16);
       const tx = hx + dx / l * sgn * 8 - dz / l * flank;
       const tz = hz + dz / l * sgn * 8 + dx / l * flank;
-      const ty = hy + 2 + u.i * 1.5;
+      const ty = hy + (u.i === 0 ? 2 : 4.5);
       this._faceTo(u, hx, hy, hz);
       if (sgn !== 0) this._advanceToward(u, tx, ty, tz, dt);
       this._fire(u, env, dist, 1);
@@ -221,15 +221,16 @@ class EnemyAirModule {
       return;
     }
     if (u.phase === 'evade') {
-      // 对角蛇形：垂直正弦 + 水平垂直于敌我连线（两机符号相反=分散）
+      // 超低空地貌突防（NOE战术）：快速下压高度贴地飞行，加大横向蛇形机动甩开导引线
       const dx = hx - u.x, dz = hz - u.z;
       const l = Math.max(1e-4, Math.hypot(dx, dz));
       const px = -dz / l, pz = dx / l;
       const sgn = u.i === 0 ? 1 : -1;
       const w = Math.sin(u.pt * C.EVADE_SIN);
-      u.x += px * sgn * C.SPEED * dt * 0.8;
-      u.z += pz * sgn * C.SPEED * dt * 0.8;
-      u.y += w * C.EVADE_VY * dt;
+      u.x += px * sgn * C.SPEED * dt * 0.95;
+      u.z += pz * sgn * C.SPEED * dt * 0.95;
+      const noeAlt = 6.0 + u.i * 2.5;
+      u.y += (noeAlt - u.y) * Math.min(1, dt * 2.2) + w * 1.6 * dt;
       u.y = Math.max(4, Math.min(40, u.y));
       u.x = Math.max(-C.CLAMP_R, Math.min(C.CLAMP_R, u.x));
       u.z = Math.max(-C.CLAMP_R, Math.min(C.CLAMP_R, u.z));
