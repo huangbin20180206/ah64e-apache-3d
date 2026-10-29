@@ -928,7 +928,7 @@ function _tickMission(dt) {
         const airCleared = _airWaveCleared();
         if (groundCleared && airCleared) {
           m.wave++;
-          if (arcade) arcade.addScore(2000 * (m.wave - 1));
+          if (arcade) arcade.addBonus(2000 * (m.wave - 1));
           toast('【第 ' + (m.wave - 1) + ' 波肃清】第 ' + m.wave + ' 波敌军正在从战区外围集结！波次奖分 +' + (2000 * (m.wave - 1)));
           radioSay('win');
           if (betty) betty.speak('WAVE CLEARED');
