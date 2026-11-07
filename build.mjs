@@ -104,6 +104,26 @@ function assertAssetRefs() {
   return refs.size;
 }
 
+// ---------- 3.6 顶层函数重名检查 ----------
+// src/app/*.js 按文件名拼进同一个 IIFE：不同文件里的同名 function 声明会
+// 静默覆盖（后者生效），构建 / node --check / 纯测试全都不报错，只在运行期
+// 表现为「按钮点了没反应」这类哑故障。2026-11-07 的 B4 回归即由此而来
+//（74-tour.js 与 82-cutscene.js 各有一个 tourTogglePause）。
+// const / let / class 重名本身就会 SyntaxError，无需检查；这里只查函数声明。
+function assertNoDuplicateFunctions() {
+  const dir = path.join(SRC, 'app');
+  const seen = new Map(), dup = [];
+  for (const f of fs.readdirSync(dir).filter(x => x.endsWith('.js')).sort()) {
+    for (const m of read(path.join(dir, f)).matchAll(/^function\s+([A-Za-z_$][\w$]*)\s*\(/gm)) {
+      const n = m[1];
+      if (seen.has(n) && seen.get(n) !== f) dup.push(`${n}: ${seen.get(n)} / ${f}`);
+      else seen.set(n, f);
+    }
+  }
+  if (dup.length) throw new Error('顶层函数重名（单 IIFE 拼接后会静默覆盖）：' + dup.join(' | '));
+  return seen.size;
+}
+
 // ---------- 主流程 ----------
 // 构建前静态检查 UI(id) 契约：拼错或改 template 漏改会在运行时才炸，
 // 而且往往藏在切场地/进 FPV 之后才走的分支里，冒烟测试抓不到。
@@ -112,6 +132,7 @@ function assertAssetRefs() {
   const r = assertDomIds(ROOT);
   console.log(`id 契约检查：template ${r.defined.size} 个 / 代码引用 ${r.used.size} 个 / 死引用 0`);
 }
+console.log('顶层函数重名检查：' + assertNoDuplicateFunctions() + ' 个顶层函数，0 重名');
 
 const three = buildThree();
 const bgu = stripModule('BufferGeometryUtils.js');

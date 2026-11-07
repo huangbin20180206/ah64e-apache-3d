@@ -571,7 +571,7 @@ function tourStep(delta) {
   cutscene.targetT = 0;
 }
 
-function tourTogglePause() {
+function missionTourTogglePause() {
   if (!cutscene.on || cutscene.step !== 'tour') return;
   cutscene.tourPaused = !cutscene.tourPaused;
   const pb = UI('btn-tour-pause');
@@ -752,7 +752,7 @@ function cutStart(key) {
   const pauseBtn = UI('btn-tour-pause');
   if (pauseBtn) {
     pauseBtn.textContent = '⏸ 暂停检视 (P)';
-    pauseBtn.onclick = (e) => { e.stopPropagation(); tourTogglePause(); };
+    pauseBtn.onclick = (e) => { e.stopPropagation(); missionTourTogglePause(); };
   }
   const nextBtn = UI('btn-tour-next');
   if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); tourStep(1); };
@@ -1088,7 +1088,7 @@ addEventListener('keydown', e => {
     if (e.code === 'KeyP') {
       e.preventDefault();
       e.stopImmediatePropagation();
-      tourTogglePause();
+      missionTourTogglePause();
       return;
     }
     if (e.code === 'Space' || e.code === 'Enter') {

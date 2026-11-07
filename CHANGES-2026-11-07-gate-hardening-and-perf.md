@@ -57,18 +57,14 @@ node build.mjs                      → Exit 0（拓扑无反向引用 / id 契�
 node --check dist/app-check.mjs     → Exit 0
 uv run --with pytest pytest -q tools/tests_pure → 140 passed
 node tools/check_undefined.mjs --json → 63 嫌疑符号 / 431 命中（与改前一致，新增缓存符号无误报）
-无头 CI 冒烟 → 至 B4 前全部断言通过、页面 ERRORS: none；B4 暂停状态断言失败（既有问题，见第六节）
+无头 CI 冒烟 → **RESULT PASS / ERRORS: none / 全章通过（含 B4）**，见第七节
 dist/index.html 2254 KB（three 654 + loader 167 + app 1351）  appBundle sha256=3b105ca0…
 ```
 
 ## 六、未做与遗留（需老黄拍板 / 需真机）
 
-- **无头 CI 冒烟卡在 B4 暂停状态断言**（`RESULT FAIL`，但页面 `ERRORS: none`、
-  前 3 组断言全通过）：`{'paused': False, 'armed': True, 'ptxt': 'Ⅱ 暂停'}`。
-  已做 A/B 反向验证——把本次对 `74-tour.js:85` 的改动还原为原样、重建后重跑同一支冒烟，
-  **失败完全一致，确认与本次改动无关**，属既有问题（疑与 10-30 导览批次或本地无头 + D3D11
-  与 CI xvfb + SwiftShader 的环境/时序差异有关，未定论）。本次未修、未改测试、未改断言。
-  **合 main 前必须先跑通冒烟**：新 `pages.yml` 等回归成功才部署，回归红会把发布永久卡住。
+- **无头 CI 冒烟 B4 暂停状态断言**：初次跑 `RESULT FAIL`（页面 `ERRORS: none`），
+  A/B 排除本轮改动后定位为 10-30 遗留的**符号撞名回归**，当晚已修复并全章 PASS，见第七节。
 - **有头全量浏览器回归未跑**：会抢鼠标焦点，需人在场；本机 `uv run --with playwright`
   因拉包超时改用了已装好的本地 Python Playwright 跑无头冒烟。
   改后由 build / node --check / 纯测试三道门禁 + 无头冒烟（至 B4 前全绿、零运行时错误）覆盖，
@@ -80,3 +76,61 @@ dist/index.html 2254 KB（three 654 + loader 167 + app 1351）  appBundle sha256
 - `main` 与 Pages 未动：本次全部推到 `feat-visuals-aerodynamics`；合 main 等于发布未经 GPU 全量门禁的功能。
 - CHANGES 文档引用的 `shot_tactical_radar.png` / `shot_predator_patrol.png` / `shot_patrol_destroyed.png`
   在磁盘上不存在（历史账本承诺的证据缺失），未擅自补图或改他人文档。
+
+---
+
+## 七、续：B4 哑故障根因与修复（当晚「继续执行」）
+
+### 根因【已核实，运行时探针逐项取证】
+
+`src/app/*.js` 按文件名数字前缀拼进**同一个 IIFE**：
+
+- `74-tour.js:157` 定义 `function tourTogglePause()` —— 操作 `tour.paused`，
+  供 `74-tour.js:215` 的「一键导览（60 秒演示）」暂停按钮使用；
+- 10-30 批次在 `82-cutscene.js:574` 又定义了**同名**函数 —— 操作
+  `cutscene.tourPaused`，是「任务开场战术目标导览」的暂停。
+
+同一作用域里后拼入的函数声明生效，于是 74 的按钮点击实际调用了 82 的版本，
+`tour.paused` 永远不变；而且**不抛错、不告警、构建 / 语法 / 纯测试全绿**，
+只在运行期表现为「按钮点了没反应」。这也解释了为何 10-27 的 CI 是绿的。
+
+独立探针（`scratch/probe_b4.py`）复现 smoke 前序后的运行时读数：
+`on:true / pbtnSame:true / nPause:1 / errors:none`，点暂停后
+`paused` 仍 false、按钮文字仍「Ⅱ 暂停」—— 依次排除了
+「导览没启动」「拿错按钮」「重复 id」「事件被拦截」「JS 异常」。
+此前 A/B 已排除本轮改动，至此定位为 10-30 遗留的符号撞名回归。
+
+### 修法（3 行改名，精准修改）
+
+`82-cutscene.js` 的 `tourTogglePause` → `missionTourTogglePause`：
+定义 `:574` + 调用 `:755`（暂停按钮）、`:1091`（P 键），共 3 处。
+改名后只在本文件内引用，不跨文件 → `docs/module-contracts.md` 无需改动
+（`node build.mjs` 拓扑检查通过）。74 的老函数名保持不变。
+
+### 顺手补的护栏（防止再犯）
+
+`build.mjs` 新增 `assertNoDuplicateFunctions()`：扫全部 app 文件的行首
+`function NAME` 声明，跨文件重名直接构建失败并列出两个文件名。
+只查函数声明的理由：`const / let / class` 重名本身就会 SyntaxError，
+**只有函数声明会静默覆盖**。
+
+- 全库基线：修复前扫描 **295 个顶层函数 / 1 处重名**（正是 B4）；
+  修复后 **296 个 / 0 重名**。
+- 反向验证：临时造 `99-dup-probe.js` 定义 `syncFlyText` →
+  `node build.mjs` `Exit 1` 并精确报 `syncFlyText: 70-hud.js / 99-dup-probe.js`；
+  删除探针后重建 `Exit 0`。探针文件已清理。
+
+### 验证（修复后）
+
+```
+py -3 tools/tests/test_ci_smoke.py   → RESULT PASS / ERRORS: none
+   全章通过，含「ci smoke OK: B2 toast / B3 解说牌 / B4 tour 暂停状态机」
+node build.mjs                      → Exit 0（296 顶层函数 0 重名 / 资源引用 66 全覆盖）
+node --check dist/app-check.mjs     → Exit 0
+uv run --with pytest pytest -q tools/tests_pure → 140 passed
+node tools/check_undefined.mjs --json → 63 嫌疑符号 / 431 命中（与改前一致）
+dist/index.html 2254 KB，bundle sha256=c27c5690…
+```
+
+> 有头全量浏览器回归仍未跑（会抢鼠标焦点，需人在场）。
+> 但无头冒烟已全绿，**合 main 的冒烟阻塞项已解除**；`main` / Pages 依旧未动。
