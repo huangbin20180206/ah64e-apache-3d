@@ -54,6 +54,8 @@ function _kcBars(show) {
 function killcamTry(t, final) {
   if (!KC.allow || KC.on || !t || !t.pos) return false;
   if (appState.mode !== 'play' || !S._mission || S._mission.phase !== 'active') return false;
+  if (HOST.cutsceneState && HOST.cutsceneState.isOn && HOST.cutsceneState.isOn()) return false;
+  if (HOST.camSeq && HOST.camSeq.owner) return false;
   if (!_kcPrefOn()) return false;
   const now = performance.now();
   if (!final) {
@@ -102,6 +104,6 @@ function killcamUpdate(rawDt) {
   if (KC.t >= KC.dur) killcamEnd();
 }
 
-// 任意键 / 点击提前跳过
-addEventListener('keydown', () => { if (KC.on && KC.t > 0.25) killcamEnd(); }, true);
-addEventListener('pointerdown', () => { if (KC.on && KC.t > 0.25) killcamEnd(); }, true);
+// 任意键 / 点击提前跳过（消费事件防穿透触发机位/重置/引擎熄火）
+addEventListener('keydown', e => { if (KC.on && KC.t > 0.25) { e.preventDefault(); e.stopImmediatePropagation(); killcamEnd(); } }, true);
+addEventListener('pointerdown', e => { if (KC.on && KC.t > 0.25) { e.preventDefault(); e.stopImmediatePropagation(); killcamEnd(); } }, true);

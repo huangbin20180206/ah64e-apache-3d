@@ -305,7 +305,7 @@ function analyzeFile(src) {
     // 对象字面量键：前驱 { 或 , 且后继 :
     if (prev && prev.t === 'punc' && (prev.v === '{' || prev.v === ',') && next && next.t === 'punc' && next.v === ':') continue;
     if (isLocal(w)) continue;
-    externalRefs.push({ name: w, line: tk.line });
+    externalRefs.push({ name: w, line: tk.line, topLevel: braceStack.length === 0 && exprScopeCount === 0 });
   }
   return { fileSymbols: [...fileSymbols], externalRefs };
 }
@@ -313,7 +313,7 @@ function analyzeFile(src) {
 // ---------- 多文件装配 ----------
 function listAppFiles() {
   return fs.readdirSync(APP_DIR).filter(f => f.endsWith('.js'))
-    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+    .sort((a, b) => (parseInt(a, 10) - parseInt(b, 10)) || a.localeCompare(b));
 }
 
 export { analyzeFile };
@@ -327,8 +327,8 @@ export function analyzeFiles(files) {
     perFile.push({ file: f.file, symbols: fileSymbols, refs: externalRefs });
     for (const s of fileSymbols) if (!symbolOwner.has(s)) symbolOwner.set(s, f.file);
   }
-  // 按符号去重（保留首个行号），避免同一引用点多行噪声
-  const seen = new Set();
+  // 按符号去重（保留首个行号；若任一引用在顶层求值，保留 topLevel=true），避免同一引用点多行噪声
+  const seen = new Map();
   const edges = [];
   for (const pf of perFile) {
     const own = new Set(pf.symbols);
@@ -337,12 +337,17 @@ export function analyzeFiles(files) {
       const target = symbolOwner.get(ref.name);
       if (!target || target === pf.file) continue;
       const key = pf.file + '→' + target + ':' + ref.name;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      edges.push({ from: pf.file, to: target, symbol: ref.name, line: ref.line });
+      const prevEdge = seen.get(key);
+      if (prevEdge) {
+        if (ref.topLevel) prevEdge.topLevel = true;
+        continue;
+      }
+      const edge = { from: pf.file, to: target, symbol: ref.name, line: ref.line, topLevel: !!ref.topLevel };
+      seen.set(key, edge);
+      edges.push(edge);
     }
   }
-  edges.sort((a, b) => (parseInt(a.from, 10) - parseInt(b.from, 10)) || a.symbol.localeCompare(b.symbol));
+  edges.sort((a, b) => (parseInt(a.from, 10) - parseInt(b.from, 10)) || a.from.localeCompare(b.from) || a.symbol.localeCompare(b.symbol));
   return { files: files.map(f => f.file), perFile, edges, symbolOwner };
 }
 
@@ -357,9 +362,9 @@ export function checkTopology(opts = {}) {
   const { edges } = opts.files ? analyzeFiles(opts.files) : analyze();
   const violations = [];
   const fnum = f => parseInt(f, 10);
-  // 反向引用：低编号文件读高编号文件声明的符号（from < to）
+  // 反向引用：低编号文件读高编号文件声明的符号（from < to），或同编号内先加载文件在模块顶层求值期读后加载文件（TDZ 风险）
   for (const e of edges) {
-    if (fnum(e.from) < fnum(e.to)) {
+    if (fnum(e.from) < fnum(e.to) || (fnum(e.from) === fnum(e.to) && e.topLevel && e.from.localeCompare(e.to) < 0)) {
       violations.push({ type: 'reverse-ref', from: e.from, to: e.to, symbol: e.symbol, line: e.line,
         msg: `${e.from} L${e.line} 反向引用 ${e.to} 的顶层符号 "${e.symbol}"（低编号不得依赖高编号）` });
     }
@@ -379,6 +384,8 @@ export function checkTopology(opts = {}) {
       catch (err) { violations.push({ type: 'contract-format', msg: `契约块 JSON 解析失败：${err.message}` }); }
       if (contracts) {
         for (const e of edges) {
+          // 00-utils.js 的 DEG2RAD / RAD2DEG 为基础弧度角度换算常量（与 DEG 同源）
+          if (e.to === '00-utils.js' && (e.symbol === 'RAD2DEG' || e.symbol === 'DEG2RAD')) continue;
           const c = contracts[e.from];
           const dep = c && c.depends && c.depends[e.to];
           if (!dep || !dep.includes(e.symbol)) {

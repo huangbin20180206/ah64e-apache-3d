@@ -46,6 +46,11 @@ class Composer {
     this.sceneRT.depthTexture = new THREE.DepthTexture(2, 2);
     // 保存 RT 选项供低档释放后的惰性重建（修复七：原子重建/代 identity）
     this._rtOpts = opts;
+    // 本地优化 2026-10-30：pass 输出 RT（模糊链 mips a/b、godRT、dofRT）只承接
+    // 全屏四边形色彩 pass，不做深度测试/写入——省掉深度附件（约 10 张 RT 的深度
+    // 显存与每帧 clear 带宽）。sceneRT 是场景渲染目标，深度附件保留不动。
+    const passOpts = { ...opts, depthBuffer: false };
+    this._passOpts = passOpts;
     this._rtGen = 0;
     this.sceneRT.userData = { gen: 0 };
     this.sceneRT.depthTexture.userData = { gen: 0 };
@@ -54,17 +59,17 @@ class Composer {
     this.mips = [];
     for (let i = 0; i < this.levels; i++) {
       this.mips.push({
-        a: new THREE.WebGLRenderTarget(2, 2, opts),
-        b: new THREE.WebGLRenderTarget(2, 2, opts),
+        a: new THREE.WebGLRenderTarget(2, 2, passOpts),
+        b: new THREE.WebGLRenderTarget(2, 2, passOpts),
       });
     }
 
     // M3 体积光：低分辨率（1/4）径向光柱 RT
-    this.godRT = new THREE.WebGLRenderTarget(2, 2, { ...opts, samples: 0 });
+    this.godRT = new THREE.WebGLRenderTarget(2, 2, { ...passOpts, samples: 0 });
 
     // M2 景深：半分辨率散焦 RT + pass（读 scene 彩色 + depth 深度，按
     // |focus-depth| 环形采样——光斑近似；仅 FPV/锁定目标启用，0.75 档关闭）
-    this.dofRT = new THREE.WebGLRenderTarget(2, 2, { ...opts, samples: 0 });
+    this.dofRT = new THREE.WebGLRenderTarget(2, 2, { ...passOpts, samples: 0 });
     this.dofPass = new FSQuad(new THREE.ShaderMaterial({
       uniforms: {
         tScene: { value: null },
@@ -368,7 +373,7 @@ class Composer {
   // 惰性重建 DOF 专属资源（首次或从 0.75 档切回时；depthTexture 已由重建场景带）
   _ensureDof() {
     if (this.dofRT) { this._dofSized = false; return; }
-    this.dofRT = new THREE.WebGLRenderTarget(2, 2, { ...this._rtOpts, samples: 0 });
+    this.dofRT = new THREE.WebGLRenderTarget(2, 2, { ...this._passOpts, samples: 0 });
     this.dofRT.userData = { gen: this._rtGen || 0 };
     this._dofSized = false;
     if (this.w) this.setSize(this.w, this.h);   // 立即按当前尺寸重建分配

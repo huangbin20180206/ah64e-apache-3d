@@ -41,6 +41,7 @@ class FPView {
     this.targets = opts.targets;          // 地面靶标（锁定框来源）
     this.airTargets = opts.airTargets;    // 空中目标（锁定框来源）
     this.enemyAir = opts.enemyAir || null;   // Phase 20-A：A2A 敌机（锁定框候选）
+    this.narrative = opts.narrative || null; // 环境察打巡逻机（锁定框候选）
     this.active = false; this.locked = false;
     // 鼠标灵敏度（rad/px，用户反馈：原 0.0022 过慢难以追踪目标——默认提高
     // 到 0.004，面板滑块可 0.5x~2x 调节，enter 时按 S.fpSens 应用）
@@ -63,7 +64,8 @@ class FPView {
     // 只记上次真正写进 DOM 的整数像素与显隐态，变化才写。
     this._lk = { mode: '', x: -1e9, y: -1e9, d: -1, ang: 1e9, lt: '', lx: -1e9, ly: -1e9 };
     this.onSfx = null;              // 音效回调（锁定变化时由 app 注入）
-    this._lastLockKey = '';         // 锁定变化检测（label 变化才触发确认音）
+    this._lastLockKey = '';         // 锁定变化检测（兼容缓存）
+    this._lastLockTarget = null;    // 锁定目标对象引用（防同名目标切换丢失提示音）
     // 最终闭环修复（首帧异常隔离·acquisition generation）：
     // 每次 requestPointerLock() 创建一个 acquisition 对象 {gen, state}——
     //   state === 'armed'    guard 生效中，等待/可消费本 acquisition 的首条 mousemove
@@ -200,6 +202,9 @@ class FPView {
   }
 
   enter() {
+    if (HOST.camSeq && HOST.camSeq.owner) return;
+    if (HOST.cutsceneState && HOST.cutsceneState.isOn && HOST.cutsceneState.isOn()) return;
+    if (HOST.cinemaState && HOST.cinemaState.on) return;
     if (FLY.state !== 'hover') { toast('先起飞到悬停 (T) 再进入第一人称'); return; }
     this._calmEye();
     this.vYaw = FLY.yaw; this.vPitch = 0;
@@ -233,7 +238,7 @@ class FPView {
     this._syncCapture();
     // 进入时应用面板灵敏度设置（S.fpSens = 用户滑块倍率，默认 1）
     this.sens = 0.004 * ((HOST.S && HOST.S.fpSens) || 1);
-    toast('第一人称：鼠标瞄准 · WASD 平移 · R/Q 升降 · 左键机炮 · 右键火箭 · F 地狱火 · C 退出');
+    toast('第一人称：鼠标瞄准 · W/S 前后 · A/D 转向 · Z/E 侧飞 · R/Q 升降 · 左键机炮 · 右键/X 火箭 · F 地狱火 · C 退出');
     // #6 方向提示：一进 FPV 就播报敌方基地相对机头的方位 + 距离——解决"不知东南
     // 西北、找不到目标"。方位角 = 基地方向与机头夹角（左/右/前/后），供玩家判断
     // 该往哪转。基地中心由 16-targets build() 写入 baseCenter（起飞前必已建好）。
@@ -290,7 +295,15 @@ class FPView {
     // 残留的 true 会在下次进入 FP 时立刻自行加速。g/x（扳机键）一并清除——
     // 与 exitNormalized() 清键集对齐（P15-A 探针实证：普通 exit 漏清 g/x，
     // 与任务接管路径行为不一致）。
-    for (const k of ['w', 'a', 's', 'd', 'r', 'q', 'g', 'x']) keys[k] = false;
+    for (const k of ['w', 'a', 's', 'd', 'r', 'q', 'g', 'x', 'z', 'e']) keys[k] = false;
+    for (const k of Object.keys(keys)) keys[k] = false;
+    FLY.vrs = false; FLY.vrsBuffet = 0; FLY.ige = 1.0;
+    this.lockD = 0; this._lastLockTarget = null; this._lastLockKey = ''; this.pitchKeys = 0;
+    this._lk.mode = 'off';
+    const _lkEl = UI('fp-lock'), _arEl = UI('fp-arr'), _lbEl = UI('fp-arr-label');
+    if (_lkEl) { _lkEl.style.display = 'none'; _lkEl.classList.remove('locked', 'seeking'); }
+    if (_arEl) _arEl.style.display = 'none';
+    if (_lbEl) _lbEl.style.display = 'none';
     // 环绕机位拉回直升机当前位置：目标高度随悬停高度抬升（否则相机会对着
     // 地面拍、机体出画——用户实测"退出后视角定位乱"的根因），并同步高度缓存
     this.orbit.tTarget.set(FLY.x, 1.1 + FLY.alt * 0.92, FLY.z);
@@ -347,11 +360,21 @@ class FPView {
     // 机体状态规范化：地面停放、高度归零、姿态归零、航向/位置用调用方
     //（startMission）随后按任务规定初值设置；这里只保证无残留
     FLY.state = 'ground'; FLY.alt = 0;
-    FLY.userAlt = 0;                      // 任务规定地面值（P4-A userAlt 通道）
+    FLY.vrs = false; FLY.vrsBuffet = 0; FLY.ige = 1.0;
+    this.lockD = 0; this._lastLockTarget = null; this._lastLockKey = ''; this.pitchKeys = 0;
+    FLY.userAlt = null;                   // 解除高度接管（P4-A userAlt 通道，防下次爬升砸地）
     FLY.pitch = 0; FLY.roll = 0;
     if (HOST.S) HOST.S._alt = 0;          // 高度缓存同步（防 orbit tTarget 残留抬升）
     // 驾驶键与输入累积全清（触屏/键盘按住不放的残留）
-    for (const k of ['w', 'a', 's', 'd', 'r', 'q', 'g', 'x']) keys[k] = false;
+    for (const k of ['w', 'a', 's', 'd', 'r', 'q', 'g', 'x', 'z', 'e']) keys[k] = false;
+    for (const k of Object.keys(keys)) keys[k] = false;
+    FLY.vrs = false; FLY.vrsBuffet = 0; FLY.ige = 1.0;
+    this.lockD = 0; this._lastLockTarget = null; this._lastLockKey = ''; this.pitchKeys = 0;
+    this._lk.mode = 'off';
+    const _lkEl = UI('fp-lock'), _arEl = UI('fp-arr'), _lbEl = UI('fp-arr-label');
+    if (_lkEl) { _lkEl.style.display = 'none'; _lkEl.classList.remove('locked', 'seeking'); }
+    if (_arEl) _arEl.style.display = 'none';
+    if (_lbEl) _lbEl.style.display = 'none';
     // Orbit 目标拉回停放位（相机交还环绕；x/z 由调用方随后按任务起点设置）
     this.orbit.tTarget.set(FLY.x || 0, 1.1, FLY.z || 0);
     this.orbit.target.copy(this.orbit.tTarget);
@@ -419,7 +442,8 @@ class FPView {
     const _slow = Math.abs(_spdTT) < Math.abs(this.spd);
     this.spd += (_spdTT - this.spd) * Math.min(1, dt * (_slow ? 0.7 : 1.0));
     // 侧飞速度：Z 左 / X 右（悬停侧飞，速度为前向的 60%——侧飞比前飞慢）
-    const sT = (k['x'] ? 1 : 0) - (k['z'] ? 1 : 0);
+    // 本地修补 2026-10-30：右串原本是 X，与 X=火箭冲突，改用 E（E 换涂装已让位 FPV）
+    const sT = (k['e'] ? 1 : 0) - (k['z'] ? 1 : 0);
     this.vSide += (sT * this.SPD_MAX * 0.6 * _pen.speedMul - this.vSide) * Math.min(1, dt * 1.5);
     // phys2 姿态跟加速度：真直升机靠倾斜旋翼盘加速——向前加速低头、刹车抬头（"拉头减速"），
     // 侧向加速往那边压坡度。最多约 7°，写进与环绕模式同一组"倾斜"槽（70-loop 叠加到机体姿态）。
@@ -462,6 +486,11 @@ class FPView {
     // 这里全部走构造期分配的暂存向量：本函数每帧执行，clone()/new Vector3()
     // 会稳定产出 4 个短命对象/帧（60fps ≈ 240 个/秒）给 GC 添无谓压力。
     const eye = this._eyeW.copy(this.eye);
+    // G 值微动态惯性晃动（大过载下沉/后坐/横移反馈）
+    const gSwayX = (-this.vSide * 0.006 + (Math.random() - 0.5) * (HOST.S ? (HOST.S._shake || 0) * 0.06 : 0));
+    const gSwayY = (-this.spd * 0.003 + (FLY.vrsBuffet || 0) * 0.04);
+    eye.x += gSwayX;
+    eye.y += gSwayY;
     this.apache.root.localToWorld(eye);
     cam.position.copy(eye);
     // 相机沿机头 +Z 看；Three 相机自身视线是 -Z，不能直接复制机体四元数。
@@ -504,62 +533,125 @@ class FPView {
       }
     }
 
-    // —— 目标指示：机炮锥内最近目标（地面+空中合并取近）投影跟随 ——
-    // 与炮塔自动追踪同款锥角逻辑：十字线放目标附近即锁定，方框+距离实时跟随
-    // #6 发现/锁定解耦：锥角 45/42→180（全向）。旧值只在机头窄锥内找目标，
-    // 机腹下方/侧后方的目标一律不显示，玩家进 FPV 后屏上空空如也、不知东南西北
-    //（用户实测"无法主动发现目标、不知方向"）。现全向取最近存活目标：目标在
-    // 屏内→亮锁定框（可攻击）；目标在屏外→边缘箭头指向它（跟着箭头压机头即入屏）。
-    // 屏内/屏外切换沿用下方既有逻辑（相机 FOV≈34°＜60° 自瞄锥，屏内即在可攻击锥内）。
-    let lock = null, lockD = 1e9;
+    // —— 目标指示：火控锥内目标（地面+空中智能优选）投影跟随 ——
+    this.updateLockHud(dt);
+  }
+
+  // 目标锁定框与屏外方位箭头更新（FPV 与第三人称火控通用）
+  updateLockHud(dt) {
+    void dt;
+    // 发现/锁定分级规范：
+    // 全向取视野内最近目标；若在视野内但超出武器火控锥（空 32°/地 30°），
+    // 显示虚线框及“转向捕获 / 未锁定”指示；进入有效火控锥后转为实线绿色锁定框并提示建议武器。
+    let lock = null, lockD = 1e9, lockAngDeg = 180;
+    this.apache.root.updateMatrixWorld(true);
     const nose = this._nose.set(0, 0, 1).applyQuaternion(this.apache.root.quaternion);
-    if (this.targets && this.targets.enabled) {
-      const gt = this.targets.nearestAhead(this.apache.root.position, nose, 180);
-      if (gt) { lock = gt; lockD = gt.pos.distanceTo(this.apache.root.position); }
-    }
+    const hp = this.apache.root.position;
+    const lookingUp = nose.y > -0.05;
+
+    let airCand = null, airAngDeg = 180, airD = 1e9;
     if (this.airTargets && this.airTargets.enabled) {
-      const at = this.airTargets.nearest(this.apache.root.position, nose, 180);
-      if (at && at.d < lockD) { lock = at.t; lockD = at.d; }
+      const at = this.airTargets.nearest(hp, nose, 180);
+      if (at) {
+        const to = at.t.pos.clone().sub(hp).normalize();
+        const ang = Math.acos(Math.max(-1, Math.min(1, to.dot(nose)))) * RAD2DEG;
+        airCand = at.t; airAngDeg = ang; airD = at.d;
+      }
     }
-    // Phase 20-A：A2A 敌机进锁定候选（合并取近——与无人机/地面目标同竞争）
+    // 基地环境察打巡逻无人机进锁定候选
+    const nr = typeof this.narrative === 'function' ? this.narrative() : this.narrative;
+    if (nr && nr.enabled && nr.nearest) {
+      const nt = nr.nearest(hp, nose, 180);
+      if (nt) {
+        const to = nt.t.pos.clone().sub(hp).normalize();
+        const ang = Math.acos(Math.max(-1, Math.min(1, to.dot(nose)))) * RAD2DEG;
+        if (ang < airAngDeg) {
+          airCand = nt.t; airAngDeg = ang; airD = nt.d;
+        }
+      }
+    }
+
+    // Phase 20-A：A2A 敌机进锁定候选
     if (this.enemyAir && this.enemyAir.enabled) {
-      const et = this.enemyAir.nearest(this.apache.root.position, nose, 180);
-      if (et && et.d < lockD) { lock = et.t; lockD = et.d; }
+      const et = this.enemyAir.nearest(hp, nose, 180);
+      if (et) {
+        const to = et.t.pos.clone().sub(hp).normalize();
+        const ang = Math.acos(Math.max(-1, Math.min(1, to.dot(nose)))) * RAD2DEG;
+        if (ang < airAngDeg) {
+          airCand = et.t; airAngDeg = ang; airD = et.d;
+        }
+      }
     }
+
+    let gndCand = null, gndAngDeg = 180, gndD = 1e9;
+    if (this.targets && this.targets.enabled) {
+      const gt = this.targets.nearestAhead(hp, nose, 180);
+      if (gt) {
+        const to = new THREE.Vector3(gt.pos.x, 0.9, gt.pos.z).sub(hp).normalize();
+        const ang = Math.acos(Math.max(-1, Math.min(1, to.dot(nose)))) * RAD2DEG;
+        gndCand = gt; gndAngDeg = ang; gndD = gt.pos.distanceTo(hp);
+      }
+    }
+
+    const airInCone = airCand && airAngDeg <= 32;
+    const gndInCone = gndCand && gndAngDeg <= 30;
+
+    if (airInCone && gndInCone) {
+      if (lookingUp || airAngDeg <= gndAngDeg) {
+        lock = airCand; lockD = airD; lockAngDeg = airAngDeg;
+      } else {
+        lock = gndCand; lockD = gndD; lockAngDeg = gndAngDeg;
+      }
+    } else if (airInCone) {
+      lock = airCand; lockD = airD; lockAngDeg = airAngDeg;
+    } else if (gndInCone) {
+      lock = gndCand; lockD = gndD; lockAngDeg = gndAngDeg;
+    } else if (airCand && (!gndCand || airAngDeg < gndAngDeg)) {
+      lock = airCand; lockD = airD; lockAngDeg = airAngDeg;
+    } else if (gndCand) {
+      lock = gndCand; lockD = gndD; lockAngDeg = gndAngDeg;
+    }
+
     // M2 景深聚焦数据（只读遥测供 DOF）：锁定目标距离（u），未锁定=0
     this.lockD = lock ? lockD : 0;
     const lockEl = UI('fp-lock'), arrEl = UI('fp-arr');
     const C = this._lk;
     if (!lock || !lockEl) {
+      this._lastLockTarget = null;
+      this._lastLockKey = '';
       // 无目标：只在从"有目标"翻转过来的那一帧收起三个元素（含箭头标签）
       if (C.mode !== 'off') {
         C.mode = 'off';
-        if (lockEl) lockEl.style.display = 'none';
+        if (lockEl) { lockEl.style.display = 'none'; lockEl.classList.remove('locked', 'seeking'); }
         if (arrEl) arrEl.style.display = 'none';
         const lEl0 = UI('fp-arr-label');
         if (lEl0) lEl0.style.display = 'none';
       }
       return;
     }
-    // 建议武器（用户反馈：给对应目标建议武器并给出快捷键——按目标类型给出
-    // 快捷键提示；变化才写 DOM）。P16 验收修复：目标在屏外（箭头模式）时
-    // 提示同样可见——挂到箭头旁的目标标签里，不再只藏在锁定框内（用户
-    // 反馈"没有攻击目标使用武器的提示"）。
+
     const tp0 = lock.type || '';
+    const isAirTarget = tp0 === 'drone' || tp0 === 'balloon' || tp0 === 'plane' || tp0 === 'enemy';
+    const lockCone = isAirTarget ? 32 : 30;
+    const isLocked = lockAngDeg <= lockCone;
+
+    // 建议武器（按目标类型给出快捷键提示）
     const wTip = tp0 === 'tank' ? '建议：F 地狱火'
-      : tp0 === 'enemy' ? '建议：G 机炮 · F 地狱火'
-      : (tp0 === 'drone' || tp0 === 'balloon' || tp0 === 'plane') ? '建议：G 机炮'
+      : (tp0 === 'enemy' || tp0 === 'plane') ? '建议：G 机炮 · F 地狱火'
+      : (tp0 === 'drone' || tp0 === 'balloon') ? '建议：G 机炮'
       : '建议：G 机炮 · X 火箭';
-    {
-      const wEl = UI('fp-lock-w');
-      if (wEl && wEl.textContent !== wTip) wEl.textContent = wTip;
-    }
-    // 锁定变化检测：新目标进入锥内时触发确认音（每次换目标触发一次）
+
+    // 锁定变化检测：新目标进入有效火控锥时触发确认音（对象级比对防同名丢失）
     const lockKey = lock.label || lock.type || '';
-    if (lockKey !== this._lastLockKey) {
+    if (isLocked && (lock !== this._lastLockTarget || lockKey !== this._lastLockKey)) {
+      this._lastLockTarget = lock;
       this._lastLockKey = lockKey;
       if (this.onSfx) this.onSfx('lock');
+    } else if (!isLocked && lock === this._lastLockTarget) {
+      this._lastLockTarget = null;
+      this._lastLockKey = '';
     }
+
     const v = this._v.copy(lock.pos).project(this.W.camera);
     const onScr = v.z < 1 && Math.abs(v.x) < 0.92 && Math.abs(v.y) < 0.88;
     if (onScr) {
@@ -571,8 +663,23 @@ class FPView {
         const lEl1 = UI('fp-arr-label');
         if (lEl1) lEl1.style.display = 'none';
       }
-      // 亚像素抖动不写 DOM：投影值每帧都在动（机体振动），但四舍五入到
-      // 整数像素后大多数帧是同一个值，比较后再写能省掉绝大部分样式重算。
+      if (isLocked) {
+        if (!lockEl.classList.contains('locked')) {
+          lockEl.classList.add('locked');
+          lockEl.classList.remove('seeking');
+        }
+        const wEl = UI('fp-lock-w');
+        if (wEl && wEl.textContent !== wTip) wEl.textContent = wTip;
+      } else {
+        if (!lockEl.classList.contains('seeking')) {
+          lockEl.classList.add('seeking');
+          lockEl.classList.remove('locked');
+        }
+        const wEl = UI('fp-lock-w');
+        const sTip = '转向捕获 / 未锁定';
+        if (wEl && wEl.textContent !== sTip) wEl.textContent = sTip;
+      }
+      // 亚像素抖动不写 DOM
       const px = Math.round((v.x * 0.5 + 0.5) * innerWidth);
       const py = Math.round((-v.y * 0.5 + 0.5) * innerHeight);
       if (px !== C.x) { C.x = px; lockEl.style.left = px + 'px'; }
@@ -581,7 +688,6 @@ class FPView {
       if (dm !== C.d) { C.d = dm; UI('fp-lock-d').textContent = dm + ' m'; }
     } else {
       // 屏外：边缘方位箭头（绕屏心旋转指向，距离屏心 170px）+ 目标标签
-      //（P16 验收修复：目标名+武器建议挂箭头下方，屏外也有提示）
       const lEl = UI('fp-arr-label');
       if (C.mode !== 'arrow') {
         C.mode = 'arrow';
@@ -595,14 +701,13 @@ class FPView {
       if (px !== C.x) { C.x = px; arrEl.style.left = px + 'px'; }
       if (py !== C.y) { C.y = py; arrEl.style.top = py + 'px'; }
       if (lEl) {
-        // 标签内容/位置同款缓存写法（变化才写 DOM）；文字贴箭头下方
-        const lt = (lock.label || lock.type || '目标') + ' · ' + wTip;
+        const lt = (lock.label || lock.type || '目标') + ' · ' + (isLocked ? wTip : '转向捕获 / 未锁定');
         if (C.lt !== lt) { C.lt = lt; lEl.textContent = lt; }
         const ly = py + 18;
         if (ly !== C.ly) { C.ly = ly; lEl.style.top = ly + 'px'; }
         if (px !== C.lx) { C.lx = px; lEl.style.left = px + 'px'; }
       }
-      // 旋转量按 0.5° 量化：肉眼分辨不出，但能滤掉振动引起的逐帧重写
+      // 旋转量按 0.5° 量化
       if (Math.abs(ang - C.ang) > 0.0087) {
         C.ang = ang;
         arrEl.style.transform = `translate(-50%,-50%) rotate(${-ang}rad)`;

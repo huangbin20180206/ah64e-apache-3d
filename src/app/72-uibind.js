@@ -205,6 +205,7 @@ function bindUI() {
   // resetNightOps 四项，导致"重置靶场"后上一局炸倒的树、死亡/开火中的步兵、打光的
   // 照明弹原地残留，与 startMission 行为不一致。现两条路径共用同一份逻辑。
   const resetRange = () => {
+    if (HOST.cutsceneState && HOST.cutsceneState.cancel) HOST.cutsceneState.cancel();
     if (HOST.resetScenario) HOST.resetScenario();
     else if (targets) targets.reset();    // 兜底：极端时序下宿主槽位未注册
     if (samvis) samvis.clearVisual();    // Phase 19：兜底隐藏导弹/干扰弹网格
@@ -342,25 +343,33 @@ function bindUI() {
 
   // 顶栏按钮
   const hint = UI('hint');
+  const arcadeEl = UI('arcade');
+  const closeHint = () => {
+    hint.classList.remove('show');
+    UI('btn-help').classList.remove('on');
+    UI('btn-help').setAttribute('aria-expanded', 'false');
+  };
+  const closeArcade = () => {
+    if (!arcadeEl) return;
+    arcadeEl.classList.remove('show');
+    UI('btn-arcade').classList.remove('on');
+    UI('btn-arcade').setAttribute('aria-expanded', 'false');
+  };
   const toggleHint = () => {
     hint.classList.toggle('show');
     const on = hint.classList.contains('show');
+    if (on) closeArcade();
     UI('btn-help').classList.toggle('on', on);
     UI('btn-help').setAttribute('aria-expanded', on ? 'true' : 'false');
   };
   UI('btn-help').onclick = toggleHint;
   // 关闭按钮只做关闭（不 toggle）——否则在面板未弹出时点关闭反而会打开它
-  UI('hint-close').onclick = () => {
-    hint.classList.remove('show');
-    UI('btn-help').classList.remove('on');
-    UI('btn-help').setAttribute('aria-expanded', 'false');
-  };
+  UI('hint-close').onclick = closeHint;
 
   // P18：成就面板（★ 按钮 / A 键）——各难度最高分 + 8 项成就。内容经
   // arcade.state() 只读遥测渲染（83 模块 achList/diffKeys/diffName/hi 读取口），
   // 打开时重渲染；单局语义：未持久化成就仅本会话局内解锁记录，all_variants
   // 读跨局累计（st.allVariants）。与 #hint 同款抽屉（样式与焦点恢复同 P11 模式）
-  const arcadeEl = UI('arcade');
   const renderArcade = () => {
     if (!arcade) return;
     const st = arcade.state();
@@ -384,16 +393,12 @@ function bindUI() {
     if (!arcadeEl) return;
     arcadeEl.classList.toggle('show');
     const on = arcadeEl.classList.contains('show');
-    if (on) { renderArcade(); setTimeout(() => UI('arcade-close').focus(), 0); }
+    if (on) { closeHint(); renderArcade(); setTimeout(() => UI('arcade-close').focus(), 0); }
     UI('btn-arcade').classList.toggle('on', on);
     UI('btn-arcade').setAttribute('aria-expanded', on ? 'true' : 'false');
   };
   UI('btn-arcade').onclick = toggleArcade;
-  UI('arcade-close').onclick = () => {
-    arcadeEl.classList.remove('show');
-    UI('btn-arcade').classList.remove('on');
-    UI('btn-arcade').setAttribute('aria-expanded', 'false');
-  };
+  UI('arcade-close').onclick = closeArcade;
   UI('btn-shot').onclick = () => shotPending = true;
   UI('btn-panel').onclick = () => {
     const p = UI('panel');
@@ -421,8 +426,13 @@ function bindUI() {
     //（幂等无害），其余一字性操作全部忽略。
     if (e.repeat && !(e.key.toLowerCase() === 'g' || e.key.toLowerCase() === 'x')) return;
     const k = e.key;
-    // Phase 11 T1：Esc 跳过整个训练路径（S._train = 0）；导览的 Esc 交还在 74-tour
-    if (k === 'Escape') { if (S._train) S._train = 0; return; }
+    // Phase 11 T1：Esc 关闭快捷键帮助/成就抽屉，或跳过整个训练路径（S._train = 0）；导览的 Esc 交还在 74-tour
+    if (k === 'Escape') {
+      if (hint && hint.classList.contains('show')) { closeHint(); return; }
+      if (arcadeEl && arcadeEl.classList.contains('show')) { closeArcade(); return; }
+      if (S._train) S._train = 0;
+      return;
+    }
     if (k === ' ') { e.preventDefault(); setRun(!S.running); return; }
     const vi = VKEYS.indexOf(k);
     // P2-B2：键盘切机位时面板可能收起，用户只见画面在动——一次性 toast
@@ -436,10 +446,13 @@ function bindUI() {
     if (key === 'r' && !fpOn) { const c = UI('chk-auto'); c.checked = !c.checked; orbit.auto = c.checked; }
     else if (key === 'l') { const c = UI('chk-labels'); c.checked = !c.checked; c.onchange(); }
     else if (key === 'w' && !fpOn) { const c = UI('chk-wire'); c.checked = !c.checked; apache.setWireframe(c.checked); }
-    else if (key === 'e') setScheme(S.scheme === 'army' ? 'lowvis' : 'army');
+    else if (key === 'e' && !fpOn) setScheme(S.scheme === 'army' ? 'lowvis' : 'army');   // 本地修补：FPV 中 E=右侧飞（46-fpview），换涂装让位
     else if (key === 'p') shotPending = true;
     else if (key === 'h') toggleHint();
-    else if (key === 'a' && !fpOn) toggleArcade();   // P18：成就面板（FP 中 A=左转向，让位）
+    // P18：成就面板（FP 中 A=左转向，让位）。本地修补：再加"飞行中不触发"——
+    // 70-loop 悬停/平飞时 A 是尾桨左舵（偏航），原实现只在 FPV 让位，第三人称
+    // 飞行中按 A 会一边左转一边弹出成就面板遮挡视野。仅地面待机保留快捷键。
+    else if (key === 'a' && !fpOn && !(S.running && FLY.state !== 'ground')) toggleArcade();
     else if (key === 'f') { if (rig && !rig.launchHf()) toast('地狱火已打完或未挂载，按 V 装填'); }
     else if (key === 'k') actHoist();                    // 与 77-mobilefire 触屏键同一份逻辑
     else if (key === 'v') { if (rig) { rig.reload(UI('chk-hellfire').checked); toast('弹药已装填'); } }

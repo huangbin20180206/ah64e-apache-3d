@@ -357,6 +357,7 @@ class Rescue {
   }
 
   update(dt, heliPos) {
+    if (!heliPos) return;
     if (!this.ok && this.state === 'idle') { this.hook.visible = this.rope.visible = false; return; }
     this._sway = (this._sway || 0) + dt;
     // 机腹吊点

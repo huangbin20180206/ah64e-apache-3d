@@ -221,6 +221,9 @@ class DamageSystem {
   }
 
   // ---------- 派生量重算（写 _fxCache 的字段，返回同一对象引用——零分配） ----------
+  // 本地优化 2026-10-30：原实现每次 recompute 都新建对象字面量整体替换 _fxCache
+  //（update 每帧调 → ~60 对象/s，与注释"同一对象引用"不符）。改为字段级写入
+  // 复用同一对象；fx() 消费方拿到的引用跨帧稳定，语义不变。
   recompute() {
     const rL = this._lvl('rotor'), eL = this._lvl('engine'),
           wL = this._lvl('weapons'), aL = this._lvl('avionics');
@@ -228,23 +231,27 @@ class DamageSystem {
     const P = DMGCFG.HUD_FAIL_BASE - aL * 2;
     this._hudFail = aL >= 2 && (this.t % P) < DMGCFG.HUD_FAIL_DUR;
     this._hudDead = !!this.abState;
-    this._fxCache = {
-      vibMul: 1 + rL * 0.45,                                  // 振动
-      liftMul: 1 - rL * 0.10,                                  // 升力效率
-      respMul: (1 - rL * 0.08) * (this.loadReduce ? DMGCFG.LOADRED_RESP : 1),
-      trimDrift: rL >= 2 ? rL * 0.012 : 0,                    // 偏航配平漂移 rad/s
-      powerCap: (1 - eL * 0.16) * (this.mitigate ? DMGCFG.MITIGATE_CAP : 1),
-      overheat: this.overheat,
-      spreadAdd: wL * 0.06,                                    // 武器散布追加
-      jammed: this.jammed,                                     // 卡壳（含处置期）
-      hfOnline: wL < 4,                                        // 地狱火火控挂架在线
-      hudFail: this._hudFail,                                  // 姿态/威胁/RWR 读数间歇失效
-      hudDead: this._hudDead,                                  // 重启期全黑
-      rwrNoise: aL * 0.20,                                     // RWR 精度下降（84 消费）
-    };
-    return this._fxCache;
+    // 四系统等级的持久缓存（HUD 机务告警每帧读，levels() 零分配暴露）
+    const L = this._lvlCache || (this._lvlCache = { rotor: 0, engine: 0, weapons: 0, avionics: 0 });
+    L.rotor = rL; L.engine = eL; L.weapons = wL; L.avionics = aL;
+    const c = this._fxCache || (this._fxCache = {});
+    c.vibMul = 1 + rL * 0.45;                                  // 振动
+    c.liftMul = 1 - rL * 0.10;                                  // 升力效率
+    c.respMul = (1 - rL * 0.08) * (this.loadReduce ? DMGCFG.LOADRED_RESP : 1);
+    c.trimDrift = rL >= 2 ? rL * 0.012 : 0;                    // 偏航配平漂移 rad/s
+    c.powerCap = (1 - eL * 0.16) * (this.mitigate ? DMGCFG.MITIGATE_CAP : 1);
+    c.overheat = this.overheat;
+    c.spreadAdd = wL * 0.06;                                    // 武器散布追加
+    c.jammed = this.jammed;                                     // 卡壳（含处置期）
+    c.hfOnline = wL < 4;                                        // 地狱火火控挂架在线
+    c.hudFail = this._hudFail;                                  // 姿态/威胁/RWR 读数间歇失效
+    c.hudDead = this._hudDead;                                  // 重启期全黑
+    c.rwrNoise = aL * 0.20;                                     // RWR 精度下降（84 消费）
+    return c;
   }
   fx() { return this._fxCache; }
+  // 四系统等级只读缓存（同一对象引用跨帧复用；HUD 热路径专用，测试断言仍走 state()）
+  levels() { return this._lvlCache; }
 
   // 战损得分系数：1.0（零伤）..1.5（全损）——风险回报
   bonusMul() {

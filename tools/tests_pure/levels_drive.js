@@ -54,4 +54,23 @@ out.mig = { l21: P.rec('2-1'), l22: P.rec('2-2'), l23: P.rec('2-3'), open23: P.i
 out.corrupt = HOST.makeProgress({ storage: mem({ ah64_progress: '{bad' }), levels: LV }).totals().stars;
 out.future = HOST.makeProgress({ storage: mem({ ah64_progress: JSON.stringify({ schema_version: 9, levels: { '2-1': { stars: 3 } } }) }), levels: LV }).rec('2-1').stars;
 out.throwing = HOST.makeProgress({ storage: { getItem() { throw new Error('x'); }, setItem() { throw new Error('x'); } }, levels: LV }).record('2-1', 'B', 1, {}, '').stars;
+// 演练特权与存档导出/导入
+let pTest = HOST.makeProgress({ storage: mem(), levels: LV });
+const beforeToggle = pTest.isUnlocked('4-3');
+pTest.toggleAllUnlocked();
+const duringToggle = pTest.isUnlocked('4-3');
+pTest.toggleAllUnlocked();
+const afterToggle = pTest.isUnlocked('4-3');
+pTest.record('3-1', 'S', 888, {}, 'standard');
+const exported = pTest.exportCode();
+let pImport = HOST.makeProgress({ storage: mem(), levels: LV });
+const importOk = pImport.importData(exported);
+out.saveSystem = {
+  beforeToggle,
+  duringToggle,
+  afterToggle,
+  importOk,
+  importedStars: pImport.rec('3-1').stars,
+  importedScore: pImport.rec('3-1').bestScore,
+};
 console.log(JSON.stringify(out));

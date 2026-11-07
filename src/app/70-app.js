@@ -139,14 +139,21 @@ function streakBanner(text) {
   streakBanner._t = setTimeout(() => el.classList.remove('show'), 1400);
 }
 
-// FPV 命中标记：十字线收缩闪白 180ms（加色感，不遮挡瞄准）
-function hitMark() {
+// 全局命中反馈（准星 ✕ 标记 + FPV 十字线收缩）：普通命中白色、击杀命中血红
+function hitMark(isKill = false) {
+  const hm = UI('hud-hitmarker');
+  if (hm) {
+    hm.className = '';
+    void hm.offsetWidth;
+    hm.className = isKill ? 'kill' : 'hit';
+  }
   const r = UI('fp-reticle');
-  if (!r) return;
-  r.classList.remove('hit');
-  void r.offsetWidth;                       // 重排触发动画重启
-  r.classList.add('hit');
-  setTimeout(() => r.classList.remove('hit'), 180);
+  if (r) {
+    r.classList.remove('hit', 'kill');
+    void r.offsetWidth;
+    r.classList.add(isKill ? 'kill' : 'hit');
+    setTimeout(() => r.classList.remove('hit', 'kill'), isKill ? 260 : 180);
+  }
 }
 
 function resize() {

@@ -326,6 +326,32 @@ class WeaponRig {
       this.scene.add(m);
       this._craters.push(m);
     }
+    // 30mm 链炮枪口动态火光（常驻点光源）
+    this._mzlLight = new THREE.PointLight(0xffbe44, 0, 16, 2);
+    this._mzlLight.castShadow = false;
+    this.scene.add(this._mzlLight);
+    // 30mm 黄铜抛壳池（24 枚）
+    this._shells = [];
+    const shellGeo = new THREE.CylinderGeometry(0.016, 0.016, 0.07, 6);
+    const shellMat = new THREE.MeshBasicMaterial({ color: 0xdfb440 });
+    for (let i = 0; i < 24; i++) {
+      const m = new THREE.Mesh(shellGeo, shellMat);
+      m.visible = false;
+      this.scene.add(m);
+      this._shells.push({ m, v: new THREE.Vector3(), w: new THREE.Vector3(), t: 0, life: 0, groundH: 0 });
+    }
+  }
+  _ejectShell(from) {
+    for (const sh of this._shells) {
+      if (sh.m.visible) continue;
+      sh.m.visible = true;
+      sh.m.position.copy(from).addScaledVector(new THREE.Vector3(0.08, -0.12, -0.15).applyQuaternion(this.apache.root.quaternion), 1);
+      sh.v.set(1.6 + rnd() * 1.4, -0.6 - rnd() * 0.6, -0.5 + (rnd() - 0.5) * 0.8).applyQuaternion(this.apache.root.quaternion);
+      sh.w.set(rnd(-18, 18), rnd(-18, 18), rnd(-18, 18));
+      sh.t = 0; sh.life = 1.3;
+      sh.groundH = this._groundH(sh.m.position.x, sh.m.position.z);
+      return;
+    }
   }
   _groundH(x, z) {
     const cv = this.targets && this.targets.canyon;
@@ -346,8 +372,32 @@ class WeaponRig {
   clearImpacts() {
     for (const m of this._craters) m.visible = false;
     this._xl.t = this._xl.life; this._xLight.intensity = 0;
+    if (this._mzlLight) this._mzlLight.intensity = 0;
+    if (this._shells) for (const sh of this._shells) sh.m.visible = false;
   }
   _updateImpactFx(dt) {
+    if (this._mzlLight && this._mzlLight.intensity > 0.02) {
+      this._mzlLight.intensity *= Math.max(0, 1 - dt * 26);
+      if (this._mzlLight.intensity <= 0.05) this._mzlLight.intensity = 0;
+    }
+    if (this._shells) {
+      for (const sh of this._shells) {
+        if (!sh.m.visible) continue;
+        sh.t += dt;
+        if (sh.t >= sh.life) { sh.m.visible = false; continue; }
+        sh.v.y -= 15 * dt;
+        sh.m.position.addScaledVector(sh.v, dt);
+        sh.m.rotation.x += sh.w.x * dt;
+        sh.m.rotation.y += sh.w.y * dt;
+        sh.m.rotation.z += sh.w.z * dt;
+        if (sh.m.position.y <= sh.groundH + 0.035) {
+          sh.m.position.y = sh.groundH + 0.035;
+          sh.v.y = -sh.v.y * 0.38;
+          sh.v.x *= 0.7; sh.v.z *= 0.7;
+          sh.w.multiplyScalar(0.6);
+        }
+      }
+    }
     const tk = this.terrainKey || null;   // 70-loop 每帧写入（避免反向引用 W）
     if (tk !== this._craterTerr) { this._craterTerr = tk; for (const m of this._craters) m.visible = false; }
     const L = this._xl;
@@ -382,7 +432,7 @@ class WeaponRig {
         L.peak = peak; L.t = 0; L.life = tier >= 3 ? 0.55 : tier <= 1 ? 0.25 : 0.4;
         this._xLight.position.set(x, y + 1.4, z);
       }
-      if (y < 1.6) this._crater(x, z, tier >= 3 ? 3.4 : tier <= 1 ? 1.1 : 2.3);
+      if (y - this._groundH(x, z) < 1.6) this._crater(x, z, tier >= 3 ? 3.4 : tier <= 1 ? 1.1 : 2.3);
     }
     if (this.onBlast) this.onBlast(x, y, z, tier);   // 31-scenery：附近树木摇晃/折倒/起火
     const T = tier >= 3 ? 1.45 : tier <= 1 ? 0.55 : 1.0;
@@ -414,6 +464,8 @@ class WeaponRig {
       if (n <= 0) break;
       if (f.m.visible) continue;
       f.m.visible = true;
+      f.m.scale.setScalar(1);
+      f.m.rotation.set(0, 0, 0);
       f.m.position.set(x, y, z);
       const a = rnd(TAU);
       f.v.set(Math.cos(a) * rnd(2, 7), rnd(2.5, 6.5), Math.sin(a) * rnd(2, 7));
@@ -451,7 +503,7 @@ class WeaponRig {
       const m = _W_TUR2.copy(this.muzzle);
       v.sub(m);
       const h = Math.hypot(v.x, v.z), d = v.length();
-      const el = Math.atan2(v.y, h) * 57.2958, az = Math.atan2(v.x, v.z) * 57.2958;   // 弧度→度
+      const el = Math.atan2(v.y, h) * RAD2DEG, az = Math.atan2(v.x, v.z) * RAD2DEG;   // 弧度→度
       if (Math.abs(az) > 86 || el > 11 || el < -60 || d > 150) continue;
       if (d < bestD) { best = t; bestD = d; }
     }
@@ -492,6 +544,11 @@ class WeaponRig {
       const et = this.enemyAir.nearest(from, dir, 30);
       if (et) { aim = _W_AIM.copy(et.t.pos); aimD = et.d; aimAir = true; }
     }
+    // 空中巡逻无人机竞争软锁
+    if (!aimAir && this.narrative && this.narrative.enabled && this.narrative.nearest) {
+      const nt = this.narrative.nearest(from, dir, 30);
+      if (nt) { aim = _W_AIM.copy(nt.t.pos); aimD = nt.d; aimAir = true; }
+    }
     if (!aimAir && this.targets && this.targets.enabled) {
       // P16 验收修复：地面导引从 ['truck','barrel'] 扩入 'tank'——悬停平射时
       // 曳光沿机头水平飞行，飞越地面目标上方 13.7u（hitTest 判定半径 2.05u
@@ -511,6 +568,11 @@ class WeaponRig {
     }
     this._tracer(from, dir, aimAir);
     this._flash(from);
+    if (this._mzlLight) {
+      this._mzlLight.intensity = 5.2;
+      this._mzlLight.position.copy(from);
+    }
+    this._ejectShell(from);
     this._kick = 0.10;
     if (this.onSfx) this.onSfx('gun');
     if (this.onAmmo) this.onAmmo('gun');
@@ -545,35 +607,27 @@ class WeaponRig {
     // 空中优先判优仍保留离地高度逻辑（贴地打装甲、升空打飞行目标）。
     const airborne = a.root.position.y > 4;
     const lockDir = dir;
-    // 角偏移竞争锁定：谁更贴近锁定轴谁赢——而不是"空中无条件优先"。
-    // 旧规则会在机头明确指向地面装甲时，被 25° 锥内任意飞行目标劫持，
-    // 弹道看着"匪夷所思"（用户实测）。贴地无地面候选时空中目标仍可锁。
     let tgtRef = null, tgtAir = false, aimP = null, bestAng = 1e9;
-    if (this.targets && this.targets.enabled) {
-      const tgt = this.targets.nearestAhead(a.root.position, lockDir, 30, ['tank']);
-      if (tgt) {
-        aimP = new THREE.Vector3(tgt.pos.x, 0.9, tgt.pos.z);
-        tgtRef = tgt;
-        const to = aimP.clone().sub(a.root.position).normalize();
-        bestAng = Math.acos(Math.max(-1, Math.min(1, to.dot(lockDir))));
-      }
-    }
-    if (this.airTargets && this.airTargets.enabled && (airborne || !tgtRef)) {
-      const at = this.airTargets.nearest(c, lockDir, 25);
+    // 视线在水平线以上（机头平飞或仰视，或处于空中且明显瞄准空域）
+    const lookingUp = lockDir.y > -0.05;
+
+    // 对空火控锥放宽至 32°（容错提升）。当视线朝上或空中瞄准时优先锁定空中目标（无人机/巡飞弹/敌机）
+    if (this.airTargets && this.airTargets.enabled && (airborne || lookingUp || !this.targets || !this.targets.enabled)) {
+      const at = this.airTargets.nearest(c, lockDir, 32);
       if (at) {
         const to = at.t.pos.clone().sub(c).normalize();
         const ang = Math.acos(Math.max(-1, Math.min(1, to.dot(lockDir))));
-        if (ang < bestAng) {          // 更贴轴才接管，否则不劫持地面锁定
+        if (ang < bestAng) {
           aimP = at.t.pos.clone();
           tgtRef = at.t;
           tgtAir = true;
+          bestAng = ang;
         }
       }
     }
-    // Phase 20-A：A2A 敌机参与角偏移竞争（与无人机同规则——谁贴轴谁赢，
-    // 不无条件劫持地面锁定；敌机可被地狱火锁定，其规避状态机随之触发）
-    if (this.enemyAir && this.enemyAir.enabled && (airborne || !tgtRef)) {
-      const et = this.enemyAir.nearest(c, lockDir, 25);
+    // Phase 20-A：A2A 敌机参与角偏移竞争
+    if (this.enemyAir && this.enemyAir.enabled && (airborne || lookingUp || !this.targets || !this.targets.enabled)) {
+      const et = this.enemyAir.nearest(c, lockDir, 32);
       if (et) {
         const to = et.t.pos.clone().sub(c).normalize();
         const ang = Math.acos(Math.max(-1, Math.min(1, to.dot(lockDir))));
@@ -581,6 +635,39 @@ class WeaponRig {
           aimP = et.t.pos.clone();
           tgtRef = et.t;
           tgtAir = true;
+          bestAng = ang;
+        }
+      }
+    }
+    // 空中巡逻无人机参与地狱火锁定角偏移竞争
+    if (this.narrative && this.narrative.enabled && this.narrative.nearest && (airborne || lookingUp || !this.targets || !this.targets.enabled)) {
+      const nt = this.narrative.nearest(c, lockDir, 32);
+      if (nt) {
+        const to = nt.t.pos.clone().sub(c).normalize();
+        const ang = Math.acos(Math.max(-1, Math.min(1, to.dot(lockDir))));
+        if (ang < bestAng) {
+          aimP = nt.t.pos.clone();
+          tgtRef = nt.t;
+          tgtAir = true;
+          bestAng = ang;
+        }
+      }
+    }
+
+    // 地面装甲候选（30° 锥）：
+    // 若机头视线水平以上且已有空中锁定，则不被地面坦克截断锁定；
+    // 否则参与角偏移竞争（谁更贴轴谁赢）
+    if (this.targets && this.targets.enabled && (!lookingUp || !tgtRef)) {
+      const tgt = this.targets.nearestAhead(a.root.position, lockDir, 30, ['tank']);
+      if (tgt) {
+        const gAim = new THREE.Vector3(tgt.pos.x, 0.9, tgt.pos.z);
+        const to = gAim.clone().sub(a.root.position).normalize();
+        const gAng = Math.acos(Math.max(-1, Math.min(1, to.dot(lockDir))));
+        if (!tgtRef || (!lookingUp && gAng < bestAng)) {
+          aimP = gAim;
+          tgtRef = tgt;
+          bestAng = gAng;
+          tgtAir = false;
         }
       }
     }
@@ -698,6 +785,10 @@ class WeaponRig {
     for (const r of this.rockets) r.g.visible = false;
     for (const f of this.frags) f.m.visible = false;
     for (const s of this.shocks) s.m.visible = false;
+    if (this._shells) for (const sh of this._shells) sh.m.visible = false;
+    if (this._mzlLight) this._mzlLight.intensity = 0;
+    this._kick = 0;
+    if (this.barrel) this.barrel.position.z = 0;
     for (const f of this.flying) { this.scene.remove(f.g); }
     this.flying.length = 0;
   }
@@ -756,32 +847,36 @@ class WeaponRig {
       r.g.position.addScaledVector(r.dir, _rkLen / _rkN);
       // 命中检测：火箭威力中（卡车/油桶一发，装甲车两发）
       if (this.targets && this.targets.hitTest(r.g.position, 2)) {
+        if (this.onHitMark) this.onHitMark(true);
         this.explosion(r.g.position.x, Math.max(0.4, r.g.position.y), r.g.position.z, 2);
         r.g.visible = false; _rkHit = true; break;
       }
-      // 空中目标掠过命中（无控弹道碰上气球/靶机也算）
-      if (this.airTargets && this.airTargets.enabled && this.airTargets.hitTest(r.g.position, 2)) {
+      // 空中目标掠过命中（无控弹道碰上气球/靶机也算，0.5u 判定余量）
+      if (this.airTargets && this.airTargets.enabled && this.airTargets.hitTest(r.g.position, 2, 0.5)) {
+        if (this.onHitMark) this.onHitMark();
         this._puff(r.g.position.x, r.g.position.y, r.g.position.z,
           { color: 0xffe9a8, s0: 0.2, s1: 0.8, life: 0.2, base: 0.9, add: true });
         r.g.visible = false; _rkHit = true; break;
       }
-      // Phase 20-A：敌机掠过命中（无控火箭碰上也算——威力 2 足以重创）
-      if (this.enemyAir && this.enemyAir.enabled && this.enemyAir.hitTest(r.g.position, 2)) {
+      // Phase 20-A：敌机掠过命中（无控火箭碰上也算——威力 2 足以重创，0.5u 判定余量）
+      if (this.enemyAir && this.enemyAir.enabled && this.enemyAir.hitTest(r.g.position, 2, 0.5)) {
+        if (this.onHitMark) this.onHitMark();
         this._puff(r.g.position.x, r.g.position.y, r.g.position.z,
           { color: 0xffe9a8, s0: 0.25, s1: 0.9, life: 0.22, base: 0.9, add: true });
         r.g.visible = false; _rkHit = true; break;
       }
       // Phase 21：基地设施命中（雷达/防空车/弹药库；hitTest 内按 radius 限域，只在基地扇区生效）
       if (this.narrative && this.narrative.enabled && this.narrative.hitTest(r.g.position, 2)) {
-        this._puff(r.g.position.x, r.g.position.y, r.g.position.z,
-          { color: 0xffe9a8, s0: 0.25, s1: 0.9, life: 0.22, base: 0.9, add: true });
+        if (this.onHitMark) this.onHitMark();
+        this.explosion(r.g.position.x, Math.max(0.4, r.g.position.y), r.g.position.z, 2);
         r.g.visible = false; _rkHit = true; break;
       }
-      // 触地：扬起尘土后消失（不用等到 life 耗尽）
-      if (r.g.position.y <= 0.03) {
+      // 触地：扬起尘土后消失（不用等到 life 耗尽；适配沙丘与峡谷地形高程）
+      const gy = this._groundH(r.g.position.x, r.g.position.z);
+      if (r.g.position.y <= gy + 0.03) {
         const p = r.g.position;
-        this._puff(p.x, 0.05, p.z, { color: 0x9a8f7c, s0: 0.3, s1: 1.7, life: 0.8, base: 0.55, rise: 0.6 });
-        this._puff(p.x, 0.05, p.z, { color: 0xc9b896, s0: 0.15, s1: 0.6, life: 0.4, base: 0.5, rise: 0.8 });
+        this._puff(p.x, gy + 0.05, p.z, { color: 0x9a8f7c, s0: 0.3, s1: 1.7, life: 0.8, base: 0.55, rise: 0.6 });
+        this._puff(p.x, gy + 0.05, p.z, { color: 0xc9b896, s0: 0.15, s1: 0.6, life: 0.4, base: 0.5, rise: 0.8 });
         r.g.visible = false; _rkHit = true; break;
       }
       }
@@ -823,9 +918,9 @@ class WeaponRig {
       let consumed = false;
       for (let si = 0; si < segN && !consumed; si++) {
         t.m.position.addScaledVector(t.dir, stepLen / segN);
-        // 空中目标命中（机炮对空：无人机/靶机/气球气球皮）
+        // 空中目标命中（机炮对空：无人机/靶机/气球气球皮，0.5u 容错余量提升命中手感）
         if (this.airTargets && this.airTargets.enabled) {
-          const ah = this.airTargets.hitTest(t.m.position, 1);
+          const ah = this.airTargets.hitTest(t.m.position, 1, 0.5);
           if (ah) {
             t.m.visible = false;
             if (this.onHitMark) this.onHitMark();
@@ -835,10 +930,9 @@ class WeaponRig {
             break;
           }
         }
-        // Phase 20-A：敌机命中（机炮 1/发——HP 8 需 8 发；对空曳光分段推进
-        // 天然防穿隧，敌机 HIT_R 2.2 余量内必判）
+        // Phase 20-A：敌机命中（机炮 1/发——HP 8 需 8 发；0.5u 判定余量）
         if (this.enemyAir && this.enemyAir.enabled) {
-          const eh = this.enemyAir.hitTest(t.m.position, 1);
+          const eh = this.enemyAir.hitTest(t.m.position, 1, 0.5);
           if (eh) {
             t.m.visible = false;
             if (this.onHitMark) this.onHitMark();
@@ -873,12 +967,14 @@ class WeaponRig {
             if (this.onHitMark && hitT.type !== 'building' && hitT.type !== 'rock') this.onHitMark();
             const p = t.m.position;
             if (hitT.type === 'tank') {
-              this._puff(p.x, p.y, p.z, { color: 0xffe9a8, s0: 0.10, s1: 0.45, life: 0.14, base: 0.9, add: true });
-              this._puff(p.x, p.y, p.z, { color: 0xd8d2c4, s0: 0.10, s1: 0.35, life: 0.22, base: 0.45 });
+              this._puff(p.x, p.y, p.z, { color: 0xfff0aa, s0: 0.08, s1: 0.38, life: 0.12, base: 0.98, add: true });
+              this._puff(p.x + (rnd() - 0.5) * 0.2, p.y + (rnd() - 0.5) * 0.2, p.z + (rnd() - 0.5) * 0.2,
+                { color: 0xff8c20, s0: 0.06, s1: 0.28, life: 0.16, base: 0.9, add: true });
+              this._puff(p.x, p.y, p.z, { color: 0x5a554e, s0: 0.10, s1: 0.35, life: 0.22, base: 0.45 });
             } else if (hitT.type === 'barrel') {
-              this._puff(p.x, p.y, p.z, { color: 0xffb054, s0: 0.20, s1: 0.8, life: 0.20, base: 0.85, add: true });
+              this._puff(p.x, p.y, p.z, { color: 0xffb054, s0: 0.20, s1: 0.85, life: 0.22, base: 0.9, add: true });
             } else {
-              this._puff(p.x, p.y, p.z, { color: 0xffd28a, s0: 0.12, s1: 0.5, life: 0.16, base: 0.8, add: true });
+              this._puff(p.x, p.y, p.z, { color: 0xffd28a, s0: 0.10, s1: 0.42, life: 0.15, base: 0.85, add: true });
               this._puff(p.x, p.y, p.z, { color: 0x9a8f7c, s0: 0.12, s1: 0.45, life: 0.25, base: 0.4 });
             }
             consumed = true;
@@ -898,10 +994,13 @@ class WeaponRig {
           consumed = true;
           break;
         }
-        // 触地
-        if (t.m.position.y <= 0.05) {
-          this._puff(t.m.position.x, 0.08, t.m.position.z,
-            { color: 0x9a8f7c, s0: 0.12, s1: 0.5, life: 0.3, base: 0.35, rise: 0.25 });
+        // 触地（适配沙丘与峡谷地形高程）
+        const gy = this._groundH(t.m.position.x, t.m.position.z);
+        if (t.m.position.y <= gy + 0.05) {
+          this._puff(t.m.position.x, gy + 0.06, t.m.position.z,
+            { color: 0xa49277, s0: 0.16, s1: 0.72, life: 0.38, base: 0.42, rise: 0.38 });
+          this._puff(t.m.position.x + (rnd() - 0.5) * 0.2, gy + 0.04, t.m.position.z + (rnd() - 0.5) * 0.2,
+            { color: 0x86745c, s0: 0.10, s1: 0.48, life: 0.26, base: 0.35, rise: 0.24 });
           t.m.visible = false;
           consumed = true;
           break;
@@ -941,6 +1040,7 @@ class WeaponRig {
       f.g.position.addScaledVector(f.dir, _hfLen / _hfN);
       // 命中检测：地狱火威力大（一发毁任何地面靶标）
       if (this.targets && this.targets.hitTest(f.g.position, 3)) {
+        if (this.onHitMark) this.onHitMark(true);
         this.explosion(f.g.position.x, f.g.position.y, f.g.position.z, 3);
         this.scene.remove(f.g);
         this.flying.splice(i, 1);
@@ -949,6 +1049,7 @@ class WeaponRig {
       // 空中目标掠过命中（大威力对气球/靶机同样是毁灭性的一击）。
       // 余量 0.6：弹速 34u/s，逐帧步进 ~0.55u，零余量会在两帧间穿过小目标。
       if (this.airTargets && this.airTargets.enabled && this.airTargets.hitTest(f.g.position, 3, 0.6)) {
+        if (this.onHitMark) this.onHitMark();
         this.explosion(f.g.position.x, f.g.position.y, f.g.position.z, 3);
         this.scene.remove(f.g);
         this.flying.splice(i, 1);
@@ -957,6 +1058,7 @@ class WeaponRig {
       // Phase 20-A：敌机命中（地狱火 3 伤——标准 3 发击落；比例导引对规避
       // 机动敌机同样有效——导引转向率 0.95 远高于敌机机动率）
       if (this.enemyAir && this.enemyAir.enabled && this.enemyAir.hitTest(f.g.position, 3, 0.6)) {
+        if (this.onHitMark) this.onHitMark();
         this.explosion(f.g.position.x, f.g.position.y, f.g.position.z, 3);
         this.scene.remove(f.g);
         this.flying.splice(i, 1);
@@ -965,7 +1067,17 @@ class WeaponRig {
       // Phase 21：基地设施命中（地狱火 3 伤——雷达/弹药库一发毁、防空车一发毁；
       // hitTest 内按 radius 限域，只在基地扇区生效）
       if (this.narrative && this.narrative.enabled && this.narrative.hitTest(f.g.position, 3)) {
+        if (this.onHitMark) this.onHitMark();
         this.explosion(f.g.position.x, f.g.position.y, f.g.position.z, 3);
+        this.scene.remove(f.g);
+        this.flying.splice(i, 1);
+        _hfHit = true; break;
+      }
+      // 触地爆炸：未锁定或丢失目标的地狱火撞地时引爆，不钻入地下
+      const gy = this._groundH(f.g.position.x, f.g.position.z);
+      if (f.g.position.y <= gy + 0.1) {
+        this.explosion(f.g.position.x, gy + 0.2, f.g.position.z, 3);
+        f.g.visible = false;
         this.scene.remove(f.g);
         this.flying.splice(i, 1);
         _hfHit = true; break;

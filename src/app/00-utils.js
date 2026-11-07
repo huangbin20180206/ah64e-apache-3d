@@ -1,7 +1,7 @@
 // ============================================================
 // 00-utils.js — 数学 / 随机 / 画布 / 噪声 / 贴图 工具
 // ============================================================
-const PI = Math.PI, TAU = PI * 2, DEG = PI / 180;
+const PI = Math.PI, TAU = PI * 2, DEG = PI / 180, DEG2RAD = DEG, RAD2DEG = 180 / PI;
 
 const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;

@@ -74,3 +74,14 @@ def test_v1_migration(d):
 def test_corrupt_and_degraded(d):
     assert d["corrupt"] == 0 and d["future"] == 0
     assert d["throwing"] == 2   # storage 抛异常 → 内存降级，记档照常
+
+
+def test_save_system_and_all_unlocked(d):
+    s = d["saveSystem"]
+    assert s["beforeToggle"] is False
+    assert s["duringToggle"] is True
+    assert s["afterToggle"] is False
+    assert s["importOk"] is True
+    assert s["importedStars"] >= 1
+    assert s["importedScore"] == 888
+

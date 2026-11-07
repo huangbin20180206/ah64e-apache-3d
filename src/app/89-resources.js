@@ -109,6 +109,17 @@ class ResourcesModule {
   // 弹药耗尽谓词（失败条件判定用；弹药真值在 rig——本模块只做纯判定）
   ammoDry(gun, rk, hf) { return (gun | 0) <= 0 && (rk | 0) <= 0 && (hf | 0) <= 0; }
 
+  // 本地优化 2026-10-30：HUD 燃油条每帧读数的零分配通道——state() 每次新建
+  // 对象 + events.map 数组（~120 分配/s），fast() 复用同一持久缓存对象。
+  // 测试断言/__dbg 仍走 state()（含 toFixed 归一与 events 快照），语义不变。
+  fast() {
+    const c = this._fast || (this._fast = { fuel: 0, warn1: false, warn2: false, out: false, rtbOn: false, rtbP: 0 });
+    c.fuel = this.fuel;
+    c.warn1 = this._warn1; c.warn2 = this._warn2; c.out = this._out;
+    c.rtbOn = this.rtbOn; c.rtbP = Math.min(1, this.rtbT / this.cfg.RTB_TIME);
+    return c;
+  }
+
   // 只读遥测（__dbg.resources.state()；测试断言一律读此状态源）
   state() {
     return {

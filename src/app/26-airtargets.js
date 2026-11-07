@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // 26-airtargets.js — 空中打击目标（P4）
 // 直升机升空后的对空火力演练目标，三类：
 //   四轴无人机 ×2 —— 悬停 + 慢漂移，机炮一发击落；
@@ -237,7 +237,15 @@ class AirTargets {
       if (!t.alive || t.off) continue;
       if (pos.distanceTo(t.pos) > t.radius + margin) continue;
       t.hp -= dmg;
-      if (t.hp <= 0) this._kill(t);
+      if (t.hp <= 0) {
+        this._kill(t);
+      } else {
+        t.damaged = true;
+        if (this.fx) {
+          this.fx._puff(t.pos.x, t.pos.y, t.pos.z,
+            { color: 0x4a4a4a, s0: 0.18, s1: 0.65, life: 0.35, base: 0.6 });
+        }
+      }
       return t;
     }
     return null;
@@ -248,11 +256,15 @@ class AirTargets {
     if (t.type === 'drone') { t.mode = 'fall'; t.vy = 0.5; }
     else if (t.type === 'balloon') { t.mode = 'burn'; t.vy = -0.6; t.t = 0; }
     else { t.mode = 'crash'; t.vy = 0; t.t = 0; }
+    if (this.fx) {
+      const tier = t.type === 'balloon' ? 2 : 1;
+      this.fx.explosion(t.pos.x, t.pos.y, t.pos.z, tier);
+    }
     if (this.onToast) this.onToast(`已击落：${t.label}`);
     if (this.onKill) this.onKill(t.label, t.type);  // 统一击杀计数+信息流（label+type；P18 计分取 type）
   }
 
-  update(dt, time) {
+  update(dt, time, heliPos = null) {
     // 2026-10-19 游戏线复查：红黄条纹热气球是靶场/训练道具，实战关卡里飘在敌方基地上空不合理。
     // 实战任务（非 train_* 变体）期间隐藏且不可锁定/命中；无人机与沙赫德巡飞弹保留（战场上合理）。
     const M = HOST.S && HOST.S._mission;
@@ -283,12 +295,42 @@ class AirTargets {
             t.flame.scale.set(f, f * 1.2, f);
           }
         } else {
-          t.ang += dt * 0.12;
-          g.position.set(t.center.x + Math.cos(t.ang) * t.r, t.center.y, t.center.z + Math.sin(t.ang) * t.r);
-          g.rotation.y = -t.ang - PI / 2;      // 机头沿切线方向
-          g.rotation.z = 0.12;                 // 压坡度盘旋
+          // 沙赫德无人机：常规盘旋 vs 自杀神风俯冲（过场期间禁止发起俯冲）
+          const inCut = !!(HOST.cutsceneState && HOST.cutsceneState.isOn && HOST.cutsceneState.isOn());
+          const canDive = combat && !inCut;
+          if (canDive && heliPos && !t.kamikaze) {
+            const dHeli = g.position.distanceTo(heliPos);
+            if (dHeli < 38) {
+              t.kamikaze = true;
+              if (this.onNotice) this.onNotice('警告：自杀无人机正高速向你俯冲！立即开火拦截！');
+            }
+          }
+          if (t.kamikaze && heliPos) {
+            g.lookAt(heliPos.x, heliPos.y, heliPos.z);
+            _atV.copy(heliPos).sub(g.position).normalize();
+            g.position.addScaledVector(_atV, dt * 24);
+            if (this.fx && rnd() < 0.6) {
+              this.fx._puff(g.position.x, g.position.y, g.position.z,
+                { color: 0x222222, s0: 0.18, s1: 0.8, life: 0.45, base: 0.7 });
+            }
+            if (g.position.distanceTo(heliPos) < 1.8) {
+              t.alive = false; t.mode = 'done'; g.visible = false;
+              if (this.fx) this.fx.explosion(g.position.x, g.position.y, g.position.z, 2);
+              if (this.onRam) this.onRam(3, g.position, g.position.clone().addScaledVector(_atV, -15));
+              continue;
+            }
+          } else {
+            t.ang += dt * 0.12;
+            g.position.set(t.center.x + Math.cos(t.ang) * t.r, t.center.y, t.center.z + Math.sin(t.ang) * t.r);
+            g.rotation.y = -t.ang - PI / 2;
+            g.rotation.z = 0.12;
+          }
         }
         t.pos.copy(g.position);
+        if (t.damaged && this.fx && rnd() < 0.3) {
+          this.fx._puff(t.pos.x + rnd(-0.2, 0.2), t.pos.y, t.pos.z + rnd(-0.2, 0.2),
+            { color: 0x333333, s0: 0.12, s1: 0.5, life: 0.4, base: 0.5 });
+        }
         continue;
       }
       if (t.mode === 'done') continue;
@@ -402,8 +444,12 @@ class AirTargets {
       t.alive = true;
       t.mode = t.type === 'drone' ? 'hover' : t.type === 'balloon' ? 'drift' : 'cruise';
       t.t = 0; t.vy = 0;
+      t.damaged = false;
+      t.off = false;
+      t.g.rotation.set(0, 0, 0);
       t.g.visible = true;
       // 出厂位置：drone/balloon 存 base，plane 存 center（对象结构不同，分别复位）
+      t.kamikaze = false;
       if (t.type === 'plane') { t.ang = rnd(TAU); t.g.position.copy(t.center); }
       else { t.g.position.copy(t.base); }
       if (t.type === 'balloon') { t.env.scale.set(1, 1.12, 1); t.envMat.color.setHex(0xffffff); }

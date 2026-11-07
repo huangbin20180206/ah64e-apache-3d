@@ -480,9 +480,9 @@ class RotorAudio {
         ng.gain.setValueAtTime(0.001, t);
         ng.gain.exponentialRampToValueAtTime(0.36, t + 0.04);   // 快攻（助推器点火即达峰值）
         ng.gain.exponentialRampToValueAtTime(0.001, t + 1.25);  // 慢衰减（飞远+距离衰减）
-        nb.out.connect(bp).connect(ng).connect(this.dry);
+        nb.connect(bp).connect(ng).connect(this.dry);
         ng.connect(this.wet);                                   // 宽频尾焰送混响（战场空间感）
-        nb.src.start(t); nb.src.stop(t + 1.35);
+        nb.start(t); nb.stop(t + 1.35);
         // 次声推力：52→28Hz 正弦 0.25s（胸腔共鸣感）
         const o = ctx.createOscillator(), og = ctx.createGain();
         o.type = 'sine'; o.frequency.setValueAtTime(52, t);
@@ -514,9 +514,9 @@ class RotorAudio {
         ng2.gain.setValueAtTime(0.001, t);
         ng2.gain.exponentialRampToValueAtTime(0.28, t + 0.03);
         ng2.gain.exponentialRampToValueAtTime(0.001, t + 0.75);
-        nb.out.connect(lp2).connect(ng2).connect(this.dry);
+        nb.connect(lp2).connect(ng2).connect(this.dry);
         ng2.connect(this.wet);
-        nb.src.start(t); nb.src.stop(t + 0.85);
+        nb.start(t); nb.stop(t + 0.85);
       } else if (type === 'explo' && this._playBuf(
           power >= 3 ? ['explo_l'] : power <= 1 ? ['explo_s', 'explo_s2'] : ['explo_m'],
           power >= 3 ? 1.0 : power <= 1 ? 0.55 : 0.8, 0.07, 0.35)) {
@@ -549,14 +549,17 @@ class RotorAudio {
         o.connect(og).connect(this.dry);
         o.start(t); o.stop(t + dur);
       } else if (type === 'hit') {
-        // 命中叮：1300Hz 短音 45ms（打中反馈，音量克制不抢戏）
+        // 命中反馈音效：普通命中 1300Hz 短音 45ms；击杀确认升调 1650→2200Hz 80ms
+        const isKill = power > 1.2;
         const o = ctx.createOscillator(), g = ctx.createGain();
         o.type = 'sine';
-        o.frequency.setValueAtTime(1300, t);
-        g.gain.setValueAtTime(0.14, t);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+        o.frequency.setValueAtTime(isKill ? 1650 : 1300, t);
+        if (isKill) o.frequency.exponentialRampToValueAtTime(2200, t + 0.06);
+        const pwr = Math.min(2, Math.max(0.5, power || 1));
+        g.gain.setValueAtTime((isKill ? 0.22 : 0.15) * pwr, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + (isKill ? 0.08 : 0.045));
         o.connect(g).connect(this.dry);
-        o.start(t); o.stop(t + 0.05);
+        o.start(t); o.stop(t + (isKill ? 0.09 : 0.05));
       } else if (type === 'lock') {
         // 锁定确认：880→1100Hz 上行扫频 80ms（FPS 经典锁定反馈音）
         const o = ctx.createOscillator(), g = ctx.createGain();
@@ -604,6 +607,45 @@ class RotorAudio {
         o.connect(og).connect(this.dry);
         o.start(t); o.stop(t + 0.6);
         this['sampPlay_thunder'] = (this['sampPlay_thunder'] || 0) + 1;
+      } else if (type === 'flyby') {
+        // 近失弹破空尖啸（Doppler Snap）：高频带通白噪声扫频 2600→360Hz 140ms
+        const nl = this._noiseSrc(0.16);
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 4.2;
+        bp.frequency.setValueAtTime(2600, t);
+        bp.frequency.exponentialRampToValueAtTime(360, t + 0.13);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.01, t);
+        g.gain.linearRampToValueAtTime(0.38 * power, t + 0.035);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+        nl.connect(bp).connect(g).connect(this.dry);
+        nl.start(t); nl.stop(t + 0.16);
+      } else if (type === 'flak') {
+        // 高炮空爆沉闷爆散：低频三角波冲击 + 宽频弹片撕裂
+        const o = ctx.createOscillator(), og = ctx.createGain();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(130, t);
+        o.frequency.exponentialRampToValueAtTime(32, t + 0.10);
+        og.gain.setValueAtTime(0.34 * power, t);
+        og.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+        o.connect(og).connect(this.dry);
+        o.start(t); o.stop(t + 0.15);
+        const nb = this._noiseBurst(0.14, 1800);
+        const ng = ctx.createGain();
+        ng.gain.setValueAtTime(0.28 * power, t);
+        ng.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+        nb.out.connect(ng).connect(this.dry);
+        nb.src.start(t); nb.src.stop(t + 0.14);
+      } else if (type === 'rpg') {
+        // RPG / 便携地空火箭呼啸升空
+        const nl = this._noiseSrc(0.42);
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 2.2;
+        bp.frequency.setValueAtTime(750, t);
+        bp.frequency.linearRampToValueAtTime(1850, t + 0.36);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.32 * power, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.40);
+        nl.connect(bp).connect(g).connect(this.dry);
+        nl.start(t); nl.stop(t + 0.42);
       }
     } catch (e) { /* 音效失败不静默影响主流程 */ }
   }

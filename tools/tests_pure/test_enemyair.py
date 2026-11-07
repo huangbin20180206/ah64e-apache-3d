@@ -2,7 +2,7 @@
 # 87-enemyair.js 纯逻辑回归（纯 pytest，无浏览器——Phase 20-A A2A 状态机）
 # 断言纪律：期望值全部写死（边界精确、布尔硬断言、确定性数值直录实测）；
 # 不 mock 被测对象本身（只注入 rng 固定概率分支——0.01 必中 / 0.99 必不中 /
-# 0.12 落在两个命中概率之间做"稳定度开关"，属构造参数）。
+# 0.185 落在两个命中概率之间做"稳定度开关"，属构造参数）。
 import json
 import subprocess
 import sys
@@ -49,7 +49,7 @@ def test_attack_hits_player():
 
 
 def test_stability_reduces_incoming_fire():
-    """机动规避收益（确定性开关）：rng=0.12 恰落在悬停命中概率（≈0.16）
+    """机动规避收益（确定性开关）：rng=0.185 恰落在悬停命中概率（≈0.16）
     与机动（stab=0.25 → ≈0.10）之间——悬停 44 发全中、机动 0 命中。"""
     out = drive("stability")
     assert out["hoverHits"] == 44

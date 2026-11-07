@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // 16-targets.js — 演示攻击靶标系统
 // 3 类靶标 + 环形布阵 + 命中接口 + 摧毁动画（爆炸/烟/碎片/残骸）+ 重生
 // 批 E（2026-10-12）拆分：建模/换壳/合批 → 16-targetmodels.js；阵地布景 → 16-targetscenery.js
@@ -21,15 +21,43 @@ class TargetRange {
     this._fx = [];            // 残留特效计时
     // 敌方反击（P2-1）：基地轻武器曳光池 + 机体受损烟 + 命中计数
     this._aaTracers = [];
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 36; i++) {
       const m = new THREE.Mesh(
-        new THREE.BoxGeometry(0.05, 0.05, 1.6),
-        new THREE.MeshBasicMaterial({ color: 0xffb054, transparent: true, opacity: 0.95,
+        new THREE.BoxGeometry(0.06, 0.06, 2.2),
+        new THREE.MeshBasicMaterial({ color: 0xff8838, transparent: true, opacity: 0.95,
           blending: THREE.AdditiveBlending, depthWrite: false }));
       m.visible = false;
       scene.add(m);
-      this._aaTracers.push({ m, dir: new THREE.Vector3(), v: 40, t: 0, life: 0, hit: false });
+      this._aaTracers.push({ m, dir: new THREE.Vector3(), v: 54, t: 0, life: 0, hit: false, flyby: false });
     }
+    // 敌方 RPG / 便携地空火箭威胁池（4 枚）
+    this._rpgs = [];
+    for (let i = 0; i < 4; i++) {
+      const group = new THREE.Group();
+      const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.08, 0.85, 6),
+        new THREE.MeshStandardMaterial({ color: 0x485244, roughness: 0.6 }));
+      body.rotation.x = Math.PI / 2;
+      group.add(body);
+      const flame = new THREE.Mesh(
+        new THREE.ConeGeometry(0.14, 0.4, 6),
+        new THREE.MeshBasicMaterial({ color: 0xffaa30, transparent: true, opacity: 0.9 }));
+      flame.rotation.x = -Math.PI / 2;
+      flame.position.z = -0.55;
+      group.add(flame);
+      group.visible = false;
+      scene.add(group);
+      this._rpgs.push({ group, dir: new THREE.Vector3(), v: 32, t: 0, life: 0, hit: false, smokeT: 0 });
+    }
+    this._rpgCool = 6.0;
+    this._burstN = 0; this._burstT = 0; this._burstFrom = new THREE.Vector3();
+    this._burstDir = new THREE.Vector3(); this._burstDist = 0; this._burstHitP = 0;
+    this.onFlyby = null;
+    this.onFlak = null;
+    this.onRpg = null;
+    this.onRpgSmoke = null;
+    this.onRpgExplode = null;
+    this.activeFlarePos = null;
     // 玩法批 B1（2026-10-09）：连锁殉爆队列（旧单槽 _fuelBoom 同帧多桶会互相覆盖，
     // 改数组）+ 基地警报（任务进行中基地首次受创 → 1.6s 后拉响警报、车辆疏散）
     this._fuelBooms = [];
@@ -223,9 +251,10 @@ class TargetRange {
     if (!best) return null;
     best.hp -= this._effDamage(power);
     this._hitPow = power;                        // P5-G4 战报：武器分类命中
-    if (this.onHitFx) this.onHitFx();            // FPV 命中标记（击毁/受击都闪）
-    if (this.onSfx) this.onSfx('hit');           // 命中叮（受击/击毁都响）
-    if (best.hp <= 0) this.destroy(best, power);
+    const isKill = best.hp <= 0;
+    if (this.onHitFx) this.onHitFx(isKill);            // 全机位命中标记（击毁红✕/受击白✕）
+    if (this.onSfx) this.onSfx('hit', isKill ? 1.5 : 1.0);           // 命中叮与击杀升调
+    if (isKill) this.destroy(best, power);
     else this.flashHit(best);
     // B1 溅射：地狱火（威力 3）近炸破片波及周边——紧密停放的车辆会被连带
     if (power >= 3) this.splash(worldPos.x, worldPos.z, 2.8, 1.5, best);
@@ -266,10 +295,17 @@ class TargetRange {
     t.group.traverse(o => {
       if (o.isMesh && o.material && o.material.emissive) {
         const m = o.material;
-        if (!m.userData._bk) m.userData._bk = m.emissive.getHex();
+        if (m.userData._bk === undefined) {
+          m.userData._bk = m.emissive.getHex();
+          m.userData._bkInt = m.emissiveIntensity;
+        }
         m.emissive.setHex(0x442200);
         m.emissiveIntensity = 1;
-        setTimeout(() => { m.emissive.setHex(m.userData._bk); m.needsUpdate = true; }, 110);
+        setTimeout(() => {
+          m.emissive.setHex(m.userData._bk);
+          m.emissiveIntensity = m.userData._bkInt ?? 1;
+          m.needsUpdate = true;
+        }, 110);
       }
     });
   }
@@ -308,19 +344,20 @@ class TargetRange {
       if (t.turret) t.turret.rotation.y = t.turret.userData.r0 ? t.turret.userData.r0.y : 0;   // ASSETS3 炮塔回正
       if (t.gunP && t.gunP.userData.r0) t.gunP.rotation.x = t.gunP.userData.r0.x;   // ASSETS6 炮管回平
       if (!t.home) continue;
-      t.mov = t.home.mov;
-      if (!t.mov) {
-        t.group.position.set(t.home.x, 0, t.home.z);
-        t.group.rotation.y = t.home.ry;
-        t.pos.copy(t.group.position);
-      }
+      t.mov = t.home.mov ? { ...t.home.mov } : null;
+      t.group.position.set(t.home.x, 0, t.home.z);
+      t.group.rotation.set(0, t.home.ry, 0);
+      t.pos.copy(t.group.position);
     }
     // 敌方反击状态复位（P2-1 + P8 威胁）
     this.passive = false; this._layout = false; this.aaRateMul = 1;
-    this._heliDmg = 0; this._aaCool = 3; this._aaDmgMul = 1;
+    this._heliDmg = 0; this._prevHeliDmg = 0; this._lastHitFrom = null;
+    this._aaCool = 3; this._aaDmgMul = 1;
     this._threat = 0; this._threatSrc = null; this._threatHitFlash = 0;
     if (this._dmgSmoke) this._dmgSmoke.visible = false;
     for (const tr of this._aaTracers) tr.m.visible = false;
+    for (const r of this._rpgs) r.group.visible = false;
+    this._burstN = 0; this._rpgCool = 6.0;
     for (const t of this.targets) {
       if (t.wreck) {
         this.scene.remove(t.wreck);
@@ -330,7 +367,19 @@ class TargetRange {
       t.hp = t.hp0;
       t.alive = true;
       t.benched = false;
+      t._chain = false;
+      t.burn = 0;
+      t._smk = 0;
+      t.hidden = false;
+      t._peekOut = false;
       t.group.visible = true;
+      t.group.traverse(o => {
+        if (o.isMesh && o.material && o.material.emissive && o.material.userData._bk !== undefined) {
+          o.material.emissive.setHex(o.material.userData._bk);
+          o.material.emissiveIntensity = o.material.userData._bkInt ?? 1;
+          o.material.needsUpdate = true;
+        }
+      });
     }
     // 玩法批 C：城镇建筑复原 + 伏兵回藏身点
     if (this.town && this.town.active) this.town.reset();
@@ -396,7 +445,8 @@ class TargetRange {
   update(dt, heliPos, m = null) {
     // 敌方反击（P2-1）：基地轻武器间歇还击（曳光+散布），命中累积机体损伤。
     // 开火条件：靶场启用 + 机体离地（alt>2，地面停放不交战）+ 距基地 8~55u。
-    const aaActive = this.enabled && !this.passive && heliPos && heliPos.y > 2 && this.baseCenter;
+    const inCut = !!(HOST.cutsceneState && HOST.cutsceneState.isOn && HOST.cutsceneState.isOn());
+    const aaActive = this.enabled && !this.passive && !inCut && heliPos && heliPos.y > 2 && this.baseCenter;
     // 2026-10-18 ASSETS3：炮塔跟踪直升机（16-targetmodels aimTurret；无 rnd，不影响种子序列）
     for (const t of this.targets) if (t.turret && t.group.visible) aimTurret(t, heliPos, dt);
     const bd = aaActive ? Math.hypot(heliPos.x - this.baseCenter.x, heliPos.z - this.baseCenter.z) : 0;
@@ -424,23 +474,19 @@ class TargetRange {
           const dir = heliPos.clone().sub(from).normalize();
           dir.x += (rnd() - 0.5) * 0.05; dir.y += (rnd() - 0.5) * 0.04; dir.z += (rnd() - 0.5) * 0.05;
           dir.normalize();
-          const tr = this._aaTracers.find(t => !t.m.visible);
-          if (tr) {
-            // 难度系数派生：命中概率保持标准公式（不随难度缩放——规格 §四边界）；
-            // 单发伤害/开火间隔经 HOST.arcade 读。局部变量名避开 2 字符短名，
-            // 防止与三方库（three 内部 const ac）在同一 IIFE 内撞名（P0-1 教训）。
-            const arcMod = HOST.arcade;
-            const d = arcMod ? arcMod.coeffs(m) : null;
-            const damageMul = d ? d.aaDmg : 1;
-            const rateMul = d ? d.aaRate : 1;
-            this._aaDmgMul = damageMul;
-            tr.m.visible = true;
-            tr.m.position.copy(from);
-            tr.dir.copy(dir);
-            tr.t = 0; tr.life = dist / tr.v;
-            tr.hit = rnd() < (inCanyon ? 0.25 : this._layout ? Math.max(0.12, Math.min(0.4, 0.45 - dist * 0.006)) : Math.max(0.12, Math.min(0.4, 0.45 - bd * 0.005)));   // 峡谷伏兵近距（≤30u）固定 25%
-            this._aaCool = (1.2 + rnd() * 1.4) / (rateMul * this.aaRateMul);
-          }
+          const arcMod = HOST.arcade;
+          const d = arcMod ? arcMod.coeffs(m) : null;
+          const damageMul = d ? d.aaDmg : 1;
+          const rateMul = d ? d.aaRate : 1;
+          this._aaDmgMul = damageMul;
+          // 防空高炮 3~4 连发点射（Burst Fire）机制
+          this._burstN = 3 + (rnd() < 0.45 ? 1 : 0);
+          this._burstT = 0;
+          this._burstFrom.copy(from);
+          this._burstDir.copy(dir);
+          this._burstDist = dist;
+          this._burstHitP = inCanyon ? 0.22 : this._layout ? Math.max(0.10, Math.min(0.35, 0.40 - dist * 0.006)) : Math.max(0.10, Math.min(0.35, 0.40 - bd * 0.005));
+          this._aaCool = (1.6 + rnd() * 1.4) / (rateMul * this.aaRateMul);
         }
       }
       // 受损烟：损伤 ≥4 后从机体尾部冒出，随损伤加深变浓变大
@@ -463,23 +509,104 @@ class TargetRange {
     // P8：AA 曳光飞行/命中结算（P2-1 断点补全——此前发射后冻结无更新，tr.hit 无消费方，
     // _heliDmg 恒 0，受损烟/分级/后果全链失效）。命中后累加损伤、升级威胁、受击闪白。
     if (heliPos) {
+      // 连发点射弹丸逐发推进
+      if (this._burstN > 0) {
+        this._burstT -= dt;
+        if (this._burstT <= 0) {
+          this._burstT = 0.088;
+          this._burstN--;
+          const tr = this._aaTracers.find(t => !t.m.visible);
+          if (tr && heliPos) {
+            const d = this._burstDir.clone();
+            d.x += (rnd() - 0.5) * 0.04; d.y += (rnd() - 0.5) * 0.035; d.z += (rnd() - 0.5) * 0.04;
+            d.normalize();
+            tr.m.visible = true;
+            tr.m.position.copy(this._burstFrom);
+            tr.dir.copy(d);
+            tr.t = 0; tr.life = (this._burstDist + 16) / tr.v;
+            tr.flyby = false;
+            tr.hit = rnd() < this._burstHitP;
+          }
+        }
+      }
       for (const tr of this._aaTracers) {
         if (!tr.m.visible) continue;
         tr.t += dt;
         tr.m.position.addScaledVector(tr.dir, tr.v * dt);
-        // 命中判定：曳光到达机体 0.9u 内
-        if (!tr.hit && tr.m.position.distanceTo(heliPos) < 0.9) {
+        const curDist = tr.m.position.distanceTo(heliPos);
+        // 近失弹呼啸判定（距离直升机 1.0~4.2u 且未命中、已飞行一段距离）
+        if (!tr.hit && !tr.flyby && curDist < 4.2 && curDist > 1.0 && tr.t > 0.08) {
+          tr.flyby = true;
+          if (this.onFlyby) this.onFlyby(tr.m.position);
+        }
+        // 命中判定：曳光到达机体 1.0u 内
+        if (!tr.hit && curDist < 1.0) {
           tr.hit = true;
           tr.m.visible = false;
-          // Phase 18：单发伤害按难度系数累加（veteran ×1.4；小数累加，阈值 4/8/12
-          // 的比较语义不变——受损分级/失败归因读同一累计值）
-          this._heliDmg += (this._aaDmgMul || 1);
-          this._threatHitFlash = 3;          // 高威胁持续 3s（HUD 红闪/音效反馈）
-          // P5-G1：记下火力来向（沿曳光反推 12u），供受击方向指示
-          this._lastHitFrom = tr.m.position.clone().addScaledVector(tr.dir, -12);
-          if (this.onHeliHit) this.onHeliHit(this._heliDmg, tr.m.position);
+          const aaD = (this._aaDmgMul || 1);
+          this._heliDmg += aaD;
+          this._threatHitFlash = 3;
+          this._lastHitFrom = this._burstFrom ? this._burstFrom.clone() : tr.m.position.clone().addScaledVector(tr.dir, -12);
+          this._hitSrc = 'aa';   // 死因分析：伤害来源标签（onHeliHit 消费后清空）
+          // 传本次真实增量（旧代码固定传 1，难度放大的高炮伤害未进入机务分区）
+          if (this.onHeliHit) this.onHeliHit(this._heliDmg, tr.m.position, aaD);
         } else if (tr.t >= tr.life) {
-          tr.m.visible = false;              // 未命中飞出寿命回收
+          tr.m.visible = false;
+          // 高空 Flak 空爆：在机身高度 ±8m 范围内自毁爆散
+          if (Math.abs(tr.m.position.y - heliPos.y) < 8.0 && curDist < 52) {
+            if (this.onFlak) this.onFlak(tr.m.position);
+          }
+        }
+      }
+      // 步兵掩体 RPG / 便携地空火箭发射判定（低空 alt < 28m，距基地 15~48u，冷却 8~14s）
+      if (aaActive && heliPos.y < 28 && bd > 14 && bd < 48) {
+        this._rpgCool -= dt;
+        if (this._rpgCool <= 0) {
+          this._rpgCool = 8.5 + rnd() * 6.0;
+          const rpg = this._rpgs.find(r => !r.group.visible);
+          const shooter = this.targets.find(t => t.alive && !t.hidden && t.pos.distanceTo(heliPos) < 46);
+          if (rpg && shooter) {
+            const from = shooter.group.position.clone(); from.y += 1.2;
+            const dir = heliPos.clone().sub(from).normalize();
+            rpg.group.position.copy(from);
+            rpg.dir.copy(dir);
+            rpg.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+            rpg.group.visible = true;
+            rpg.t = 0; rpg.life = 4.2; rpg.hit = false; rpg.smokeT = 0;
+            rpg.from = from;   // 发射点：受击来向弧与死因分析用（而非爆点）
+            if (this.onRpg) this.onRpg(from);
+          }
+        }
+      }
+      for (const rpg of this._rpgs) {
+        if (!rpg.group.visible) continue;
+        rpg.t += dt; rpg.smokeT += dt;
+        // 导引追踪（干扰弹起效时被诱骗）
+        const toHeli = heliPos.clone().sub(rpg.group.position).normalize();
+        if (this.activeFlarePos) {
+          const toFlare = this.activeFlarePos.clone().sub(rpg.group.position).normalize();
+          if (toFlare.dot(rpg.dir) > 0.5) rpg.dir.lerp(toFlare, dt * 3.8).normalize();
+        } else {
+          rpg.dir.lerp(toHeli, dt * 1.6).normalize();
+        }
+        rpg.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), rpg.dir);
+        rpg.group.position.addScaledVector(rpg.dir, rpg.v * dt);
+        if (rpg.smokeT > 0.05 && this.onRpgSmoke) {
+          rpg.smokeT = 0;
+          const tail = rpg.group.position.clone().addScaledVector(rpg.dir, -0.6);
+          this.onRpgSmoke(tail.x, tail.y, tail.z);
+        }
+        const d = rpg.group.position.distanceTo(heliPos);
+        if (!rpg.hit && d < 1.4) {
+          rpg.hit = true; rpg.group.visible = false;
+          this._heliDmg += 3; this._threatHitFlash = 3;
+          if (rpg.from) this._lastHitFrom = rpg.from.clone();
+          this._hitSrc = 'rpg';
+          if (this.onHeliHit) this.onHeliHit(this._heliDmg, rpg.group.position, 3);
+          if (this.onRpgExplode) this.onRpgExplode(rpg.group.position);
+        } else if (rpg.t >= rpg.life || rpg.group.position.y < 0.2) {
+          rpg.group.visible = false;
+          if (this.onRpgExplode) this.onRpgExplode(rpg.group.position);
         }
       }
       if (this._threatHitFlash > 0) this._threatHitFlash -= dt;

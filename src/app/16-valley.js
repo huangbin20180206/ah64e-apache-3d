@@ -416,8 +416,15 @@ class CanyonRun {
       this._lockT -= dt;
       if (this._lockT <= 0) {
         this._lockT = 2.4;
-        // 基础 1.5；难度系数由 70-app 消费时乘（与 SAM 链同源）
-        this.hitPending = { dmg: 1.5, x: heliPos.x, y: heliPos.y + 2, z: heliPos.z };
+        let rLock = null, minD = 1e9;
+        for (const r of this.radars) {
+          if (!r.alive) continue;
+          const d = Math.hypot(r.x - heliPos.x, r.z - heliPos.z);
+          if (d < minD) { minD = d; rLock = r; }
+        }
+        // 基础 1.5；难度系数由 70-app 消费时乘（与 SAM 链同源，带真实雷达发射方位）
+        this.hitPending = { dmg: 1.5, x: heliPos.x, y: heliPos.y + 2, z: heliPos.z,
+          sx: rLock ? rLock.x : (heliPos.x + 30), sz: rLock ? rLock.z : (heliPos.z + 30) };
       }
     } else if (this.exposure < 0.6) this._locked = false;
   }

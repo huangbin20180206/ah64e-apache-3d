@@ -97,8 +97,14 @@ class DetailParts {
         // 且贴近机身时投影反而穿帮（悬空在轮侧/机腹的小件阴影）。receiveShadow
         // 保留让细节件被机身阴影正确覆盖。
         scene.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
-        // P9 环境反射初始化（细节件并入 mats 后需手动同步一次；后续由 setEnv 事件驱动）
-        this.apache.setEnvIntensity(ENV_PRESETS[HOST.S.env]);
+        // P9 环境反射与涂装/视觉令牌初始化（细节件异步并入 mats 后需手动同步一次）
+        if (HOST.S) {
+          const envKey = HOST.S.env || HOST.S.envKey;
+          if (envKey && ENV_PRESETS[envKey]) this.apache.setEnvIntensity(ENV_PRESETS[envKey]);
+        }
+        if (typeof this.apache._applyVisualTokens === 'function') this.apache._applyVisualTokens();
+        if (this.apache.scheme === 'army' && typeof this.apache.setScheme === 'function') this.apache.setScheme('army', true);
+        if (this.apache._wire && typeof this.apache.setWireframe === 'function') this.apache.setWireframe(true);
         this.scenes.push(scene);
         this.state.loaded++;
         this.state.tris += cmpTris(scene);

@@ -165,10 +165,13 @@ function finish() {
   };
   rig.onBlast = (x, y, z, t) => { scenery.blast(x, y, z, t); infantry.blast(x, y, z, t); life.blast(x, y, z, t); };   // 爆炸波及远景树（31-scenery）+ 步兵
   rig.onTreeHit = (p, d) => scenery.bulletHit(p, d);         // 机炮打树：飞叶/打断
-  rig.onHitMark = () => hitMark();
+  rig.onHitMark = (isKill) => {
+    hitMark(isKill);
+    if (audio) audio.playSfx('hit', isKill ? 1.5 : 1.0);
+  };
   targets.onSfx = rig.onSfx;
-  targets.onHitFx = () => {
-    rig.onHitMark();
+  targets.onHitFx = (isKill) => {
+    rig.onHitMark(isKill);
     const m = S._mission;
     if (m && !m.done) {
       m.hits++;
@@ -178,17 +181,71 @@ function finish() {
     }
   };
   // P8：机体受击反馈——损伤分级 toast + 受损后果（散布惩罚/武器卡壳）在此派生
-  targets.onHeliHit = (dmg, hitPos) => {
+  targets.onHeliHit = (dmg, hitPos, deltaDmg) => {
+    const hitDelta = deltaDmg !== undefined ? deltaDmg : dmg;
+    const isHeavy = hitDelta >= 2.0 || dmg >= 8.0;
     toast(`机体受损（Lv.${Math.min(3, Math.ceil(dmg / 4))}）——注意规避反击`);
     if (rig) rig._dmgPenalty = Math.min(0.5, dmg * 0.06)   // 散布惩罚：每伤 0.06，上限 +50%
       + (damageSys ? damageSys.fx().spreadAdd : 0);   // Phase 19：武器系统散布追加（事件驱动，保 D2 断言语义）
-    if (audio) audio.playSfx('hit');
-    // P5-G1 受击反馈：红色暗角 + 来向弧标 + 火花（来向优先用曳光反推点）
-    _hitFeedback(targets._lastHitFrom || hitPos);
+    if (audio) {
+      if (isHeavy) {
+        audio.playSfx('explo', 0.55);
+        audio.playSfx('hit', 1.8);
+      } else {
+        audio.playSfx('hit', 1.0);
+      }
+    }
+    // 受击闪光与震屏（轻击震颤、重创剧烈震颤与红白闪光）
+    S._shake = Math.max(S._shake || 0, isHeavy ? 1.25 : 0.6);
+    S._flash = Math.max(S._flash || 0, isHeavy ? 0.75 : 0.4);
+    if (isHeavy && betty) betty.warn('WARNING', 2);
+    // P5-G1 受击反馈：红色暗角 + 来向弧标 + 火花（来向优先用真实发射阵位反推）
+    _hitFeedback(targets._lastHitFrom || hitPos, isHeavy);
     if (S._mission && !S._mission.done) S._mission.hitsTaken = (S._mission.hitsTaken || 0) + 1;   // P5-G4 战报：中弹次数
+    // 死因分析：记录来源/增量/时钟方位（来源标签由各伤害入口写入，消费即清）
+    _dmgLogPush(targets._hitSrc || 'other', hitDelta, targets._lastHitFrom || hitPos);
+    targets._hitSrc = null;
     targets._lastHitFrom = null;
-    // Phase 19：命中方位 → 四子系统确定性分配（86-damage 纯逻辑）
-    _dmgApply(dmg, hitPos ? hitPos.x : null, hitPos ? hitPos.y : null, hitPos ? hitPos.z : null);
+    // Phase 19：命中方位 → 四子系统确定性分配（86-damage 纯逻辑；传单次增量伤害避免累计叠加二次方暴增，2参直调兼容测试）
+    _dmgApply(hitDelta, hitPos ? hitPos.x : null, hitPos ? hitPos.y : null, hitPos ? hitPos.z : null);
+  };
+  // 敌方防空高炮近失弹呼啸与微震
+  targets.onFlyby = (pos) => {
+    if (audio) audio.playSfx('flyby', 1.0, pos);
+    S._shake = Math.max(S._shake || 0, 0.28);
+  };
+  // 高炮高空 Flak 空爆
+  targets.onFlak = (pos) => {
+    if (audio) audio.playSfx('flak', 0.85, pos);
+    if (rig) rig._puff(pos.x, pos.y, pos.z, { color: 0x242424, s0: 0.8, s1: 2.6, life: 0.9, base: 0.75 });
+  };
+  // 步兵掩体 RPG / 便携防空发射
+  targets.onRpg = (pos) => {
+    if (audio) audio.playSfx('rpg', 1.1, pos);
+    toast('⚠ 警报：地面便携导弹/RPG 升空！大机动或按 J 投放干扰弹！');
+    if (betty) betty.warn('WARNING', 2);
+  };
+  targets.onRpgSmoke = (x, y, z) => {
+    if (rig) rig._puff(x, y, z, { color: 0xd8d8d8, s0: 0.22, s1: 0.95, life: 0.65, base: 0.6 });
+  };
+  targets.onRpgExplode = (pos) => {
+    if (rig) rig.explosion(pos.x, pos.y, pos.z, 2);
+  };
+
+  // 沙赫德无人机自杀俯冲与冲撞
+  air.onNotice = (msg) => {
+    toast(msg);
+    if (betty) betty.warn('WARNING', 2);
+  };
+  air.onRam = (dmg, pos, fromPos) => {
+    targets._heliDmg += dmg;
+    targets._threatHitFlash = 3;
+    targets._lastHitFrom = fromPos || (pos ? pos.clone() : null);
+    targets._hitSrc = 'shahed';   // 死因分析：自杀无人机撞击
+    if (targets.onHeliHit) targets.onHeliHit(targets._heliDmg, pos, dmg);
+    S._flash = Math.max(S._flash || 0, 0.7);
+    S._shake = 1.25;
+    toast('⚠ 警报：自杀无人机撞击直升机！');
   };
   air.onKill = (label, type) => { _kills++; S._slowmo = 0.55; S._flash = 0.5; S._shake = 1.0; killFeed(label); updateTargetHUD(null); radioSay('air'); if (arcade && S._mission && S._mission.phase === 'active') { arcade.onKill(type, S._mission); } };
   // 机体夜间指示灯（航行灯/信标/频闪）：先建灯再绑倒影，灯珠才能进镜像
@@ -209,7 +266,7 @@ function finish() {
   // 特效密度按当前画质档位补齐（washfx 在 boot 的 applyQuality 之后才存在）
   washfx.setQualityEffects(qualityPreset(S.quality).effects);
   // 第一人称驾驶 + 瞄准（悬停时按 C 进入）
-  fp = new FPView({ apache, W, orbit, canvas, rig, targets, airTargets: air, enemyAir: enemyVis });
+  fp = new FPView({ apache, W, orbit, canvas, rig, targets, airTargets: air, enemyAir: enemyVis, narrative: () => narrative });
   fp.onSfx = t => audio.playSfx(t);
   HOST.fp = fp;                       // Phase 14-A：FPV 实例注册（01-host modeState 取用）
   // 浏览器自动播放策略：首次任意手势后启动音频上下文。

@@ -84,7 +84,7 @@ const CASES = {
   // stab=0.25（p≈0.10）的命中概率之间——悬停必中、机动必不中（确定性）
   stability() {
     const run = (stab) => {
-      const mod = makeEnemyAir({ rng: () => 0.12, seed: 1 });
+      const mod = makeEnemyAir({ rng: () => 0.185, seed: 1 });
       const env = mkEnv({ stability: stab });
       mod.spawn({ x: 0, z: 42 });
       driveTo(mod, env, 'attack', 200);
@@ -264,6 +264,53 @@ const CASES = {
     const empty = mod.killEvent === null;
     mod.killEvent = { i: 2 }; mod.reset();
     return { first, second, empty, clearedByReset: mod.killEvent === null };
+  },
+  // 安全期门控：env.safe=true 时即使玩家在视距视锥内也不索敌，保持 patrol
+  safe_patrol() {
+    const mod = makeEnemyAir({ seed: 20260918 });
+    const env = mkEnv({ safe: true });
+    mod.spawn({ x: 0, z: 42 });
+    env.heli = { x: 30, y: 14, z: 60 };
+    for (let i = 0; i < 40; i++) mod.update(env);
+    const staysPatrol = mod.units[0].phase === 'patrol';
+    return { staysPatrol, phase: mod.units[0].phase };
+  },
+
+  // 安全期禁火：env.safe=true 时不消耗弹药也不产生火控事件
+  safe_no_ammo_drain() {
+    const mod = makeEnemyAir({ rng: () => 0.01, seed: 1 });
+    const env = mkEnv();
+    mod.spawn({ x: 0, z: 42 });
+    driveTo(mod, env, 'attack', 200);
+    // 进入 attack 后切 safe=true
+    env.safe = true;
+    const g0 = mod.units[0].gunN, r0 = mod.units[0].rkN;
+    for (let i = 0; i < 100; i++) mod.update(env);
+    return {
+      phase: mod.units[0].phase,
+      gunPreserved: mod.units[0].gunN === g0,
+      rkPreserved: mod.units[0].rkN === r0,
+      hitPendingNull: mod.hitPending === null,
+    };
+  },
+
+  // 安全期规避脱离：在 evade 态切 safe=true 时立即脱离并转回 patrol
+  safe_evade() {
+    const mod = makeEnemyAir({ seed: 1 });
+    const env = mkEnv();
+    mod.spawn({ x: 0, z: 42 });
+    driveTo(mod, env, 'attack', 200);
+    // 注入伤害进入 evade
+    mod.hitTest(mod.units[0], 3);
+    mod.update(env);
+    const inEvade = mod.units[0].phase === 'evade';
+    // 切 safe=true
+    env.safe = true;
+    mod.update(env);
+    return {
+      inEvade,
+      returnsPatrol: mod.units[0].phase === 'patrol',
+    };
   },
 };
 

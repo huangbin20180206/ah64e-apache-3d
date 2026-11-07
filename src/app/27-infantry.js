@@ -230,11 +230,14 @@ class Infantry {
   reset() {
     for (const p of this.men) {
       p.x = p.home.x; p.z = p.home.z; p.ry = p.home.ry;
-      p.alive = true; p.st = 'idle'; p.t = 0; p.cd = rnd(3, 7); p.flee = 0; p.walk = false; p.burst = 0;
+      p.alive = true; p.st = 'idle'; p.t = 0; p.cd = rnd(3, 7); p.flee = 0; p.walk = false; p.burst = 0; p.shotT = 0;
     }
     for (const r of this._rpgs) r.g.visible = false;
     for (const t of this._tracers) t.m.visible = false;
     this.kills = 0;
+    this.suppressed = 0;
+    this._rpgWarned = false;
+    this._rpgCallT = -99;
   }
 
   aliveCount() { return this.men.filter(p => p.alive).length; }
@@ -445,7 +448,9 @@ class Infantry {
     R._heliDmg += dmg;
     R._threatHitFlash = 3;
     R._lastHitFrom = new THREE.Vector3(fx, fy, fz);
-    if (R.onHeliHit) R.onHeliHit(R._heliDmg, H);
+    R._hitSrc = 'infantry';   // 死因分析：伤害来源标签
+    // 传本次真实增量 dmg（旧代码固定传 1，机务分区伤害与实际扣血不一致）
+    if (R.onHeliHit) R.onHeliHit(R._heliDmg, H, dmg);
   }
 
   _draw() {

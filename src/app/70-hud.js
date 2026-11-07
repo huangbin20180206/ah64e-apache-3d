@@ -115,7 +115,10 @@ function _tickModeChip() {
   // chip 永远显示不出"过场影像"——合并后实测 69/73，test_mode_chip 与
   // test_phase14_feedback 双双卡死超时，且单独跑同样失败（非抖动，是真回归）。
   let cutOn = false;
-  if (HOST.cutsceneState && HOST.cutsceneState.state) cutOn = !!HOST.cutsceneState.state().on;
+  // 本地优化 2026-10-30：优先走 isOn() 标量通道（82-cutscene，零分配）——
+  // state() 每帧新建 6 字段对象；无 isOn 的旧注册对象按原链回退，行为不变。
+  if (HOST.cutsceneState && HOST.cutsceneState.isOn) cutOn = HOST.cutsceneState.isOn();
+  else if (HOST.cutsceneState && HOST.cutsceneState.state) cutOn = !!HOST.cutsceneState.state().on;
   else if (HOST.cutsceneState) cutOn = !!HOST.cutsceneState.on;
   let label = '';
   let warn = false;
@@ -238,10 +241,13 @@ function _tickHud(dt, s, rpm) {
     }
     // Phase 19：机务告警 HUD（四系统最高级缩写）+ 航电失效窗口守卫
     if (damageSys) {
-      const st = damageSys.state();
+      // 本地优化 2026-10-30：原每帧调 damageSys.state()——每次新建 sys/levels/
+      // events 等 5+ 个对象（~60 组/s 进新生代）。HUD 只需等级与失效窗口两个
+      // 标量源：fx()（recompute 每帧字段级复写）与 levels()（持久缓存引用）。
+      const st = damageSys.fx();
       const mxEl = UI('hud-mx');
       if (mxEl) {
-        const L = st.levels;
+        const L = damageSys.levels();
         const AB = { rotor: 'ROT', engine: 'ENG', weapons: 'WPN', avionics: 'AVN' };
         let bk = null, bl = 0;
         for (const k of ['rotor', 'engine', 'weapons', 'avionics']) if (L[k] > bl) { bl = L[k]; bk = k; }
@@ -263,7 +269,7 @@ function _tickHud(dt, s, rpm) {
     if (resources) {
       const fw = UI('hud-fuel-wrap'), fb = UI('hud-fuel');
       const inMission = !!(S._mission && !S._mission.frozen);
-      const rs = resources.state();
+      const rs = resources.fast ? resources.fast() : resources.state();   // 本地优化：每帧零分配通道
       const show = inMission ? '' : 'none';
       if (fw && fw.style.display !== show) fw.style.display = show;
       if (fb && inMission) {
@@ -323,3 +329,290 @@ function _tickHud(dt, s, rpm) {
     S._fa = 0; S._ft = 0;
   }
 }
+
+// ============================================================
+// 战术升级特性：长弓 AN/APG-78 360° 全向雷达与 FARP 战地补给导航
+// ============================================================
+let _radarCv = null, _radarCtx = null;
+let _radarTimer = 0;
+
+function updateTacticalRadar(dt) {
+  const rEl = UI('tac-radar');
+  if (!rEl) return;
+  // 仅在任务模式、训练模式或开启了靶标战斗时显示；在展示/航线/全屏图鉴中隐藏
+  const inCombat = !!(apache && (S.mode === 'mission' || S.mode === 'train' || (targets && targets.enabled && !targets.passive)));
+  const cutOn = !!(HOST.cutsceneState && HOST.cutsceneState.isOn && HOST.cutsceneState.isOn());
+  const cinOn = !!(HOST.cinemaState && HOST.cinemaState.on);
+  const show = inCombat && !cutOn && !cinOn && !S.armoryOpen;
+  
+  if (!show) {
+    if (rEl.style.display !== 'none') rEl.style.display = 'none';
+    return;
+  }
+  if (rEl.style.display !== 'block') rEl.style.display = 'block';
+
+  _radarTimer += dt;
+  if (_radarTimer < 0.08) return; // ~12fps 刷新率，保证极致性能与 0 GC
+  _radarTimer = 0;
+
+  if (!_radarCv) {
+    _radarCv = UI('tac-radar-cv');
+    if (_radarCv && _radarCv.getContext) _radarCtx = _radarCv.getContext('2d');
+  }
+  if (!_radarCtx) return;
+
+  const ctx = _radarCtx;
+  const W = 136, H = 136;
+  const cx = W / 2, cy = H / 2, cr = 58;
+  const maxR = 120; // 探测半径 120u (~270m)
+  const hp = apache.root.position;
+  const yaw = FLY.yaw || 0;
+  const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
+
+  ctx.clearRect(0, 0, W, H);
+
+  // 雷达底盘背景圆
+  ctx.fillStyle = 'rgba(7, 18, 14, 0.72)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 同心距离圈 (40u, 80u, 120u)
+  ctx.strokeStyle = 'rgba(95, 208, 168, 0.22)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, cr * (40 / maxR), 0, Math.PI * 2);
+  ctx.arc(cx, cy, cr * (80 / maxR), 0, Math.PI * 2);
+  ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 十字十字基线（Heading-up：上方为机头方向）
+  ctx.strokeStyle = 'rgba(95, 208, 168, 0.15)';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - cr); ctx.lineTo(cx, cy + cr);
+  ctx.moveTo(cx - cr, cy); ctx.lineTo(cx + cr, cy);
+  ctx.stroke();
+
+  // 雷达扫描线扇区（若旋翼启动或开启雷达）
+  if (S.running) {
+    const swAng = (S.radarPhase || (S.time * 2)) % (Math.PI * 2);
+    ctx.strokeStyle = 'rgba(95, 208, 168, 0.45)';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(swAng) * cr, cy + Math.sin(swAng) * cr);
+    ctx.stroke();
+  }
+
+  // 标绘本机（中心绿色三角）
+  ctx.fillStyle = '#5fd0a8';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 5);
+  ctx.lineTo(cx - 3.5, cy + 3.5);
+  ctx.lineTo(cx + 3.5, cy + 3.5);
+  ctx.closePath();
+  ctx.fill();
+
+  let threatCount = 0;
+  let nearestDist = 1e9, nearestClock = 12;
+
+  // 辅助坐标转换 (世界坐标 -> 相对机体 Heading-Up 屏幕像素)
+  function toRadar(wx, wz) {
+    const dx = wx - hp.x;
+    const dz = wz - hp.z;
+    // 相对机体坐标系（yaw=0 时 +Z 为机头）：
+    // 前向: dx * sin(yaw) + dz * cos(yaw)
+    // 右向: dx * cos(yaw) - dz * sin(yaw)
+    const rx = dx * cosY - dz * sinY;
+    const rz = dx * sinY + dz * cosY;
+    const d = Math.hypot(rx, rz);
+    const px = cx + (rx / maxR) * cr;
+    const py = cy - (rz / maxR) * cr;
+    return { px, py, d, rx, rz };
+  }
+
+  // 1. 标绘 FARP 前线停机坪 (0, 0)
+  const farp = toRadar(0, 0);
+  if (farp.d <= maxR * 1.5) {
+    const cpx = clamp(farp.px, cx - cr + 4, cx + cr - 4);
+    const cpy = clamp(farp.py, cy - cr + 4, cy + cr - 4);
+    ctx.strokeStyle = '#4fc3f7';
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(cpx - 3, cpy - 3, 6, 6);
+    ctx.fillStyle = '#4fc3f7';
+    ctx.font = '8px monospace';
+    ctx.fillText('H', cpx - 2.5, cpy + 2.5);
+  }
+
+  // 2. 标绘地面目标
+  if (targets && targets.targets) {
+    for (const t of targets.targets) {
+      if (!t.alive) continue;
+      threatCount++;
+      const pos = t.pos || (t.group && t.group.position);
+      if (!pos) continue;
+      const r = toRadar(pos.x, pos.z);
+      if (r.d < nearestDist) {
+        nearestDist = r.d;
+        // 计算时钟方位（1~12点钟）：以 rz 为前向，rx 为右向
+        let deg = Math.atan2(r.rx, r.rz) * 180 / Math.PI;
+        if (deg < 0) deg += 360;
+        nearestClock = Math.round(deg / 30) || 12;
+      }
+      if (r.d > maxR) {
+        // 屏外边缘圆弧点指示
+        const ang = Math.atan2(r.py - cy, r.px - cx);
+        const ex = cx + Math.cos(ang) * (cr - 2);
+        const ey = cy + Math.sin(ang) * (cr - 2);
+        ctx.fillStyle = 'rgba(255, 100, 100, 0.65)';
+        ctx.beginPath();
+        ctx.arc(ex, ey, 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = (t.type === 'sam' || t.type === 'radar') ? '#ff4d4f' : '#ff9800';
+        ctx.fillRect(r.px - 2, r.py - 2, 4, 4);
+      }
+    }
+  }
+
+  // 3. 标绘敌方空中战机与神风无人机
+  if (air && air.targets) {
+    for (const at of air.targets) {
+      if (at.off || !at.g || !at.g.visible) continue;
+      threatCount++;
+      const r = toRadar(at.g.position.x, at.g.position.z);
+      if (r.d < nearestDist) {
+        nearestDist = r.d;
+        let deg = Math.atan2(r.rx, r.rz) * 180 / Math.PI;
+        if (deg < 0) deg += 360;
+        nearestClock = Math.round(deg / 30) || 12;
+      }
+      const cpx = clamp(r.px, cx - cr + 3, cx + cr - 3);
+      const cpy = clamp(r.py, cy - cr + 3, cy + cr - 3);
+      ctx.fillStyle = '#ff3366';
+      ctx.beginPath();
+      ctx.moveTo(cpx, cpy - 3);
+      ctx.lineTo(cpx - 3, cpy + 3);
+      ctx.lineTo(cpx + 3, cpy + 3);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  if (enemyAir && enemyAir.alive && enemyAir.group && enemyAir.group.visible) {
+    threatCount++;
+    const r = toRadar(enemyAir.group.position.x, enemyAir.group.position.z);
+    const cpx = clamp(r.px, cx - cr + 3, cx + cr - 3);
+    const cpy = clamp(r.py, cy - cr + 3, cy + cr - 3);
+    ctx.fillStyle = '#ff1744';
+    ctx.beginPath();
+    ctx.arc(cpx, cpy, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 3.5 标绘环境侦察/巡逻无人机
+  if (narrative && narrative.enabled && narrative.patrol) {
+    for (const p of narrative.patrol) {
+      if (!p.alive || p.crashed) continue;
+      threatCount++;
+      const r = toRadar(p.pos.x, p.pos.z);
+      if (r.d < nearestDist) {
+        nearestDist = r.d;
+        let deg = Math.atan2(r.rx, r.rz) * 180 / Math.PI;
+        if (deg < 0) deg += 360;
+        nearestClock = Math.round(deg / 30) || 12;
+      }
+      const cpx = clamp(r.px, cx - cr + 3, cx + cr - 3);
+      const cpy = clamp(r.py, cy - cr + 3, cy + cr - 3);
+      ctx.fillStyle = '#ff7043';
+      ctx.beginPath();
+      ctx.moveTo(cpx, cpy - 3.5);
+      ctx.lineTo(cpx - 3, cpy + 3.5);
+      ctx.lineTo(cpx + 3, cpy + 3.5);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // 4. 标绘绞车救援幸存者
+  if (rescue && rescue.targetPos && rescue.state !== 'delivered') {
+    const rp = toRadar(rescue.targetPos.x, rescue.targetPos.z);
+    if (rp.d <= maxR * 1.5) {
+      const cpx = clamp(rp.px, cx - cr + 3, cx + cr - 3);
+      const cpy = clamp(rp.py, cy - cr + 3, cy + cr - 3);
+      ctx.strokeStyle = '#ffd700';
+      ctx.beginPath();
+      ctx.arc(cpx, cpy, 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  // 更新文本读数
+  const cntEl = UI('tac-radar-cnt');
+  if (cntEl) cntEl.textContent = threatCount > 0 ? `${threatCount} 威胁` : '空域净空';
+
+  const infoEl = UI('tac-radar-info');
+  if (infoEl) {
+    if (threatCount === 0) {
+      infoEl.textContent = '空域清空 · 可返航停机坪';
+      infoEl.style.color = '#5fd0a8';
+    } else {
+      const dMeters = Math.round(nearestDist * U2M);
+      infoEl.textContent = `最近威胁: ${nearestClock}点钟 · ${dMeters}m`;
+      infoEl.style.color = nearestDist < 35 ? '#ff4d4f' : '#ffc107';
+    }
+  }
+}
+
+function updateFarpHud() {
+  const fEl = UI('farp-hud');
+  if (!fEl) return;
+  const inMission = !!(S._mission && !S._mission.frozen && S.mode === 'mission');
+  const cutOn = !!(HOST.cutsceneState && HOST.cutsceneState.isOn && HOST.cutsceneState.isOn());
+  if (!inMission || cutOn || !resources) {
+    if (fEl.style.display !== 'none') fEl.style.display = 'none';
+    return;
+  }
+
+  const rs = resources.fast ? resources.fast() : resources.state();
+  const heliDmg = targets ? (targets._heliDmg || 0) : 0;
+  const lowFuel = rs.fuel < 35;
+  const lowAmmo = rig && (rig.gunAmmo < 200 || (rig.rocketAmmo === 0 && rig.hfAmmo === 0));
+  const damaged = heliDmg >= 4;
+  const needSupply = lowFuel || lowAmmo || damaged;
+
+  // 离前线停机坪 (0, 0) 的距离
+  const distToPad = Math.hypot(FLY.x || 0, FLY.z || 0);
+
+  if (rs.rtbOn) {
+    if (fEl.style.display !== 'block') fEl.style.display = 'block';
+    const txtEl = UI('farp-hud-txt');
+    if (txtEl) txtEl.textContent = `FARP 战地抢修与弹药再装填... ${Math.round(rs.rtbP * 100)}%`;
+    const fillEl = UI('farp-hud-fill');
+    if (fillEl) fillEl.style.width = `${Math.round(rs.rtbP * 100)}%`;
+    return;
+  }
+
+  if (needSupply || distToPad < 14) {
+    if (fEl.style.display !== 'block') fEl.style.display = 'block';
+    const distM = Math.round(distToPad * U2M);
+    const txtEl = UI('farp-hud-txt');
+    if (txtEl) {
+      if (distToPad < 6) {
+        txtEl.textContent = FLY.state === 'hover' ? '已抵达 FARP · 降落或悬停 3 秒开始再装填' : 'FARP 准备补给中';
+      } else {
+        const dx = 0 - (FLY.x || 0), dz = 0 - (FLY.z || 0);
+        const yaw = FLY.yaw || 0;
+        const rx = dx * Math.cos(yaw) - dz * Math.sin(yaw);
+        const rz = dx * Math.sin(yaw) + dz * Math.cos(yaw);
+        let deg = Math.atan2(rx, rz) * 180 / Math.PI;
+        if (deg < 0) deg += 360;
+        const clock = Math.round(deg / 30) || 12;
+        txtEl.textContent = `返航指引: 前线停机坪 (FARP) ${clock}点钟 · ${distM}m`;
+      }
+    }
+    const fillEl = UI('farp-hud-fill');
+    if (fillEl) fillEl.style.width = '0%';
+  } else {
+    if (fEl.style.display !== 'none') fEl.style.display = 'none';
+  }
+}
+

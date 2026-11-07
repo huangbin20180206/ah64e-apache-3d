@@ -271,8 +271,59 @@ class NarrativeFX {
       fus.name = 'narrative-patrol-' + i + '-fus';
       p.add(fus);
       this.group.add(p);
-      this.patrol.push({ g: p, phase: i * Math.PI, altv: (i % 2) * 0.5 });
+      this.patrol.push({
+        id: 'patrol-' + i,
+        key: 'patrol-' + i,
+        label: 'MQ-1 察打无人机',
+        type: 'plane',
+        alive: true,
+        hp: 2,
+        hp0: 2,
+        radius: 1.8,
+        g: p,
+        pos: new THREE.Vector3(),
+        phase: i * Math.PI,
+        altv: (i % 2) * 0.5,
+        crashed: false,
+        vy: 0,
+        vr: 0,
+        burn: 0,
+        _smk: 0,
+        _hasGlb: false,
+      });
     }
+
+    // 采用免费开源的高清 MQ-1 捕食者中空长航时无人机 3D 模型替换粗糙几何体拼图
+    new THREE.GLTFLoader().load('assets/targets/mq1_predator.glb', (gltf) => {
+      const src = gltf.scene;
+      src.updateMatrixWorld(true);
+      const bb = new THREE.Box3().setFromObject(src, true);
+      const sz = bb.getSize(new THREE.Vector3());
+      const maxDim = Math.max(sz.x, sz.y, sz.z, 1e-3);
+      const k = 4.6 / maxDim; // 等比缩放至约 4.6u 翼展（与巡逻高度尺度契合）
+      const c = bb.getCenter(new THREE.Vector3());
+      for (let i = 0; i < this.patrol.length; i++) {
+        const item = this.patrol[i];
+        const m = src.clone(true);
+        m.traverse(o => {
+          if (o.isMesh) {
+            o.castShadow = true;
+            o.receiveShadow = false;
+          }
+        });
+        m.scale.setScalar(k);
+        m.position.set(-c.x * k, -c.y * k, -c.z * k);
+        const wrap = new THREE.Group();
+        wrap.name = 'narrative-patrol-' + i + '-glb';
+        wrap.add(m);
+        // 隐藏原始几何拼接体，呈现高质量开源无人机外观
+        for (const ch of item.g.children) {
+          if (ch.name && ch.name.includes('fus')) ch.visible = false;
+        }
+        item.g.add(wrap);
+        item._hasGlb = true;
+      }
+    }, undefined, () => {});
 
     // 6) 远交火烟柱：基地外 2 处，间歇升腾（Sprite + 径向渐变贴图）
     // P14-F：烟团中心基线从 6 降至 4.7——旧值下 Sprite 底部（中心-3.5）悬空
@@ -387,35 +438,105 @@ class NarrativeFX {
   }
 
   // ---------- Phase 21：打击层（仿 16-targets 统一战斗模式） ----------
-  // 命中检测：武器世界坐标 → 距离最近存活设施；扣 hp、flashHit / _destroy。
+  // 命中检测：武器世界坐标 → 距离最近存活设施或空中巡逻无人机；扣 hp、flashHit / _destroy。
   // 判定 y 压缩同 16-targets（近失破片语义）；难度抗打击读 HOST.arcade。
   // hitTest 内按 radius 限域，天然只在基地扇区生效（与 enemyAir 并列调用安全）。
   hitTest(worldPos, power) {
     if (!this.enabled) return null;
-    let best = null, bestD = 1e9;
+    let best = null, bestD = 1e9, isPatrol = false;
     for (const s of this.strikes) {
       if (!s.alive) continue;
       const d = Math.hypot(worldPos.x - s.pos.x, (worldPos.y - 1.0) * 0.6, worldPos.z - s.pos.z);
-      if (d < s.radius + 0.9 && d < bestD) { best = s; bestD = d; }
+      if (d < s.radius + 0.9 && d < bestD) { best = s; bestD = d; isPatrol = false; }
+    }
+    // 彻底修复基地巡逻无人机永远打不到打不掉的严重 Bug
+    if (this.patrol) {
+      for (const p of this.patrol) {
+        if (!p.alive || p.crashed) continue;
+        const d = p.pos.distanceTo(worldPos);
+        if (d < p.radius + 1.2 && d < bestD) { best = p; bestD = d; isPatrol = true; }
+      }
     }
     if (!best) return null;
     const arcMod = HOST.arcade;
     const res = (arcMod && arcMod.targetResMul()) || 1;   // 难度抗打击（veteran 更耐打）
-    best.hp -= (power || 0) / res;
-    if (best.hp <= 0) this._destroy(best, power);
-    else {
-      this._flashHit(best);
-      // Phase 21.2：命中脉冲——受击组瞬时下压再回弹（update 推进的 0.12s 计时器，
-      // 不用 setTimeout 堆积）+ 命中点火花（复用 WeaponRig puff 池 additive 小亮点，
-      // wfx 不可用则跳过——同 21.1 残骸烟守卫）。纯视觉，不碰扣血/事件链
-      best._punch = 0.12;
-      const wfx = window.__rigFx;
-      if (wfx && wfx._puff) {
-        wfx._puff(worldPos.x, worldPos.y, worldPos.z,
-          { color: 0xffd27a, s0: 0.10, s1: 0.34, life: 0.2, base: 0.85, add: true });
+    best.hp -= (power || 1) / res;
+    if (isPatrol) {
+      if (best.hp <= 0) this._destroyPatrol(best, power);
+      else {
+        this._flashHitPatrol(best);
+        const wfx = window.__rigFx;
+        if (wfx && wfx._puff) {
+          wfx._puff(worldPos.x, worldPos.y, worldPos.z,
+            { color: 0xffd27a, s0: 0.12, s1: 0.40, life: 0.25, base: 0.85, add: true });
+        }
+      }
+    } else {
+      if (best.hp <= 0) this._destroy(best, power);
+      else {
+        this._flashHit(best);
+        best._punch = 0.12;
+        const wfx = window.__rigFx;
+        if (wfx && wfx._puff) {
+          wfx._puff(worldPos.x, worldPos.y, worldPos.z,
+            { color: 0xffd27a, s0: 0.10, s1: 0.34, life: 0.2, base: 0.85, add: true });
+        }
       }
     }
     return best;
+  }
+
+  // 巡逻无人机被击毁：凌空爆炸火球 + 螺旋下坠黑烟 + 击毁通报
+  _destroyPatrol(p, power = 2) {
+    p.alive = false;
+    p.crashed = true;
+    p.vy = -1.5;
+    p.vr = (rnd() > 0.5 ? 1 : -1) * (4.0 + rnd() * 2.0);
+    if (window.__rigFx) {
+      window.__rigFx.explosion(p.pos.x, p.pos.y, p.pos.z, power || 2);
+    }
+    this.killEvent = { key: p.key, type: 'plane', label: p.label, x: p.pos.x, z: p.pos.z };
+  }
+
+  // 巡逻无人机受击闪光
+  _flashHitPatrol(p) {
+    p.g.traverse(o => {
+      if (o.isMesh && o.material) {
+        const m = o.material;
+        if (!m.userData._bk) m.userData._bk = m.emissive ? m.emissive.getHex() : 0;
+        if (m.emissive) {
+          m.emissive.setHex(0xffaa44);
+          m.emissiveIntensity = 1.2;
+        }
+        setTimeout(() => {
+          if (m.emissive) {
+            m.emissive.setHex(m.userData._bk || 0);
+            m.emissiveIntensity = 0;
+            m.needsUpdate = true;
+          }
+        }, 110);
+      }
+    });
+  }
+
+  // 空中巡逻机对空瞄准与火控锁定捕获支持（供 65-weapons 与 46-fpview 锁定框调用）
+  nearest(from, dir, coneDeg = 45) {
+    if (!this.enabled || !this.patrol) return null;
+    let best = null, bestD = 1e9;
+    const cosCone = Math.cos((coneDeg || 45) * DEG);
+    const v = new THREE.Vector3();
+    for (const p of this.patrol) {
+      if (!p.alive || p.crashed) continue;
+      v.copy(p.pos).sub(from);
+      const d = v.length();
+      v.normalize();
+      if (dir && v.dot(dir) < cosCone) continue;
+      if (d < bestD) {
+        best = p;
+        bestD = d;
+      }
+    }
+    return best ? { t: best, d: bestD } : null;
   }
 
   // 受击闪一下（未摧毁）——emissive 闪，仿 16-targets.flashHit
@@ -607,6 +728,21 @@ class NarrativeFX {
       s.alive = true;
       s.group.visible = true;
     }
+    if (this.patrol) {
+      for (const p of this.patrol) {
+        p.alive = true;
+        p.hp = p.hp0;
+        p.crashed = false;
+        p.vy = 0;
+        p.vr = 0;
+        p.g.rotation.set(0, 0, 0);
+        p.g.visible = this.enabled;
+        for (const ch of p.g.children) {
+          if (ch.name && ch.name.includes('fus')) ch.visible = !p._hasGlb;
+          else if (ch.name && ch.name.includes('glb')) ch.visible = true;
+        }
+      }
+    }
   }
 
   // 每帧驱动：雷达旋转 / 探照灯扫掠 / 编队巡航 / 烟柱间歇
@@ -649,12 +785,39 @@ class NarrativeFX {
     const bc = BASE_C;
     for (let i = 0; i < this.patrol.length; i++) {
       const p = this.patrol[i];
+      if (p.crashed) {
+        p.vy -= 14 * dt;
+        p.g.position.y += p.vy * dt;
+        p.g.rotation.x += p.vr * dt;
+        p.g.rotation.z += p.vr * dt * 0.8;
+        p.pos.copy(p.g.position);
+        p._smk = (p._smk || 0) - dt;
+        if (p._smk <= 0 && window.__rigFx && window.__rigFx._puff) {
+          p._smk = 0.08;
+          window.__rigFx._puff(p.pos.x, p.pos.y, p.pos.z,
+            { color: 0x2b2620, s0: 0.35, s1: 1.2, life: 0.6, base: 0.5, rise: 0.4 });
+        }
+        if (p.g.position.y <= 0.6) {
+          p.crashed = false;
+          p.g.visible = false;
+          if (window.__rigFx) {
+            window.__rigFx.explosion(p.pos.x, 0.8, p.pos.z, 2.2);
+          }
+        }
+        continue;
+      }
+      if (!p.alive) {
+        p.g.visible = false;
+        continue;
+      }
+      p.g.visible = this.enabled;
       const a = time * 0.16 + p.phase;
       p.g.position.set(bc.x + Math.cos(a) * 18, 12 + p.altv, bc.z + Math.sin(a) * 18);
       // P14-F：机头沿切线方向——位置 (cos a, sin a)·18 的速度向量为
       // (-sin a, cos a)，机头局部 +Z 在 yaw=θ 时指向 (sin θ, cos θ)，
       // 令 θ=-a 恰使机头=切向（旧值 -a+π/2 使机头径向朝外，像"侧着飞"）
       p.g.rotation.y = -a;
+      p.pos.copy(p.g.position);
     }
     // 远交火烟柱：间歇呼吸（0.35 + 0.25 sin），缓慢升腾高度
     // P14-F：基线 4.7（Sprite 半高 3.5 → 底缘 0~2.4 贴地升起，不再悬空）

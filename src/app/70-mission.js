@@ -71,14 +71,19 @@ const AIRSUP_WAVES = 3;
 // 不得以"满血新波"的形式回来（否则逃逸等于白逃）。代价：逃逸过多则本局凑不满
 // 6 击落，按正常逻辑超时判负；逃机在出界前仍可被追击击落（玩家须咬住）。
 // 读注入的 enemyAir 引用（拓扑：70 低编号不得静态引用 87），不反向 import。
-function _airWaveCleared() {
+function _airWaveCleared(countWithdrawn) {
   if (!enemyAir || !enemyAir.units || !enemyAir.units.length) return false;
-  return enemyAir.units.every(u => u.phase === 'down');
+  // 本地修补 2026-10-30：endless 变体 timeout=99999 实际不可达，若沿用"撤离不算
+  // 打光"的制空语义，一架敌机带伤逃逸后 airCleared 永久为 false → 波次永久卡死。
+  // endless 传 countWithdrawn=true：撤离出界（on=false）也算本波肃清（spawn 会
+  // 满状态重置单元）。制空作战保持原语义不变（逃机不回、超时判负，见上方拍板注释）。
+  return enemyAir.units.every(u => u.phase === 'down' || (countWithdrawn && !u.on));
 }
 // 制空作战续波锚点 = 与首波同一锚点（startMission 时快照靶场 baseCenter，
-// 靶场重建也不漂移）。缺失时回退 baseCenter，再回退默认基地坐标。
+// 靶场重建也不漂移）。无尽模式推后至 z=80（约 180~235m 外空域，巡逻南缘恰入索敌视距），留出从容起飞接敌距离。
 function _airSupAnchor() {
   const m = S._mission;
+  if (m && m.variant === 'endless') return { x: 0, z: 80 };
   if (m && m._airAnchor) return m._airAnchor;
   if (targets && targets.baseCenter) return targets.baseCenter;
   return { x: BASE_C.x, z: BASE_C.z };
@@ -246,6 +251,17 @@ function setMissionVariant(k) {
   const m = S._mission;
   if (!m || !MISSION_VARIANTS[k]) return;
   m.variant = k;
+  const VT = MISSION_VARIANTS[k];
+  if (VT && VT.train && targets) targets.applyTraining(VT.bench);
+  else if (targets && !m.levelId) targets.reset();
+  if (enemyAir && targets && targets.baseCenter) {
+    if (VT && (VT.train || VT.noAirStart)) {
+      enemyAir.reset();
+    } else {
+      m._airAnchor = k === 'endless' ? { x: 0, z: 80 } : { x: targets.baseCenter.x, z: targets.baseCenter.z };
+      enemyAir.spawn(m._airAnchor);
+    }
+  }
   applyVariantAmmo();
   renderVariantChips();
   renderBriefing();
@@ -366,10 +382,14 @@ function renderBriefing() {
       : v === 'train_rescue' ? '幸存者 ×1（看烟和信标找人）'
       : v === 'train_weapons' ? '静止靶 ×6（4 辆卡车 + 2 个油桶）'
       : v === 'train_hellfire' ? '移动坦克 ×3'
+      : v === 'endless' ? '动态波次防御：全歼当波地面与空中敌军即推进下一波'
       : '载具 ×10（接近基地后锁定攻击）') + '</b></div>' +
     extra +
     '<div class="mrow"><span>完成条件</span><b>' + (LO && LO.goal ? LO.goal : V.goal) + '</b></div>' +
-    '<div class="mrow"><span>失败条件</span><b>' + Math.round(V.timeout / 60) + ' 分钟内未完成' + (V.train ? '' : '（或机体损伤过重）') + '</b></div>' +
+    // 本地修补：endless 的 timeout=99999，通用文案会渲染成"1667 分钟内未完成"
+    '<div class="mrow"><span>失败条件</span><b>' + (V.endless
+      ? '尽可能存活——机体损伤过重即强制返航'
+      : Math.round(V.timeout / 60) + ' 分钟内未完成' + (V.train ? '' : '（或机体损伤过重）')) + '</b></div>' +
     '<div class="mhint">' + ((LO && LO.hint) || TRAIN_HINT[v] || '起飞后沿机头方向前进，接近后锁定并攻击；随时可按 B 重试') + '</div>';
 }
 function updateMissionPanel() {
@@ -401,6 +421,17 @@ function updateMissionPanel() {
       '<div class="mrow"><span>剩余时间</span><b>' + fmtMissionTime(Math.max(0, missionTimeout() - el)) + '</b></div>' +
       (course && course.active && course.stage === 3 ? '<div class="mrow"><span>悬停计时</span><b>' + course.hoverT.toFixed(1) + ' / 10 s</b></div>' : '') +
       _levelProgressHtml();
+    return;
+  }
+  // 本地修补：endless 专属进度面板——通用渲染的"剩余时间"会显示 1666:39 倒数
+  //（timeout=99999 占位值），且"剩余目标/已摧毁"不反映波次语义。
+  if (S._mission.variant === 'endless') {
+    const airLive = enemyAir && enemyAir.state ? enemyAir.state().live : 0;
+    UI('mission-body').innerHTML =
+      '<div class="mrow"><span>当前波次</span><b>第 ' + (S._mission.wave || 1) + ' 波</b></div>' +
+      '<div class="mrow"><span>剩余地面目标</span><b>' + remain + '</b></div>' +
+      '<div class="mrow"><span>敌直升机活动</span><b>' + airLive + '</b></div>' +
+      '<div class="mrow"><span>用时</span><b>' + fmtMissionTime(el) + '</b></div>' + _levelProgressHtml();
     return;
   }
   UI('mission-body').innerHTML =
@@ -699,7 +730,18 @@ function failMission(reason) {
     '<div class="mrow"><span>用时</span><b>' + fmtMissionTime(el) + '</b></div>' +
     '<div class="mrow"><span>已摧毁</span><b>' + (targets.totalCount - targets.aliveCount) + '/' + targets.totalCount + '</b></div>' +
     '<div class="mrow"><span>机体受损</span><b>' + (targets ? targets._heliDmg : 0) + '</b></div>' +
+    // 死因分析：损伤失败时说明"被谁、从哪、怎么避免"（其他失败原因有受击记录也展示）
+    _deathAnalysisHtml(m) +
     '<div class="mhint">按 B 或点重试可再来一次</div>';
+  if (!document.getElementById('p5-death-css')) {
+    const s = document.createElement('style'); s.id = 'p5-death-css';
+    s.textContent = '.p5-death{margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,90,70,.35)}' +
+      '.p5-death .p5-deb-h{font-size:12px;letter-spacing:4px;color:#ff8a70;margin-bottom:2px}' +
+      '.p5-death .mrow span{flex:0 0 auto;white-space:nowrap;margin-right:12px}.p5-death .mrow b{text-align:right}' +
+      '.p5-death .p5-w i{display:block;font-style:normal;white-space:nowrap}' +
+      '.p5-death .p5-tip i{white-space:normal;text-align:left;font-weight:400;opacity:.9;line-height:1.45}';
+    document.head.appendChild(s);
+  }
   UI('mission').classList.add('show');
   UI('mission').classList.remove('briefing');
   UI('mission').classList.add('fin');   // game3：战报可滚动
@@ -773,27 +815,33 @@ function startMission(variant, levelIdx, levelId) {
   // P14-A（幂等）：round 递增需在重建前捕获上一任务轮次阶段——简报/进行中
   // 重复点击"开始/重试"属同一轮，不得 roll（否则 cutscene 重排、power 重复播放）。
   // 仅"全新任务 / 上一轮已结算（done/failed）"才递增轮次（retry=新轮合法）。
-  const prevPhase = S._mission ? S._mission.phase : null;
+  const prevM = S._mission;
+  const prevPhase = prevM ? prevM.phase : null;
+  const nextVariant = variant || 'standard';
+  const nextIdx = (levelIdx == null ? null : levelIdx);
+  const nextId = levelId || null;
+  const targetChanged = !prevM || prevM.variant !== nextVariant || prevM.levelIdx !== nextIdx || prevM.levelId !== nextId;
+  if (targetChanged && HOST.cutsceneState && HOST.cutsceneState.cancel) {
+    HOST.cutsceneState.cancel();
+  }
   S._mission = { t0: null, gun0: null, rk0: null, hf0: null, hits: 0, done: false,
-    phase: 'briefing', failedReason: null, frozen: false, variant: variant || 'standard',
+    phase: 'briefing', failedReason: null, frozen: false, variant: nextVariant,
     // Phase 18：难度快照（本局冻结；结算/超时/AA 系数均读此值，任务中切面板不改）
     difficulty: (arcade && arcade.difficulty) || 'standard',
     // Phase 20-D：战役关卡序号（null=自由局不入档）
-    levelIdx: (levelIdx == null ? null : levelIdx),
+    levelIdx: nextIdx,
     // P2：游戏模式关卡 id（91-levels；null=非关卡局）。结算按它记星级（92-progress）
-    levelId: levelId || null };
+    levelId: nextId };
   // Phase 18：本局计分/连击/成就状态清零（最高分与跨局变体记录保留）
   if (arcade) arcade.onMissionStart();
   S._baseFound = false;
   // Phase 13-S4：任务开始 → 战斗配乐（鼓点+贝斯；垫乐压低）
   if (music) music.setMode('battle');
-  // Phase 13-M6：任务 cutscene（round 制：每新任务轮次最多播一次）；rescue
+  // Phase 13-M6：任务 cutscene（round 制：每新任务轮次或切换不同关卡/变体时递增）；rescue
   // replay 标记复位（新轮次重新具备资格）
-  const isNewRound = prevPhase === null || prevPhase === 'done' || prevPhase === 'failed';
+  const isNewRound = targetChanged || prevPhase === null || prevPhase === 'done' || prevPhase === 'failed';
   if (isNewRound) S._missionRound = (S._missionRound || 0) + 1;   // 新轮次 ID（round 制）
   S._rescueCut = false; S._winchCam = false;   // game5：新一轮清绞车镜头标记
-  // 第二轮 A：训练关（train_*）没有敌方基地，不播"接近敌方基地后锁定开火"的基地过场——新手直接上手
-  if (HOST.cutsceneState && !_isTrainVariant()) HOST.cutsceneState.maybe('mission', S._missionRound);
   // 弹药恢复满 + 按变体应用（受限弹药减半、切回标准即满弹）——重试不累积
   applyVariantAmmo();
   // Phase 20-A：A2A 敌机编队进场——巡逻锚=敌方基地方位（靶场基地外延环）。
@@ -806,9 +854,13 @@ function startMission(variant, levelIdx, levelId) {
   if (LO && LO.units && targets) targets.applyLayout(LO.units);
   if (LO && LO.rescueAt) _placeRescue(LO.rescueAt.x, LO.rescueAt.z);
   if (enemyAir && targets && targets.baseCenter && !(VT && (VT.train || VT.noAirStart)) && !(LO && LO.noAir)) {
-    // C005：锚点快照进 mission——制空作战续波必须用与首波同一锚点
-    S._mission._airAnchor = (LO && LO.airAnchor) ? { x: LO.airAnchor.x, z: LO.airAnchor.z }
-      : { x: targets.baseCenter.x, z: targets.baseCenter.z };   // P3c：关卡可移出基地
+    // C005：锚点快照进 mission——制空作战续波必须用与首波同一锚点（无尽模式推后至 z=80 外空域）
+    if (S._mission.variant === 'endless') {
+      S._mission._airAnchor = { x: 0, z: 80 };
+    } else {
+      S._mission._airAnchor = (LO && LO.airAnchor) ? { x: LO.airAnchor.x, z: LO.airAnchor.z }
+        : { x: targets.baseCenter.x, z: targets.baseCenter.z };   // P3c：关卡可移出基地
+    }
     enemyAir.spawn(S._mission._airAnchor);
   }
   // 回到地面停放态，简报先出（规范化全部飞行状态——FPV 退出后的残留一并清零）
@@ -816,6 +868,8 @@ function startMission(variant, levelIdx, levelId) {
   FLY.pitch = 0; FLY.roll = 0; FLY.fp = false;
   const rb = UI('btn-mission-retry'); if (rb) rb.style.display = 'none';  // 新一轮开始隐藏重试
   showMissionBriefing();
+  // 开场目标导览与进场过场（在 applyTraining / applyLayout / _placeRescue 全部就位后启动，确保导览读取真实布局坐标）
+  if (HOST.cutsceneState) HOST.cutsceneState.maybe('mission', S._missionRound);
 }
 // Phase 20-D：战役关卡入口——按解锁链选关（canPlay 门控），快照难度并进入
 // 对应变体；levelIdx 记进 S._mission 供结算记档。
@@ -849,6 +903,10 @@ function retryMission() {
   const v = (m && m.variant) || 'standard';
   const li = m ? m.levelIdx : null;
   startMission(v, li, m ? m.levelId : null);
+  // 本地修补：重试不走 startLevel，70-play 的 syncPlayActions 不会被调——顶栏
+  // "下一关 X →"按钮与 playState.next 残留旧局状态，新局按 N 会中途跳关。
+  // onLevelResult 即 syncPlayActions 的宿主出口，phase 已非 done 时会清干净。
+  if (HOST.onLevelResult) HOST.onLevelResult();
   toast('任务已重置——按 T 起飞出发');
 }
 
@@ -861,7 +919,7 @@ function _tickMission(dt) {
   // cinematic 等序列持有 HOST.camSeq，maybe('mission', round) 被拒并保留
   // pendingRound——此处每帧重试，owner 释放后自动取得并播放；幂等（已播
   // 返回 true 零副作用）。同轮最多播一次，retry 新轮重新具备资格。
-  if (S._mission && S._missionRound && HOST.cutsceneState && !_isTrainVariant()) {
+  if (S._mission && S._missionRound && HOST.cutsceneState) {
     HOST.cutsceneState.maybe('mission', S._missionRound);
   }
   // 接近敌方基地的叙事节点（寻找→锁定→攻击→摧毁）：接近到 30u 内
@@ -870,9 +928,10 @@ function _tickMission(dt) {
   // 两种情况：① 无任务 → 新建并进 briefing→active；② 已在 briefing（如刚
   // retry 或 startMission 后）→ 接近即视为"出发确认"，自动进入 active。
   const VTr = S._mission && MISSION_VARIANTS[S._mission.variant];
-  // P3：训练关——离地即开始（不靠接近基地触发）
-  if (VTr && VTr.train && S._mission.phase === 'briefing' && FLY.state !== 'ground') beginMission();
-  if (targets && targets.baseCenter && !S._baseFound && S.mode === 'mission' && !(VTr && VTr.train)) {
+  // P3：训练关——离地即开始（不靠接近基地触发，且需在过场未占用时）
+  const isCutOn = !!(HOST.cutsceneState && (HOST.cutsceneState.isOn ? HOST.cutsceneState.isOn() : (HOST.cutsceneState.state && HOST.cutsceneState.state().on)));
+  if (VTr && VTr.train && S._mission.phase === 'briefing' && FLY.state !== 'ground' && !isCutOn) beginMission();
+  if (targets && targets.baseCenter && !S._baseFound && S.mode === 'mission' && !(VTr && VTr.train) && !isCutOn) {
     const bd = Math.hypot(apache.root.position.x - targets.baseCenter.x,
                           apache.root.position.z - targets.baseCenter.z);
     if (bd < 30) {
@@ -925,21 +984,32 @@ function _tickMission(dt) {
         const m = S._mission;
         if (!m.wave) m.wave = 1;
         const groundCleared = targets && targets.aliveCount === 0;
-        const airCleared = _airWaveCleared();
+        const airCleared = _airWaveCleared(true);
         if (groundCleared && airCleared) {
           m.wave++;
-          if (arcade) arcade.addBonus(2000 * (m.wave - 1));
+          // 本地修补 2026-10-29：83-arcade 只暴露 addBonus（无 addScore）。原写法在清波
+          // 那一帧抛 TypeError，_tickMission 后半段（波次提示 / 目标重置 / 补新敌机）全部
+          // 被跳过，且 0.5s 节流每轮复抛——无尽模式清场后战场永不刷新。
+          if (arcade && arcade.addBonus) arcade.addBonus(2000 * (m.wave - 1));
           toast('【第 ' + (m.wave - 1) + ' 波肃清】第 ' + m.wave + ' 波敌军正在从战区外围集结！波次奖分 +' + (2000 * (m.wave - 1)));
-          radioSay('win');
+          radioSay('done');
           if (betty) betty.speak('WAVE CLEARED');
           if (targets && targets.reset) {
             targets.reset();
             for (const t of targets.targets) {
-              if (t.hpMax) t.hp = t.hpMax = Math.min(6, t.hpMax + Math.floor(m.wave / 2));
+              // 本地修补 2026-10-30：上游写 t.hpMax，但 16-targets 的血量字段是 hp0
+              //（reset() 恢复 hp=hp0），hpMax 全库无定义 → 恒 undefined，"随波次
+              // 加厚装甲"是死代码。改以 hp0 为基准按波次加成，上限 6（原公式同帽）。
+              if (t.hp0) t.hp = Math.min(6, t.hp0 + Math.floor(m.wave / 2));
             }
           }
+          if (air && air.reset) air.reset();
+          if (infantry && infantry.reset) infantry.reset();
           if (enemyAir && enemyAir.spawn) {
             enemyAir.spawn(_airSupAnchor());
+            if (enemyAir.units) {
+              for (const u of enemyAir.units) u._withdrawNoticed = false;
+            }
           }
         }
       }
@@ -956,7 +1026,14 @@ function _tickMission(dt) {
         if (S._mission.phase === 'active' && variantGoalMet(S._mission)) completeMission();
         else if (S._mission.phase === 'active' && (S.time - S._mission.t0) > missionTimeout()) failMission('timeout');
       }
-      else if (targets.aliveCount === 0 && S._mission.variant !== 'air_superiority') {
+      // 本地修补 2026-10-30：①全歼分支补排除 endless——variantGoalMet 对 endless
+      // 落 default:true，原写法在"地面清光但敌机还在"的常态下立即 completeMission()，
+      // 无尽模式第一波地面清完即被误判通关（波次机制形同虚设）。②超时/损伤/弹药
+      // 三条失败判定原是 else-if 链尾——timed_rescue/sead_strike 全歼地面但附加
+      // 目标未完成时控制流停进提示分支，时限耗尽也永不判负（任务永久悬挂，违背
+      // 411 行"等救援完成或变体时限耗尽失败"的承诺）。改为独立判定块，phase 守卫
+      // 防重复结算；finale/train_flight/train_rescue 分支自带判定，维持原语义跳过。
+      else if (targets.aliveCount === 0 && S._mission.variant !== 'air_superiority' && S._mission.variant !== 'endless') {
         if (variantGoalMet(S._mission)) { completeMission(); }
         else if (S._mission.variant === 'timed_rescue') {
           if (!S._mission._rescueHint) { S._mission._rescueHint = true; toast('目标已全歼——还需完成救援：放绞车救起并送抵停机坪'); }
@@ -965,14 +1042,24 @@ function _tickMission(dt) {
           if (!S._mission._seadHint) { S._mission._seadHint = true; toast('地面已清剿——还需摧毁敌雷达站与防空发射车完成 SEAD'); }
         }
       }
-      else if (S._mission.phase === 'active' && (S.time - S._mission.t0) > missionTimeout()) { failMission('timeout'); }
-      // P8：损伤过重失败——损伤 ≥12（Lv.3 顶格）强制返航，归因可解释（有分级、有恢复=重试）
-      else if (S._mission.phase === 'active' && targets._heliDmg >= 12) { failMission('damage'); }
-      // Phase 20-B：弹药耗尽失败——三类弹药全空且目标未全歼（返场补给窗口
-      // 是唯一补给途径；limited_ammo 变体无补给窗，打光即败局可解释）
-      else if (S._mission.phase === 'active' && resources
-        && resources.ammoDry(rig ? rig.gunAmmo : 0, rig ? rig.rocketAmmo : 0, rig ? rig.hfAmmo : 0)
-        && targets.aliveCount > 0) { failMission('ammo'); }
+      if (vv !== 'finale' && vv !== 'train_flight' && vv !== 'train_rescue') {
+        if (S._mission.phase === 'active' && (S.time - S._mission.t0) > missionTimeout()) { failMission('timeout'); }
+        // P8：损伤过重失败——损伤 ≥12（Lv.3 顶格）强制返航，归因可解释（有分级、有恢复=重试）
+        else if (S._mission.phase === 'active' && targets._heliDmg >= 12) { failMission('damage'); }
+        // Phase 20-B：弹药耗尽失败——三类弹药全空且目标未全歼（无尽模式支持飞回 FARP 补给，不直接判负）
+        else if (S._mission.phase === 'active' && resources
+          && resources.ammoDry(rig ? rig.gunAmmo : 0, rig ? rig.rocketAmmo : 0, rig ? rig.hfAmmo : 0)
+          && targets.aliveCount > 0) {
+          if (vv === 'endless') {
+            if (!S._mission._ammoHint) {
+              S._mission._ammoHint = true;
+              toast('⚠ 弹药已耗尽——请立即飞回 FARP 停机坪 (0,0) 低空悬停补给弹药！');
+            }
+          } else {
+            failMission('ammo');
+          }
+        }
+      }
     }
   }
   // Phase 11 T1：训练模式分步引导推进（0.5s 节流粒度足够；判定全部复用
@@ -1022,19 +1109,26 @@ function _tickMissionMaps(dt) {
     }
     if (cy.active) {
       if (W.duneFar) W.duneFar.visible = false;
-      // 新一局/重试：停在地面时放回峡谷南端（startMission 先把 FLY 归零，这里再落位）
-      if (cy.needSpawn && FLY.state === 'ground') {
+      const inCut = !!(HOST.cutsceneState && HOST.cutsceneState.isOn && HOST.cutsceneState.isOn());
+      // 新一局/重试：停在地面时放回峡谷南端（过场期间不抢占 needSpawn）
+      if (cy.needSpawn && FLY.state === 'ground' && !inCut) {
         cy.needSpawn = false;
         FLY.x = cy.spawn.x; FLY.z = cy.spawn.z; FLY.yaw = cy.spawn.yaw; FLY.alt = 0;
       }
-      // 雷达锁定命中 → 走 P8 既有损伤链（同 SAM hitPending 单槽消费）
-      if (cy.hitPending) {
+      // 雷达锁定命中 → 走 P8 既有损伤链（过场期间不产生雷达伤害）
+      if (inCut) {
+        cy.hitPending = null;
+        cy.exposure = 0;
+      } else if (cy.hitPending) {
         const h = cy.hitPending;
         cy.hitPending = null;
         const cdm = arcade ? arcade.coeffs(S._mission) : null;
-        targets._heliDmg += h.dmg * (cdm ? cdm.aaDmg : 1);
+        const hitDmg = h.dmg * (cdm ? cdm.aaDmg : 1);
+        targets._heliDmg += hitDmg;
         targets._threatHitFlash = 3;
-        if (targets.onHeliHit) targets.onHeliHit(targets._heliDmg, h);
+        targets._hitSrc = 'radar';   // 死因分析：峡谷雷达锁定打击
+        if (Number.isFinite(h.sx)) targets._lastHitFrom = new THREE.Vector3(h.sx, 0.8, h.sz);
+        if (targets.onHeliHit) targets.onHeliHit(targets._heliDmg, h, hitDmg);
         S._flash = Math.max(S._flash, 0.5); S._shake = 1.0;
       }
     }

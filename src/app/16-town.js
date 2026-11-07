@@ -291,7 +291,7 @@ class TownDistrict {
       b.group.position.y = 0;
       b.group.rotation.set(0, 0, 0);
       b.mat.color.setHex(b.tint);
-      if (b.skinMats) for (const m of b.skinMats) m.color.setScalar(1);
+      if (b.skinMats) for (const m of b.skinMats) if (m.userData.c0) m.color.copy(m.userData.c0); else m.color.setScalar(1);
       if (b.rubble) { this.scene.remove(b.rubble); disposeObject3D(b.rubble); b.rubble = null; }
     }
     this._resetAmbush();

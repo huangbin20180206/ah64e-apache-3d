@@ -125,6 +125,7 @@ class EnemyAirModule {
       u.gunN = ENEMYCFG.GUN_N; u.rkN = ENEMYCFG.RK_N;
       u.gunT = -u.i * 0.4; u.rkT = -u.i;   // 僚机错开节奏（编队火力分配）
       u.aimT = 0;
+      u._withdrawNoticed = false;
       this._facePatrol(u);
     }
   }
@@ -182,8 +183,8 @@ class EnemyAirModule {
       u.z = this.anchor.z + Math.sin(u.ang) * r;
       u.y = C.PATROL_H + u.i * C.WING_DH;
       this._facePatrol(u);
-      // 索敌：视距 + 视锥（巡逻机头向为轴）——敌方视角的目标搜索
-      if (dist < C.VISION) {
+      // 索敌：视距 + 视锥（巡逻机头向为轴）——若处于安全期/停机坪停放，保持警戒巡逻不主动攻击
+      if (!env.safe && dist < C.VISION) {
         const dx = hx - u.x, dy = hy - u.y, dz = hz - u.z;
         const l = Math.max(1e-4, Math.hypot(dx, dy, dz));
         const dot = (dx * u.hx + dy * u.hy + dz * u.hz) / l;
@@ -192,6 +193,10 @@ class EnemyAirModule {
       return;
     }
     if (u.phase === 'search') {
+      if (env.safe) {
+        u.ang = Math.atan2(u.z - this.anchor.z, u.x - this.anchor.x);
+        u.phase = 'patrol'; u.pt = 0; return;
+      }
       this._faceTo(u, hx, hy, hz);
       this._advance(u, dt);
       if (dist > C.VISION_LOSE) {
@@ -204,6 +209,10 @@ class EnemyAirModule {
       return;
     }
     if (u.phase === 'attack') {
+      if (env.safe) {
+        u.ang = Math.atan2(u.z - this.anchor.z, u.x - this.anchor.x);
+        u.phase = 'patrol'; u.pt = 0; return;
+      }
       // 双机钳形协同：长机(0)正面牵制吸引视线，僚机(1)大侧偏包抄至盲区发动突袭
       const dx = hx - u.x, dy = hy - u.y, dz = hz - u.z;
       const l = Math.max(1e-4, Math.hypot(dx, dy, dz));
@@ -221,6 +230,10 @@ class EnemyAirModule {
       return;
     }
     if (u.phase === 'evade') {
+      if (env.safe) {
+        u.ang = Math.atan2(u.z - this.anchor.z, u.x - this.anchor.x);
+        u.phase = 'patrol'; u.pt = 0; return;
+      }
       // 超低空地貌突防（NOE战术）：快速下压高度贴地飞行，加大横向蛇形机动甩开导引线
       const dx = hx - u.x, dz = hz - u.z;
       const l = Math.max(1e-4, Math.hypot(dx, dz));
@@ -232,8 +245,7 @@ class EnemyAirModule {
       const noeAlt = 6.0 + u.i * 2.5;
       u.y += (noeAlt - u.y) * Math.min(1, dt * 2.2) + w * 1.6 * dt;
       u.y = Math.max(4, Math.min(40, u.y));
-      u.x = Math.max(-C.CLAMP_R, Math.min(C.CLAMP_R, u.x));
-      u.z = Math.max(-C.CLAMP_R, Math.min(C.CLAMP_R, u.z));
+      this._clampPos(u);
       this._faceTo(u, hx, hy, hz);
       this._fire(u, env, dist, 0.5);          // 规避中仍以半概率还击（威胁性）
       if (u.pt >= C.EVADE_T) {
@@ -258,21 +270,30 @@ class EnemyAirModule {
     }
   }
 
+  _clampPos(u) {
+    // 基地锚点外推（BASE_C.z=75 / endless=80）时按真实活动域(160u)限幅，防 search/attack/evade 瞬间拉回 60u 造成闪烁瞬移
+    const r = (Math.abs(this.anchor.x) > 45 || Math.abs(this.anchor.z) > 45)
+      ? Math.max(160, Math.hypot(this.anchor.x, this.anchor.z) + ENEMYCFG.PATROL_R + 20)
+      : ENEMYCFG.CLAMP_R;
+    u.x = Math.max(-r, Math.min(r, u.x));
+    u.z = Math.max(-r, Math.min(r, u.z));
+  }
   _advance(u, dt) { this._advanceToward(u, u.x + u.hx * 8, u.y + u.hy * 8, u.z + u.hz * 8, dt); }
   _advanceToward(u, tx, ty, tz, dt) {
     const dx = tx - u.x, dy = ty - u.y, dz = tz - u.z;
     const l = Math.max(1e-4, Math.hypot(dx, dy, dz));
     const s = Math.min(l, ENEMYCFG.SPEED * dt);
     u.x += dx / l * s; u.y += dy / l * s; u.z += dz / l * s;
-    u.x = Math.max(-ENEMYCFG.CLAMP_R, Math.min(ENEMYCFG.CLAMP_R, u.x));
-    u.z = Math.max(-ENEMYCFG.CLAMP_R, Math.min(ENEMYCFG.CLAMP_R, u.z));
+    this._clampPos(u);
   }
 
   // 开火（rateMul：attack=1 / evade=0.5）：命中概率 = 基础 × 距离衰减 × 玩家稳定度因子
   _fire(u, env, dist, rateMul) {
+    if (env.safe) return;   // 若玩家在地面或处于安全期，敌机不得开火或消耗弹药
     const C = ENEMYCFG;
     const aaRate = env.aaRate || 1;
-    const pDist = 0.5 + 0.5 * Math.min(1, dist / C.P_DIST0);
+    // 本地修补 2026-10-30：距离衰减方向调正：贴脸 1.0 → P_DIST0 外 0.5
+    const pDist = 1 - 0.5 * Math.min(1, dist / C.P_DIST0);
     const pStab = C.P_STAB0 + (1 - C.P_STAB0) * Math.max(0, Math.min(1, env.stability == null ? 1 : env.stability));
     const aaDmg = env.aaDmg || 1;
     u.gunT += (env.dt || 0) * rateMul * aaRate;
@@ -283,16 +304,17 @@ class EnemyAirModule {
       // 开火事件（渲染层曳光/枪口焰视觉；单槽——两机同帧开火概率极低，
       // 视觉层丢一帧曳光无感，84 hitPending 同款约定）
       this.fireEvent = { i: u.i, x: u.x, y: u.y, z: u.z, hit, big: false };
-      if (hit) this._hitPlayer(env, C.GUN_DMG * aaDmg);
+      if (hit) this._hitPlayer(env, C.GUN_DMG * aaDmg, u);
     }
     if (u.rkN > 0 && u.rkT >= C.RK_RATE) {
       u.rkT = 0; u.rkN--;
       const hit = this._rng() < C.RK_HIT_P * pDist * pStab;
       this.fireEvent = { i: u.i, x: u.x, y: u.y, z: u.z, hit, big: true };
-      if (hit) this._hitPlayer(env, C.RK_DMG * aaDmg);
+      if (hit) this._hitPlayer(env, C.RK_DMG * aaDmg, u);
     }
   }
-  _hitPlayer(env, dmg) {
+  // u（可选）= 开火敌机：附带开火位 sx/sy/sz，供受击来向弧与死因分析（不消耗 rng，确定性不变）
+  _hitPlayer(env, dmg, u) {
     // 单槽事件（84 hitPending 同款约定）：同帧双机命中的后发覆盖先发——
     // 命中频率 ≤2/s 量级，覆盖窗口可忽略（REPORT 已声明）
     this.hitPending = {
@@ -300,6 +322,7 @@ class EnemyAirModule {
       y: env.heli.y + (this._rng() - 0.5),
       z: env.heli.z + (this._rng() - 0.5) * 2,
       dmg: Math.round(dmg),
+      sx: u ? u.x : undefined, sy: u ? u.y : undefined, sz: u ? u.z : undefined,
     };
   }
 

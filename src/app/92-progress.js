@@ -27,7 +27,7 @@ class ProgressModule {
     this.last = null;                  // 最近一次 record() 结果（结算面板读）
     this._load();
   }
-  _fresh() { return { schema_version: PROGRESS_SCHEMA, levels: {}, extraUnlocked: [], migratedFrom: null }; }
+  _fresh() { return { schema_version: PROGRESS_SCHEMA, levels: {}, extraUnlocked: [], migratedFrom: null, allUnlocked: false }; }
   _get(k) { try { return this.storage && this.storage.getItem ? this.storage.getItem(k) : null; } catch (e) { return null; } }
   _sanitize(raw) {
     const out = this._fresh();
@@ -49,6 +49,7 @@ class ProgressModule {
     }
     if (Array.isArray(raw.extraUnlocked)) out.extraUnlocked = raw.extraUnlocked.filter(id => !!this.L.byId(id));
     out.migratedFrom = raw.migratedFrom === 1 ? 1 : null;
+    out.allUnlocked = !!raw.allUnlocked;
     return out;
   }
   // v1（90-campaign 的 ah64_campaign）→ v2
@@ -98,9 +99,66 @@ class ProgressModule {
   isUnlocked(id) {
     const L = this.L.byId(id);
     if (!L || !L.ready) return false;
+    if (this._mem.allUnlocked) return true;
     const prev = this.L.prevReady(id);
     if (!prev) return true;
     return this.rec(prev.id).stars >= 1 || this._mem.extraUnlocked.includes(id);
+  }
+  isAllUnlocked() { return !!this._mem.allUnlocked; }
+  toggleAllUnlocked() {
+    this._mem.allUnlocked = !this._mem.allUnlocked;
+    this._persist();
+    return this._mem.allUnlocked;
+  }
+  exportJson() {
+    return JSON.stringify(this._mem, null, 2);
+  }
+  exportCode() {
+    try {
+      const jsonStr = JSON.stringify(this._mem);
+      if (typeof btoa !== 'undefined') {
+        return btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
+      }
+      if (typeof globalThis !== 'undefined' && globalThis.Buffer) {
+        return globalThis.Buffer.from(jsonStr, 'utf8').toString('base64');
+      }
+      return jsonStr;
+    } catch (e) {
+      return JSON.stringify(this._mem);
+    }
+  }
+  importData(inputStr) {
+    if (!inputStr || typeof inputStr !== 'string') return false;
+    let raw = null;
+    const trimmed = inputStr.trim();
+    // 优先尝试 Base64 解码
+    try {
+      let decoded = '';
+      if (typeof atob !== 'undefined') {
+        decoded = decodeURIComponent(atob(trimmed).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+      } else if (typeof globalThis !== 'undefined' && globalThis.Buffer) {
+        decoded = globalThis.Buffer.from(trimmed, 'base64').toString('utf8');
+      }
+      if (decoded && (decoded.startsWith('{') || decoded.startsWith('['))) {
+        raw = JSON.parse(decoded);
+      }
+    } catch (e) {
+      raw = null;
+    }
+    // 其次尝试直接作为 JSON 解析
+    if (!raw) {
+      try { raw = JSON.parse(trimmed); } catch (e) { raw = null; }
+    }
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+    if (raw.schema_version === PROGRESS_SCHEMA) {
+      this._mem = this._sanitize(raw);
+    } else if (Array.isArray(raw.levels)) {
+      this._mem = this.migrateV1(raw);
+    } else {
+      return false;
+    }
+    this._persist();
+    return true;
   }
   // 下一个 ready 关（结算面板的「下一关」）
   nextOf(id) {

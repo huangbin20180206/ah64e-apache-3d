@@ -74,6 +74,10 @@ function flyUpdate(dt) {
     F.alt = 0;
     F.pitch += (GROUND_PITCH - F.pitch) * Math.min(1, dt * 2.2);
   }
+  // 非第一人称或着陆/进近态强制清除涡环与地面效应残留，防止退出 FPV 或降落后 PULL UP 告警卡死
+  if (F.state === 'ground' || F.state === 'down' || !F.fp) {
+    F.vrs = false; F.vrsBuffet = 0; F.ige = 1.0;
+  }
   // root 高度补偿随俯仰线性过渡：地面全量，空中归零（FP 接管时强制归零，
   // 防止机头下俯被误当成停放姿态把整机抬起）
   F.comp = F.fp ? 0 : (F.pitch < 0 ? (F.pitch / GROUND_PITCH) * GROUND_PITCH_COMP : 0);

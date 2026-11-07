@@ -108,7 +108,10 @@ function _knowFly(node) {
   // 战术聚焦高光脉冲：选定部件瞬时高亮微光淡出反馈
   o.traverse(m => {
     if (m.isMesh && m.material && m.material.emissive) {
-      const orig = m.material.emissive.clone();
+      // 本地修补：原色只在材质上缓存一次。连点两张知识卡时上一轮的 pulse
+      // 尚未收敛，第二次 clone() 会把"正在发绿光"的中间态当原色存下来，
+      // 部件脉冲结束后永久残留绿光。__kcOrig 首次缓存真原色，后续复用。
+      const orig = m.material.__kcOrig || (m.material.__kcOrig = m.material.emissive.clone());
       m.material.emissive.setHex(0x00e6a8);
       let step = 0;
       const pulse = () => {
@@ -166,6 +169,11 @@ function focusKnow(i) {
   navBox.querySelector('.kc-prev').onclick = (e) => { e.stopPropagation(); focusKnow((i - 1 + KNOW_CARDS.length) % KNOW_CARDS.length); };
   navBox.querySelector('.kc-next').onclick = (e) => { e.stopPropagation(); focusKnow((i + 1) % KNOW_CARDS.length); };
   const spinBtn = navBox.querySelector('.kc-spin');
+  // 本地修补：navBox 每次 focusKnow 都整体重建，按钮文案固定"360° 环视"——
+  // 若上一张卡已开启环视（orbit.auto=true），新按钮显示与实际状态相反，
+  // 点一下变成"关闭"却显示"停止环视"。重建后按 orbit.auto 同步初始态。
+  spinBtn.textContent = orbit.auto ? '停止环视' : '360° 环视';
+  spinBtn.classList.toggle('on', !!orbit.auto);
   spinBtn.onclick = (e) => {
     e.stopPropagation();
     orbit.auto = !orbit.auto;

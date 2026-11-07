@@ -78,7 +78,10 @@ function cineStart() {
 
 function cineEnd(skipped) {
   if (!cinema.on) return;
-  cinema.endReason = 'skipped=' + skipped + ' t=' + cinema.t.toFixed(2) + ' @ ' + (new Error().stack.split('\n')[2] || '').trim().slice(0, 80);
+  // 本地修补：stack 采集加空值守卫——部分 WebView/加固浏览器 Error.stack 为
+  // undefined，原写法在 cinema.on=false 之前抛 TypeError → 跳过监听器因 on 恒
+  // true 永久吞掉全部键鼠输入，且 camSeq 的 cinematic owner 永不释放。
+  cinema.endReason = 'skipped=' + skipped + ' t=' + cinema.t.toFixed(2) + ' @ ' + ((new Error().stack || '').split('\n')[2] || '').trim().slice(0, 80);
   cinema.on = false;
   cancelAnimationFrame(cinema.raf);
   document.body.classList.remove('cinema-mode');

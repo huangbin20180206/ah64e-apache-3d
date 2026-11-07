@@ -243,6 +243,12 @@ function loadTargetModels(scene, keys) {
 function applyModelToTarget(t, model) {
   while (t.group.children.length) t.group.remove(t.group.children[0]);
   const inst = model.clone(true);
+  // 克隆网格材质：防止受击闪光（flashHit）与战损变暗在同类车辆实例间串色
+  inst.traverse(c => {
+    if (c.isMesh && c.material) {
+      c.material = Array.isArray(c.material) ? c.material.map(m => m.clone()) : c.material.clone();
+    }
+  });
   const key = targetModelKey(t);
   inst.rotation.y = TARGET_MODELS[key].yaw;
   t.group.add(inst);

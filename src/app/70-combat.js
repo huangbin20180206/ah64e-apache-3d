@@ -42,16 +42,18 @@ function _dmgApply(delta, wx, wy, wz) {
 // DOM 由脚本动态建（不进模板，不占 DOM ID 契约）；CSS 动画自己淡出，无每帧开销。
 let _hitEl = null, _hitArc = null;
 const _hfV = new THREE.Vector3(), _hfF = new THREE.Vector3();
-function _hitFeedback(src) {
+function _hitFeedback(src, isHeavy = false) {
   radioSay('hit');   // E2 无线电
   if (!_hitEl) {
     const st = document.createElement('style');
     st.textContent = '#p5-hitvig{position:fixed;inset:0;pointer-events:none;z-index:40;opacity:0;' +
       'background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(170,0,0,.55) 100%)}' +
       '#p5-hitvig.on{animation:p5hv .9s ease-out}' +
+      '#p5-hitvig.heavy{background:radial-gradient(ellipse at center,rgba(180,0,0,.15) 30%,rgba(230,20,10,.85) 100%);animation:p5hv 1.4s ease-out}' +
       '#p5-hitarc{position:fixed;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:41;opacity:0}' +
       '#p5-hitarc i{position:absolute;left:-90px;top:-200px;width:180px;height:50px;border-top:8px solid rgba(255,40,30,.9);' +
       'border-radius:50% 50% 0 0/100% 100% 0 0;filter:drop-shadow(0 0 6px rgba(255,0,0,.8))}' +
+      '#p5-hitarc.heavy i{left:-110px;top:-210px;width:220px;height:65px;border-top:12px solid rgba(255,30,20,1);filter:drop-shadow(0 0 10px rgba(255,0,0,1))}' +
       '#p5-hitarc.on{animation:p5ha 1.6s ease-out}' +
       '@keyframes p5hv{0%{opacity:1}100%{opacity:0}}@keyframes p5ha{0%,40%{opacity:1}100%{opacity:0}}';
     document.head.appendChild(st);
@@ -59,8 +61,8 @@ function _hitFeedback(src) {
     _hitArc = document.createElement('div'); _hitArc.id = 'p5-hitarc'; _hitArc.appendChild(document.createElement('i'));
     document.body.appendChild(_hitEl); document.body.appendChild(_hitArc);
   }
-  const restart = (el) => { el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); };
-  restart(_hitEl);
+  const restart = (el, cls) => { el.className = ''; void el.offsetWidth; el.className = 'on' + (cls ? ' ' + cls : ''); };
+  restart(_hitEl, isHeavy ? 'heavy' : '');
   if (apache && src && Number.isFinite(src.x)) {
     const hp = apache.root.position;
     _hfV.set(src.x - hp.x, 0, src.z - hp.z);
@@ -68,22 +70,125 @@ function _hitFeedback(src) {
     if (_hfV.lengthSq() > 1e-4 && _hfF.lengthSq() > 1e-6) {
       _hfV.normalize(); _hfF.normalize();
       // 屏幕顺时针角：右侧为正（相机右向量 = forward × up 的反向）
-      const right = _hfF.z * _hfV.x - _hfF.x * _hfV.z;   // (f × v).y 的相反数
-      const ang = Math.atan2(-right, _hfF.x * _hfV.x + _hfF.z * _hfV.z);
+      // 屏幕顺时针角：右侧为正（CSS rotate 顺时针，3点钟=正右，9点钟=正左）
+      const right = _hfF.z * _hfV.x - _hfF.x * _hfV.z;
+      const dot = _hfF.x * _hfV.x + _hfF.z * _hfV.z;
+      const ang = Math.atan2(right, dot);
       _hitArc.style.transform = 'rotate(' + ang.toFixed(3) + 'rad)';
-      restart(_hitArc);
+      restart(_hitArc, isHeavy ? 'heavy' : '');
     }
   }
   if (rig && apache) {
     const hp = apache.root.position;
-    for (let i = 0; i < 4; i++) {
-      rig._puff(hp.x + (rnd() - 0.5) * 1.6, hp.y + 0.6 + rnd() * 0.8, hp.z + (rnd() - 0.5) * 1.6,
-        { color: 0xffd27a, s0: 0.08, s1: 0.35, life: 0.18, base: 0.9, add: true });
+    const count = isHeavy ? 9 : 4;
+    for (let i = 0; i < count; i++) {
+      rig._puff(hp.x + (rnd() - 0.5) * 1.8, hp.y + 0.6 + rnd() * 0.9, hp.z + (rnd() - 0.5) * 1.8,
+        { color: isHeavy ? 0xffaa44 : 0xffd27a, s0: 0.08, s1: isHeavy ? 0.6 : 0.35, life: 0.22, base: 0.95, add: true });
     }
   }
 }
 
 // 以下 _tick* 由 70-loop.js 的 loop() 在 if (apache) 段内按原顺序逐帧调用。
+
+// ---- 死因分析（2026-11-02）----
+// 每次机体受击记一条 {src, dmg, t, clock}，任务因损伤失败时在结算面板给出：
+// 主要威胁排行（次数/伤害/占比）、致命一击来源与时钟方位、针对性战术建议。
+// src 由各伤害入口在调 onHeliHit 前写 targets._hitSrc（消费后清空）。
+const _DMG_SRC = {
+  aa:       { n: '地面高炮', tip: '高炮有效射程约 50u：在射程外先用地狱火拔点，进入射程后保持横向机动，不要悬停。' },
+  rpg:      { n: '步兵 RPG / 便携防空导弹', tip: '低空（28u 以下）贴近基地时最容易遭遇；听到升空警报立刻按 J 投放干扰弹并大幅转向。' },
+  infantry: { n: '步兵火力', tip: '先用机炮扫掉掩体后的步兵再压低高度，步兵对高空目标基本无效。' },
+  sam:      { n: '防空导弹（SAM）', tip: '先摧毁雷达站可让防空导弹致盲；导弹来袭告警响起时按 J 投干扰弹。' },
+  enemyair: { n: '敌方武装直升机', tip: '敌机会追着你的机尾打：正面迎敌，用地狱火锁定或机炮短点射，别长时间背对它。' },
+  shahed:   { n: '自杀无人机撞击', tip: '无人机俯冲前会有告警，机炮能自动对空；提前拉高或侧移即可躲开。' },
+  radar:    { n: '峡谷雷达锁定打击', tip: '压低高度贴着峡谷壁飞，缩短在雷达视线里的暴露时间。' },
+  collision:{ n: '地形/岩壁碰撞', tip: '低空机动时留意两翼旋翼间隙与下沉气流，避免擦碰岩壁。' },
+  other:    { n: '其他火力', tip: '多利用雷达（左下角）提前判断威胁方位。' },
+};
+const _dlF = new THREE.Vector3();
+function _dmgLogPush(src, dmg, from) {
+  const m = S._mission;
+  if (!m || m.done || !(dmg > 0)) return;
+  const log = m._dmgLog || (m._dmgLog = []);
+  let clock = 0;
+  if (apache && from && Number.isFinite(from.x)) {
+    const hp = apache.root.position;
+    const vx = from.x - hp.x, vz = from.z - hp.z;
+    _dlF.set(0, 0, 1).applyQuaternion(apache.root.quaternion);
+    const fx = _dlF.x, fz = _dlF.z;
+    if (Math.hypot(vx, vz) > 1e-3 && Math.hypot(fx, fz) > 1e-3) {
+      // 机体坐标系顺时针角：右向量 = (fz, 0, -fx)；12 点 = 正前方，3 点 = 正右方
+      const right = vx * fz - vz * fx;
+      const fwd = vx * fx + vz * fz;
+      const ang = Math.atan2(right, fwd);
+      clock = ((Math.round(ang / (Math.PI / 6)) % 12) + 12) % 12 || 12;
+    }
+  }
+  if (log.length < 200) log.push({ src: _DMG_SRC[src] ? src : 'other', dmg, t: S.time, clock });
+}
+function _deathAnalysisHtml(m) {
+  const log = (m && m._dmgLog) || [];
+  if (!log.length) return '';
+  const agg = {};
+  let tot = 0;
+  for (const e of log) {
+    const a = agg[e.src] || (agg[e.src] = { n: 0, d: 0 });
+    a.n++; a.d += e.dmg; tot += e.dmg;
+  }
+  const rank = Object.entries(agg).sort((a, b) => b[1].d - a[1].d);
+  const last = log[log.length - 1];
+  const span = Math.max(0.5, last.t - log[0].t);
+  const rows = rank.slice(0, 4).map(([k, a]) => {
+    const s = _DMG_SRC[k] || _DMG_SRC.other;
+    return '<i>' + s.n + '　' + a.n + ' 次 · ' + Math.round(a.d * 10) / 10 + ' 伤害（' +
+      Math.round(a.d / Math.max(1e-6, tot) * 100) + '%）</i>';
+  }).join('');
+  const top = rank[0] ? rank[0][0] : 'other';
+  const tipKeys = [top];
+  if (last.src !== top && !tipKeys.includes(last.src)) tipKeys.push(last.src);
+  const tips = tipKeys.map(k => {
+    const s = _DMG_SRC[k] || _DMG_SRC.other;
+    return '<i>· ' + s.tip + '</i>';
+  }).join('');
+
+  // 阵亡前受损节奏智能识别（2026-11-02）：
+  // ① 临终爆发判定：最后 2.5 秒内连续承受 ≥3 次命中 → 短时连击爆发
+  // ② 频次密集判定：累计 ≥5 次 或 平均受击间隔 < 2.0 秒 → 密集弹雨压制
+  // ③ 毁灭性重创：总受击 ≤2 次 且 单发伤害占比 ≥50% 或 ≥6.0 → 一击致命瘫痪
+  // ④ 其它常规消耗 → 持续火力对耗
+  let recentHits = 0;
+  for (let i = log.length - 1; i >= 0; i--) {
+    if (last.t - log[i].t <= 2.5) recentHits++;
+    else break;
+  }
+  let rhythmTag = '', rhythmCls = '';
+  if (log.length >= 3 && recentHits >= 3) {
+    rhythmTag = '短时连击爆发（BURST VOLLEY）';
+    rhythmCls = 'color:#ff5a4a';
+  } else if (log.length >= 5 || (log.length > 1 && span / (log.length - 1) < 2.0)) {
+    rhythmTag = '密集弹雨压制（SATURATION FIRE）';
+    rhythmCls = 'color:#ff9838';
+  } else if (log.length <= 2 && (last.dmg >= tot * 0.48 || last.dmg >= 6.0)) {
+    rhythmTag = '一击致命瘫痪（CATASTROPHIC KILL）';
+    rhythmCls = 'color:#ff3333';
+  } else {
+    rhythmTag = '持续火力对耗（SUSTAINED ATTRITION）';
+    rhythmCls = 'color:#ffd044';
+  }
+
+  const lastSrcInfo = _DMG_SRC[last.src] || _DMG_SRC.other;
+  const lastPct = Math.round(last.dmg / Math.max(1e-6, tot) * 100);
+  const lethalTxt = lastSrcInfo.n + ' · ' + (Math.round(last.dmg * 10) / 10) + ' 伤害（' + lastPct + '%）' +
+    (last.clock ? '（来自 ' + last.clock + ' 点钟方向）' : '');
+
+  return '<div class="p5-deb p5-death"><div class="p5-deb-h">死因分析</div>' +
+    '<div class="mrow"><span>致命一击</span><b style="color:#ff8a70">' + lethalTxt + '</b></div>' +
+    '<div class="mrow"><span>伤害来源</span><b class="p5-w">' + rows + '</b></div>' +
+    '<div class="mrow"><span>受击节奏</span><b><span style="' + rhythmCls + '">' + rhythmTag + '</span><br>' +
+    '<span style="font-size:11px;opacity:.8;font-weight:normal">' + log.length + ' 次 / ' + Math.round(span) + ' 秒' +
+    (log.length > 1 ? '（平均 ' + (span / (log.length - 1)).toFixed(1) + ' 秒一次）' : '') + '</span></b></div>' +
+    '<div class="mrow"><span>建议</span><b class="p5-w p5-tip">' + tips + '</b></div></div>';
+}
 function _tickSamwar(dt) {
   // Phase 19：SAM 威胁（纯逻辑）。组装 scratch 环境 → update → 消费事件；
   // 交战门控与 AA 同语义（靶场启用 + 离地 + 距基地 8~55u），难度系数同源。
@@ -92,7 +197,8 @@ function _tickSamwar(dt) {
     E.dt = dt;
     const bsw = (targets && targets.enabled && targets.baseCenter)
       ? Math.hypot(hp.x - targets.baseCenter.x, hp.z - targets.baseCenter.z) : -1;
-    E.aaOn = bsw > 8 && bsw < 55 && hp.y > 2 && !targets.passive;   // P3：训练关靶场不还击
+    const inCut = !!(HOST.cutsceneState && HOST.cutsceneState.isOn && HOST.cutsceneState.isOn());
+    E.aaOn = !inCut && bsw > 8 && bsw < 55 && hp.y > 2 && !targets.passive;   // P3：训练关靶场与过场期间不还击
     E.heli.x = hp.x; E.heli.y = hp.y; E.heli.z = hp.z;
     if (_swPrev.has && dt > 1e-5) {
       E.heli.vx = (hp.x - _swPrev.x) / dt; E.heli.vy = (hp.y - _swPrev.y) / dt; E.heli.vz = (hp.z - _swPrev.z) / dt;
@@ -109,6 +215,11 @@ function _tickSamwar(dt) {
     if (narrative && !narrative.radarAlive()) E.siteN = 0;
     const swd = arcade ? arcade.coeffs(S._mission) : null;
     E.aaRate = swd ? swd.aaRate : 1; E.aaDmg = swd ? swd.aaDmg : 1;
+    if (targets && samwar._flare && samwar._flare.on) {
+      targets.activeFlarePos = samwar._flare;
+    } else if (targets) {
+      targets.activeFlarePos = null;
+    }
     samwar.update(E);
     // 发射事件 → toast + Betty 播报（RWR 告警链的听觉端）
     if (samwar.launchN !== S._swSeen) {
@@ -123,7 +234,10 @@ function _tickSamwar(dt) {
       samwar.hitPending = null;
       targets._heliDmg += h.dmg;
       targets._threatHitFlash = 3;
-      if (targets.onHeliHit) targets.onHeliHit(targets._heliDmg, h);
+      // 来向用发射阵位（弹体命中点紧贴机身，方向不可靠）
+      if (Number.isFinite(h.sx)) targets._lastHitFrom = new THREE.Vector3(h.sx, 0.8, h.sz);
+      targets._hitSrc = 'sam';
+      if (targets.onHeliHit) targets.onHeliHit(targets._heliDmg, h, h.dmg);
       S._flash = Math.max(S._flash, 0.5); S._shake = 1.0;
     }
     // 战损→操控惩罚。**必须复制值，不能替换引用**：penaltyFor 返回的是
@@ -198,7 +312,11 @@ function _tickEnemyAir(dt) {
   // Phase 20：A2A 敌机（87 纯逻辑 + 88 视觉镜像）。env 组装同 SAM scratch
   // 模式；aim=机体机头单位向量（+Z 经 quaternion）——敌机"被持续瞄准"
   // 规避判定的输入。难度系数与 SAM 同源（arcade.coeffs 任务快照）。
+  // 门控保护：若非任务 active、或处于过场动画、或直升机在地面停放，敌机保持巡逻警戒，不主动索敌/开火。
   if (enemyAir) {
+    const isCombatReady = !!(S._mission && S._mission.phase === 'active'
+      && !(HOST.cutsceneState && HOST.cutsceneState.isOn && HOST.cutsceneState.isOn())
+      && FLY.state !== 'ground');
     const E = _eaEnv, hp = apache.root.position;
     E.dt = dt;
     E.heli.x = hp.x; E.heli.y = hp.y; E.heli.z = hp.z;
@@ -208,16 +326,22 @@ function _tickEnemyAir(dt) {
     const cd = arcade ? arcade.coeffs(S._mission) : null;
     E.aaRate = cd ? cd.aaRate : 1; E.aaDmg = cd ? cd.aaDmg : 1;
     E.res = cd ? cd.res : 1;
+    E.safe = !isCombatReady;
     enemyAir.update(E);
     if (enemyVis) enemyVis.update(dt);
-    // 敌机火力命中 → 走 P8 既有损伤链（与 SAM hitPending 同款单槽消费）
+    // 敌机火力命中 → 走 P8 既有损伤链（与 SAM hitPending 同款单槽消费，仅战斗状态下消费）
     if (targets && enemyAir.hitPending) {
       const h = enemyAir.hitPending;
       enemyAir.hitPending = null;
-      targets._heliDmg += h.dmg;
-      targets._threatHitFlash = 3;
-      if (targets.onHeliHit) targets.onHeliHit(targets._heliDmg, h);
-      S._flash = Math.max(S._flash, 0.5); S._shake = 1.0;
+      if (isCombatReady) {
+        targets._heliDmg += h.dmg;
+        targets._threatHitFlash = 3;
+        // 来向用开火敌机位置（旧实现用机身周围随机抖动点，来向弧方向是随机的）
+        if (Number.isFinite(h.sx)) targets._lastHitFrom = new THREE.Vector3(h.sx, h.sy, h.sz);
+        targets._hitSrc = 'enemyair';
+        if (targets.onHeliHit) targets.onHeliHit(targets._heliDmg, h, h.dmg);
+        S._flash = Math.max(S._flash, 0.5); S._shake = 1.0;
+      }
     }
     // 玩家击落敌机 → 计分（83-arcade enemy 分+ace 成就）+ 信息流 + 电影三件套
     if (enemyAir.killEvent) {
@@ -254,7 +378,16 @@ function _tickResources(dt) {
       ? Math.min(1, (Math.abs(fp.spd) + Math.abs(fp.vSide)) / 10 + Math.abs(fp.vy) / 4)
       : (keys['arrowup'] || keys['arrowdown'] || keys['arrowleft'] || keys['arrowright'] ? 1 : 0);
     R.homeDist = Math.hypot(hp.x, hp.z);
-    R.alt = FLY.alt;
+    const needRtb = resources.fuel < 99.5 || (targets && targets._heliDmg > 0)
+      || (rig && (rig.gunAmmo < 1200 || rig.rocketAmmo < 38 || rig.hfAmmo < 8));
+    // 开局地面停放且满油满弹无伤时不触发 3s 循环补给；第三人称环绕悬停回停机坪且有损耗时允许触发野战补给
+    if (FLY.state === 'ground' && !needRtb) {
+      R.alt = 99;
+    } else if (FLY.state === 'hover' && !(fp && fp.active) && !FLY.fp && R.homeDist < 8 && needRtb) {
+      R.alt = Math.min(FLY.alt, 2.5);
+    } else {
+      R.alt = FLY.alt;
+    }
     R.stability = S._stability;
     R.variant = S._mission ? S._mission.variant : 'standard';
     resources.update(R);

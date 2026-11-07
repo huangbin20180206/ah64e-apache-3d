@@ -256,7 +256,8 @@ class SamWarModule {
           const hr = Math.hypot(m.x - hx, m.y - hy, m.z - hz);
           if (hr < SAMCFG.HIT_R) {
             m.on = false;
-            this.hitPending = { x: m.x, y: m.y, z: m.z, dmg: Math.round(SAMCFG.DMG * (env.aaDmg || 1)) };
+            this.hitPending = { x: m.x, y: m.y, z: m.z, dmg: Math.round(SAMCFG.DMG * (env.aaDmg || 1)),
+              sx: m.sx, sz: m.sz };
             done = true;
           }
         } else if (flLive && Math.hypot(m.x - fl.x, m.y - fl.y, m.z - fl.z) < 1.2) {
@@ -279,6 +280,7 @@ class SamWarModule {
     const dd = Math.max(1e-4, Math.hypot(ddx, ddy, ddz));
     m.on = true; m.t = 0; m.v = SAMCFG.MSL_V0; m.decoyed = false; m.lost = false; m.hasLos = false;
     m.x = site.x; m.y = 0.8; m.z = site.z;
+    m.sx = site.x; m.sz = site.z;   // 发射阵位快照（受击来向弧 / 死因分析用）
     m.dx = ddx / dd; m.dy = ddy / dd; m.dz = ddz / dd;
     this.launchN++;
   }

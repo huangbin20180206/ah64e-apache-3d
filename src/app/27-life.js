@@ -228,7 +228,9 @@ class BattleLife {
       g.traverse(o => {
         if (!o.isMesh) return;
         o.castShadow = true; o.receiveShadow = true;
-        o.material = o.material.clone(); m.mats.push(o.material);
+        o.material = o.material.clone();
+        if (!o.material.userData.c0) o.material.userData.c0 = o.material.color.clone();
+        m.mats.push(o.material);
       });
       g.visible = false;
       this.scene.add(g);
@@ -251,7 +253,9 @@ class BattleLife {
       g.traverse(o => {
         if (!o.isMesh) return;
         o.castShadow = true; o.receiveShadow = true;
-        o.material = o.material.clone(); m.mats.push(o.material);
+        o.material = o.material.clone();
+        if (!o.material.userData.c0) o.material.userData.c0 = o.material.color.clone();
+        m.mats.push(o.material);
       });
       g.visible = false;
       this.scene.add(g);
@@ -266,13 +270,13 @@ class BattleLife {
       p.alive = true; p.st = 'walk'; p.t = 0; p.pk = 1; p.pw = 0; p.flee = 0;
     }
     for (const m of this.motos) {
-      m.s = m.f0 * m.L; m.dir = 1; m.alive = true; m.wait = 0; m.t = 0; m.roll = 0;
-      for (const mt of m.mats) mt.color.setScalar(1);
+      m.s = m.f0 * m.L; m.dir = 1; m.alive = true; m.wait = 0; m.t = 0; m.roll = 0; m.smk = 0; m.dust = 0;
+      for (const mt of m.mats) if (mt.userData.c0) mt.color.copy(mt.userData.c0); else mt.color.setScalar(1);
       if (m.g) m.g.rotation.set(0, 0, 0);
     }
     for (const c of this.cars) {
-      c.s = c.f0 * c.L; c.dir = c.dir0; c.alive = true; c.t = 0; c.hp = 3; c.roll = 0;
-      for (const mt of c.mats) mt.color.setScalar(1);
+      c.s = c.f0 * c.L; c.dir = c.dir0; c.alive = true; c.t = 0; c.hp = 3; c.roll = 0; c.fear = 0; c.smk = 0; c.dust = 0;
+      for (const mt of c.mats) if (mt.userData.c0) mt.color.copy(mt.userData.c0); else mt.color.setScalar(1);
     }
     for (const a of this.animals) {
       if (a.k === 'd') { a.x = a.a[0]; a.z = a.a[1]; a.ry = 0; a.dir = 1; }

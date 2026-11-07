@@ -14,6 +14,120 @@ const playState = { mapOpen: false, lastLevel: null };
 
 function _starStr(n) { return '★'.repeat(n) + '☆'.repeat(3 - n); }
 
+function closeSaveModal() {
+  const m = UI('save-modal');
+  if (m) m.style.display = 'none';
+}
+
+function openSaveModal(mode) {
+  const modal = UI('save-modal');
+  const title = UI('sm-title');
+  const desc = UI('sm-desc');
+  const text = UI('sm-text');
+  const btnCopy = UI('sm-btn-copy');
+  const btnDownload = UI('sm-btn-download');
+  const btnUpload = UI('sm-btn-upload');
+  const btnConfirm = UI('sm-btn-confirm');
+  const btnClose = UI('sm-close');
+  const fileInput = UI('sm-file');
+  if (!modal || !title || !desc || !text) return;
+
+  if (btnClose) btnClose.onclick = () => closeSaveModal();
+  modal.onclick = (e) => { if (e.target === modal) closeSaveModal(); };
+
+  if (mode === 'export') {
+    title.textContent = '战役存档导出 / 备份';
+    desc.textContent = '以下是您的完整战役存档代码（包含星级、通关数和最高分）。您可以一键复制文本，或下载为 .json 存档文件以在其他设备导入：';
+    const code = progress && progress.exportCode ? progress.exportCode() : (progress ? JSON.stringify(progress.save_data) : '');
+    text.value = code;
+    text.readOnly = true;
+    if (btnCopy) btnCopy.style.display = '';
+    if (btnDownload) btnDownload.style.display = '';
+    if (btnUpload) btnUpload.style.display = 'none';
+    if (btnConfirm) btnConfirm.style.display = 'none';
+
+    if (btnCopy) {
+      btnCopy.onclick = () => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text.value).then(() => toast('✅ 存档代码已复制到剪贴板！')).catch(() => {
+            text.select();
+            document.execCommand('copy');
+            toast('✅ 存档代码已复制！');
+          });
+        } else {
+          text.select();
+          document.execCommand('copy');
+          toast('✅ 存档代码已复制！');
+        }
+      };
+    }
+    if (btnDownload) {
+      btnDownload.onclick = () => {
+        try {
+          const jsonStr = progress && progress.exportJson ? progress.exportJson() : JSON.stringify(progress.save_data, null, 2);
+          const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'ah64e_campaign_save_' + new Date().toISOString().slice(0, 10) + '.json';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          toast('✅ 存档文件已下载！');
+        } catch (e) {
+          toast('❌ 下载存档失败：' + (e.message || e));
+        }
+      };
+    }
+  } else {
+    title.textContent = '导入战役存档';
+    desc.textContent = '请在下方文本框中粘贴存档代码或 JSON，也可以直接点击“从文件导入”上传之前的 .json 存档：';
+    text.value = '';
+    text.readOnly = false;
+    text.placeholder = '在此粘贴存档代码（Base64）或 JSON 文本...';
+    if (btnCopy) btnCopy.style.display = 'none';
+    if (btnDownload) btnDownload.style.display = 'none';
+    if (btnUpload) btnUpload.style.display = '';
+    if (btnConfirm) btnConfirm.style.display = '';
+
+    if (btnUpload && fileInput) {
+      btnUpload.onclick = () => fileInput.click();
+      fileInput.onchange = () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const content = e.target.result;
+          if (progress && progress.importData && progress.importData(content)) {
+            toast('✅ 存档文件导入成功！');
+            closeSaveModal();
+            renderLevelMap();
+          } else {
+            toast('❌ 存档格式不正确或解析失败');
+          }
+        };
+        reader.readAsText(file);
+      };
+    }
+    if (btnConfirm) {
+      btnConfirm.onclick = () => {
+        const val = text.value.trim();
+        if (!val) { toast('请先输入或粘贴存档内容'); return; }
+        if (progress && progress.importData && progress.importData(val)) {
+          toast('✅ 战役存档导入成功！');
+          closeSaveModal();
+          renderLevelMap();
+        } else {
+          toast('❌ 存档解析失败，请检查代码是否完整');
+        }
+      };
+    }
+  }
+
+  modal.style.display = 'flex';
+}
+
 function renderLevelMap() {
   const box = UI('levelmap');
   if (!box || !HOST.levels || !progress) return;
@@ -21,12 +135,27 @@ function renderLevelMap() {
   const tot = progress.totals();
   const diffs = arcade ? arcade.diffKeys() : ['standard'];
   const curDiff = (arcade && arcade.difficulty) || 'standard';
+  const isAllUnlocked = progress.isAllUnlocked ? progress.isAllUnlocked() : false;
+  const saveBarHtml = '<div class="lm-savebar">' +
+    '<div class="lm-sb-left">' +
+    '<span class="lm-sb-status"><i class="lm-sb-dot"></i>本地自动存档: 正常 (已实时持久化)</span>' +
+    '<span class="lm-sb-tip">换浏览器/清除缓存可导出备份；支持一键开启演练特权自由选关</span>' +
+    '</div>' +
+    '<div class="lm-sb-actions">' +
+    '<button class="lm-sb-btn lm-sb-unlock' + (isAllUnlocked ? ' lm-sb-unlocked' : '') + '" title="无需逐关通关，即刻解锁全部13关进行演练与自由出击">' +
+    (isAllUnlocked ? '🔓 已解锁全部关卡 (演练中)' : '🔓 解锁全部关卡 (演练特权)') + '</button>' +
+    '<button class="lm-sb-btn lm-sb-export" title="导出存档代码或下载JSON存档文件">📤 导出/备份</button>' +
+    '<button class="lm-sb-btn lm-sb-import" title="粘贴代码或上传JSON存档恢复进度">📥 导入存档</button>' +
+    '<button class="lm-sb-btn lm-sb-danger lm-sb-reset" title="清空全部战役关卡进度与星级">🔄 重置进度</button>' +
+    '</div></div>';
   let html = '<div class="lm-head"><div><div class="lm-k">CAMPAIGN</div><div class="lm-t">战役地图</div></div>' +
     '<div class="lm-tot"><b>' + tot.stars + '</b> / ' + tot.maxStars + ' ★<span>已通关 ' + tot.cleared + ' / ' + tot.ready + '</span></div>' +
     '<div class="lm-diff" role="radiogroup" aria-label="难度">' +
     diffs.map(k => '<button class="lm-dchip' + (k === curDiff ? ' on' : '') + '" data-diff="' + k + '" role="radio" aria-checked="' +
       (k === curDiff) + '">' + (arcade ? arcade.diffName(k) : k) + '</button>').join('') + '</div>' +
-    '<button class="lm-close" aria-label="关闭战役地图">×</button></div><div class="lm-cols">';
+    '<button class="lm-close" aria-label="关闭战役地图">×</button></div>' +
+    saveBarHtml +
+    '<div class="lm-cols">';
   for (const ch of LV.chapters) {
     html += '<div class="lm-ch"><div class="lm-chh"><i>0' + ch.n + '</i>' + ch.name + '<span>' + ch.en + '</span></div>';
     for (const L of LV.list.filter(x => x.chapter === ch.n)) {
@@ -59,6 +188,9 @@ function renderLevelMap() {
       hideLevelMap();
       if (HOST.setPlayMode && S.mode !== 'mission') HOST.setPlayMode('mission');
       startMission('endless');
+      // 本地修补：endless 不经 startLevel，需手动同步——否则上一战役关的
+      // "下一关 X →"按钮与 playState.next 残留，局中按 N 会丢弃当前无尽局跳关
+      syncPlayActions();
     };
   }
   if (!document.getElementById('p5-endless-css')) {
@@ -86,6 +218,32 @@ function renderLevelMap() {
   }
   for (const b of box.querySelectorAll('.lm-dchip')) {
     b.onclick = () => { if (arcade && arcade.setDifficulty(b.dataset.diff)) renderLevelMap(); };
+  }
+  const btnUnlock = box.querySelector('.lm-sb-unlock');
+  if (btnUnlock) {
+    btnUnlock.onclick = () => {
+      const now = progress.toggleAllUnlocked ? progress.toggleAllUnlocked() : false;
+      toast(now ? '🔓 已开启演练特权：全部 13 关即刻开放自由出击！' : '🔒 已恢复标准逐关解锁模式');
+      renderLevelMap();
+    };
+  }
+  const btnExport = box.querySelector('.lm-sb-export');
+  if (btnExport) {
+    btnExport.onclick = () => openSaveModal('export');
+  }
+  const btnImport = box.querySelector('.lm-sb-import');
+  if (btnImport) {
+    btnImport.onclick = () => openSaveModal('import');
+  }
+  const btnReset = box.querySelector('.lm-sb-reset');
+  if (btnReset) {
+    btnReset.onclick = () => {
+      if (confirm('确定要清空战役存档吗？\n将重置所有 13 个关卡的通关记录、星级与最高分。')) {
+        progress.reset();
+        toast('已重置战役存档为初始状态');
+        renderLevelMap();
+      }
+    };
   }
   const c = box.querySelector('.lm-close'); if (c) c.onclick = () => hideLevelMap();
 }
@@ -171,19 +329,28 @@ function bindPlayUI() {
   const lm = UI('btn-levelmap');
   if (lm) lm.onclick = () => showLevelMap();
   const nx = UI('btn-next-level');
-  if (nx) nx.onclick = () => { const r = progress && progress.last; if (r && r.next) startLevel(r.next); };
+  // 本地修补：任务进行中（briefing/active）禁止跳关——防止过期 playState.next
+  // 在重打本关/无尽局中被 N 键或顶栏按钮触发，无声丢弃当前局
+  const _missionBusy = () => { const m = S._mission; return !!(m && (m.phase === 'briefing' || m.phase === 'active')); };
+  if (nx) nx.onclick = () => { if (_missionBusy()) return; const r = progress && progress.last; if (r && r.next) startLevel(r.next); };
   addEventListener('keydown', e => {
     // N：结算后直接进入下一关（仅当下一关已解锁且结算卡显示了按钮）
-    if (!playState.mapOpen && (e.key === 'n' || e.key === 'N') && playState.next && !e.ctrlKey && !e.metaKey) {
+    if (!playState.mapOpen && (e.key === 'n' || e.key === 'N') && playState.next && !_missionBusy() && !e.ctrlKey && !e.metaKey) {
       const t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
       e.preventDefault(); e.stopImmediatePropagation();
       startLevel(playState.next);
       return;
     }
+    const sm = UI('save-modal');
+    if (sm && sm.style.display && sm.style.display !== 'none') {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); closeSaveModal(); return; }
+      e.stopImmediatePropagation();
+      return;
+    }
     if (!playState.mapOpen) return;
     if (e.key === 'Escape') { e.stopImmediatePropagation(); hideLevelMap(); }
-    // 地图打开时吞掉驾驶/开火键（按钮自身的回车/空格激活不受影响：未 preventDefault）
-    else if (e.key === ' ' || /^[a-z0-9]$/i.test(e.key)) e.stopImmediatePropagation();
+    // 地图打开时吞掉驾驶/开火/机位键（按钮自身的回车/空格激活不受影响：未 preventDefault）
+    else if (e.key === ' ' || /^[-=a-z0-9]$/i.test(e.key)) e.stopImmediatePropagation();
   }, true);
 }

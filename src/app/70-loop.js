@@ -214,15 +214,16 @@ function _frame(dt, doRender) {
     // 默认 XYZ 序在转向后会把俯仰变成滚转（蹬舵转向+侧倾的配套修正）
     apache.root.rotation.order = 'YXZ';
     // 玩法批 D：峡谷地形约束（机体不进岩体；旋翼擦壁 → 退回 + 计伤 + 震屏）
-    // P4b：展示航线自动驾驶沿中线飞，不做岩壁碰撞（避免航线被弹回/计伤）
-    if (targets && targets.canyon && targets.canyon.active && !(HOST.routeState && HOST.routeState.on)) {
+    // P4b/过场：自动驾驶与转场过场期间沿规划飞，不做岩壁碰撞（避免被弹回/计伤）
+    if (targets && targets.canyon && targets.canyon.active && !(HOST.routeState && HOST.routeState.on) && !(HOST.cutsceneState && HOST.cutsceneState.isOn && HOST.cutsceneState.isOn())) {
       const ev = targets.canyon.collide(FLY, dt);
       if (ev) {
         if (fp && fp.active) { fp.spd *= -0.3; fp.vSide *= -0.3; }
         if (ev === 'strike') {
           S._shake = Math.max(S._shake || 0, 0.7);
           toast('⚠ 旋翼擦到岩壁');
-          if (targets.onHeliHit) targets.onHeliHit(targets._heliDmg, null);
+          if (targets) targets._hitSrc = 'collision';
+          if (targets.onHeliHit) targets.onHeliHit(targets._heliDmg, null, 2);
         }
       }
     }
@@ -303,8 +304,8 @@ function _frame(dt, doRender) {
 
     // 下洗 3D 特效（草浪/水纹/沙柱），跟随飞机位置
     if (washfx) washfx.update(dt, s, FLY.alt, apache.root.position.x, apache.root.position.z, S.time);
-    // 空中打击目标：机动 + 击落坠毁动画
-    if (air) air.update(dt, S.time);
+    // 空中打击目标：机动 + 击落坠毁动画 + 战术神风俯冲
+    if (air) air.update(dt, S.time, apache ? apache.root.position : null);
     _tickNightOps(dt);   // P5-G3 热成像扫描 / 照明弹
     // P5-G2 敌方步兵：仅游戏关卡 + 基地靶场（非城镇/峡谷/训练/航线）出现，任务进行中才开火
     if (infantry) {
@@ -407,6 +408,8 @@ function _frame(dt, doRender) {
   _tickModeChip();     // P14-B+E 模式/输入状态徽标（70-hud.js）
 
   _tickHud(rawDt, s, rpm);   // RPM/弹药/FPS/自动降档/首访引导（70-hud.js）；FPS 读数/降档用真实时钟（慢动作期间不误判）
+  updateTacticalRadar(rawDt); // 长弓 AN/APG-78 全向战术雷达
+  updateFarpHud();           // FARP 前线补给与抢修指引条
 
   // NaN 兜底：任何一环算出 NaN 都会污染 FLY 状态并静默黑屏。
   // NaN !== NaN 恒真，用这个特性廉价自检；触发即复位（外部系统写坏状态时的最后防线）

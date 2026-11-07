@@ -112,7 +112,7 @@ function _propPromise(k) {
   const d = PROP_DEFS[k];
   if (!d) return (_propCache[k] = Promise.resolve(null));
   const loader = new THREE.GLTFLoader();
-  _propCache[k] = _propByUrl[d.url] || (_propByUrl[d.url] = new Promise((res) => loader.load(d.url, (g) => { if (d.fix) try { d.fix(g.scene); } catch (e) { console.error('[props] fix ' + k + ': ' + e.message); } res(g.scene); }, undefined, () => res(null))));
+  _propCache[k] = _propByUrl[d.url] || (_propByUrl[d.url] = new Promise((res) => loader.load(d.url, (g) => { if (d.fix) try { d.fix(g.scene); } catch (e) { console.error('[props] fix ' + k + ': ' + e.message); } res(g.scene); }, undefined, () => { delete _propByUrl[d.url]; delete _propCache[k]; res(null); })));
   return _propCache[k];
 }
 const _propLazy = new Proxy({}, { get: (_, k) => (typeof k === 'string' ? _propPromise(k) : undefined) });
@@ -244,6 +244,7 @@ function skinTownBuilding(b, key, ry) {
       if (!o.isMesh) return;
       o.castShadow = true; o.receiveShadow = true;
       o.material = o.material.clone();
+      if (!o.material.userData.c0) o.material.userData.c0 = o.material.color.clone();
       b.skinMats.push(o.material);
     });
     for (const ch of b.group.children) ch.visible = false;   // 程序化墙体 + 屋顶

@@ -555,8 +555,7 @@
     "rnd"
    ],
    "05-config.js": [
-    "BASE_C"
-   ,
+    "BASE_C",
     "U2M_INV"
    ],
    "16-town.js": [
@@ -771,8 +770,7 @@
     "FLY"
    ],
    "05-config.js": [
-    "FLY_BOUND"
-   ,
+    "FLY_BOUND",
     "U2M"
    ]
   }
@@ -950,8 +948,7 @@
     "toast"
    ],
    "05-config.js": [
-    "qualityPreset"
-   ,
+    "qualityPreset",
     "applySceneAniso"
    ],
    "30-world.js": [
@@ -1045,7 +1042,9 @@
  },
  "70-combat.js": {
   "provides": [
+   "_deathAnalysisHtml",
    "_dmgApply",
+   "_dmgLogPush",
    "_hitFeedback",
    "_tickDamage",
    "_tickEnemyAir",
@@ -1057,6 +1056,7 @@
     "rnd"
    ],
    "01-host.js": [
+    "HOST",
     "toast"
    ],
    "45-flight.js": [
@@ -1101,7 +1101,9 @@
    "_tickHud",
    "_tickModeChip",
    "_tickPostFx",
-   "syncFlyText"
+   "syncFlyText",
+   "updateFarpHud",
+   "updateTacticalRadar"
   ],
   "depends": {
    "05-config.js": [
@@ -1125,13 +1127,16 @@
    "70-app.js": [
     "S",
     "W",
+    "air",
     "apache",
     "applyQuality",
     "arcade",
     "composer",
     "damageSys",
+    "enemyAir",
     "fp",
     "narrative",
+    "rescue",
     "resources",
     "rig",
     "samwar",
@@ -1287,7 +1292,9 @@
     "_tickHud",
     "_tickModeChip",
     "_tickPostFx",
-    "syncFlyText"
+    "syncFlyText",
+    "updateFarpHud",
+    "updateTacticalRadar"
    ],
    "70-killcam.js": [
     "KC",
@@ -1391,6 +1398,9 @@
    ],
    "70-camera.js": [
     "setView"
+   ],
+   "70-combat.js": [
+    "_deathAnalysisHtml"
    ],
    "70-nightops.js": [
     "resetNightOps"
@@ -1617,6 +1627,7 @@
    ],
    "70-combat.js": [
     "_dmgApply",
+    "_dmgLogPush",
     "_hitFeedback"
    ],
    "70-loop.js": [
@@ -1969,6 +1980,7 @@
   ],
   "depends": {
    "00-utils.js": [
+    "DEG",
     "TAU",
     "rnd",
     "vcKit",
@@ -1990,20 +2002,39 @@
   "depends": {
    "00-utils.js": [
     "clamp",
-    "easeInOut"
+    "easeInOut",
+    "lerp",
+    "smoothstep"
    ],
    "01-host.js": [
-    "HOST"
+    "HOST",
+    "UI",
+    "toast"
+   ],
+   "05-config.js": [
+    "BASE_C"
+   ],
+   "45-flight.js": [
+    "FLY"
    ],
    "70-app.js": [
     "S",
-    "orbit"
+    "air",
+    "apache",
+    "enemyAir",
+    "orbit",
+    "rescue",
+    "targets",
+    "washfx"
    ],
    "70-camera.js": [
     "setView"
    ],
-   "05-config.js": [
-    "BASE_C"
+   "70-mission.js": [
+    "beginMission"
+   ],
+   "70-radio.js": [
+    "radioSay"
    ]
   }
  },
@@ -2343,7 +2374,7 @@
 
 ## 70-combat.js
 
-- **提供**: _dmgApply, _tickDamage, _tickEnemyAir, _tickResources, _tickSamwar
+- **提供**: _deathAnalysisHtml, _dmgApply, _dmgLogPush, _hitFeedback, _tickDamage, _tickEnemyAir, _tickResources, _tickSamwar
 - **依赖**: 01-host.js（toast）；45-flight.js（FLY）；46-fpview.js（keys）；47-betty.js（betty）；70-app.js（S, _kills, apache, arcade, damageSys, enemyAir, enemyVis, fp, killFeed, music, narrative, resources, rig, samwar, targets, updateTargetHUD）；70-mission.js（applyVariantAmmo, failMission）
 - **调用时机**: 作战子系统帧逻辑：_tickSamwar（Phase 19 SAM scratch 环境组装+事件消费）、_tickDamage（86-damage 演化与派生量下发）、_tickEnemyAir（Phase 20 A2A）、_tickResources（Phase 20 燃油/补给）；scratch 对象 _swEnv/_swPrev/_eaEnv/_eaF/_rsEnv（零每帧分配）；_dmgApply 命中方位换算（finish 注入的 onHeliHit 使用）。均由 70-loop 在 if (apache) 段内按原顺序调用。
 
@@ -2368,13 +2399,13 @@
 ## 70-mission.js
 
 - **提供**: MISSION_VARIANTS, TRAIN_NUM, TRAIN_STEPS, _tickMission, _tickMissionMaps, applyVariantAmmo, beginMission, completeMission, failMission, fmtMissionTime, missionRating, missionTimeout, missionVariant, renderBriefing, renderCampaignChips, renderDiffChips, renderVariantChips, retryMission, setMissionDifficulty, setMissionVariant, showMissionBriefing, startCampaign, startMission, trainAdvance, trainFinish, trainToastMs, updateMissionPanel
-- **依赖**: 01-host.js（HOST, UI, toast）；05-config.js（GUN, ROCKET）；16-valley.js（CANYON_HOVER）；45-flight.js（FLY）；47-betty.js（betty）；70-app.js（S, W, _kills, air, apache, arcade, audio, campaign, damageSys, enemyAir, enemyVis, fp, music, narrative, rescue, resources, rig, samwar, targets, updateTargetHUD, washfx）
+- **依赖**: 01-host.js（HOST, UI, toast）；05-config.js（GUN, ROCKET）；16-valley.js（CANYON_HOVER）；45-flight.js（FLY）；47-betty.js（betty）；70-app.js（S, W, _kills, air, apache, arcade, audio, campaign, damageSys, enemyAir, enemyVis, fp, music, narrative, rescue, resources, rig, samwar, targets, updateTargetHUD, washfx）；70-combat.js（_deathAnalysisHtml）
 - **调用时机**: 任务系统：MISSION_VARIANTS/难度/战役 chip、简报 renderBriefing、面板 updateMissionPanel、completeMission/failMission/startMission/retryMission/beginMission、训练 TRAIN_STEPS/trainAdvance；帧逻辑 _tickMission（过场重试、接近基地触发、0.5s 面板刷新与胜负判定、训练推进）与 _tickMissionMaps（城镇/峡谷随变体派生）。
 
 ## 70-start.js
 
 - **提供**: boot, finish, loadFill, loadTxt, prog
-- **依赖**: 00-utils.js（STATS, clamp, countScene, fmtK）；01-host.js（HOST, UI, toast）；05-config.js（AC, WATER_Y, qualityPreset）；16-targets.js（TargetRange）；16-town.js（TownDistrict）；16-valley.js（CanyonRun）；18-audio.js（RotorAudio）；19-reflect.js（WaterReflection）；20-scene.js（ENV_PRESETS）；24-navlights.js（NightLights）；26-airtargets.js（AirTargets）；28-washfx.js（WashFX）；32-envpreset.js（applyPreset）；46-fpview.js（FPView）；47-betty.js（betty）；48-rescue.js（Rescue）；50-controls.js（VIEWS）；60-model.js（Apache, makeRotorDisc）；62-detailparts.js（DetailParts）；65-weapons.js（WeaponRig）；70-app.js（S, W, _kills, air, apache, applyQuality, arcade, audio, campaign, canvas, damageSys, disc, discMat, dp, enemyAir, enemyVis, fp, hitMark, killFeed, music, narrative, nlights, orbit, refl, renderer, rescue, resources, rig, samvis, samwar, targets, updateTargetHUD, washfx, weather）；70-camera.js（buildViewBar）；70-combat.js（_dmgApply）；70-loop.js（loop）
+- **依赖**: 00-utils.js（STATS, clamp, countScene, fmtK）；01-host.js（HOST, UI, toast）；05-config.js（AC, WATER_Y, qualityPreset）；16-targets.js（TargetRange）；16-town.js（TownDistrict）；16-valley.js（CanyonRun）；18-audio.js（RotorAudio）；19-reflect.js（WaterReflection）；20-scene.js（ENV_PRESETS）；24-navlights.js（NightLights）；26-airtargets.js（AirTargets）；28-washfx.js（WashFX）；32-envpreset.js（applyPreset）；46-fpview.js（FPView）；47-betty.js（betty）；48-rescue.js（Rescue）；50-controls.js（VIEWS）；60-model.js（Apache, makeRotorDisc）；62-detailparts.js（DetailParts）；65-weapons.js（WeaponRig）；70-app.js（S, W, _kills, air, apache, applyQuality, arcade, audio, campaign, canvas, damageSys, disc, discMat, dp, enemyAir, enemyVis, fp, hitMark, killFeed, music, narrative, nlights, orbit, refl, renderer, rescue, resources, rig, samvis, samwar, targets, updateTargetHUD, washfx, weather）；70-camera.js（buildViewBar）；70-combat.js（_dmgApply, _dmgLogPush, _hitFeedback）；70-loop.js（loop）
 - **调用时机**: 载入与装配：prog 进度条、boot 载 GLB、finish 装配子系统并注册 HOST.rig；文件末尾调用 boot()——必须是 70-* 组按文件名排序的最后一个（boot 同步段要求 70-* 顶层 const 已初始化）。
 
 ## 71-armory.js
