@@ -116,7 +116,7 @@ function routeStep(dt) {
   const r = route.r;
   route.t += dt;
   const t = route.t;
-  while (route.evI < route.ev.length && t >= route.ev[route.evI][0]) { try { route.ev[route.evI++][1](); } catch (e) {} }
+  while (route.evI < route.ev.length && t >= route.ev[route.evI][0]) { try { route.ev[route.evI++][1](); } catch (e) { console.warn('[route] 事件执行失败 evI=' + (route.evI - 1), e); } }
   while (route.capI < r.caps.length && t >= r.caps[route.capI][0]) tourCap(r.caps[route.capI++][1]);
   // 自动驾驶
   const autoOn = r.start !== 'ground' || t >= r.auto;

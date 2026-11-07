@@ -335,6 +335,11 @@ function _tickHud(dt, s, rpm) {
 // ============================================================
 let _radarCv = null, _radarCtx = null;
 let _radarTimer = 0;
+// 2026-11-07：雷达每 0.08s 刷新一次。标绘点全是"用完即弃"，复用同一 scratch
+// 对象（每目标不再新建对象）；文本/颜色读数只在值变化时写 DOM，与 _tickHud
+// 的 dataset 缓存同纪律，零视觉变化。
+const _radarPt = { px: 0, py: 0, d: 0, rx: 0, rz: 0 };
+const _radarDom = { cnt: '', info: '', color: '' };
 
 function updateTacticalRadar(dt) {
   const rEl = UI('tac-radar');
@@ -425,9 +430,11 @@ function updateTacticalRadar(dt) {
     const rx = dx * cosY - dz * sinY;
     const rz = dx * sinY + dz * cosY;
     const d = Math.hypot(rx, rz);
-    const px = cx + (rx / maxR) * cr;
-    const py = cy - (rz / maxR) * cr;
-    return { px, py, d, rx, rz };
+    const o = _radarPt;
+    o.px = cx + (rx / maxR) * cr;
+    o.py = cy - (rz / maxR) * cr;
+    o.d = d; o.rx = rx; o.rz = rz;
+    return o;
   }
 
   // 1. 标绘 FARP 前线停机坪 (0, 0)
@@ -545,20 +552,42 @@ function updateTacticalRadar(dt) {
     }
   }
 
-  // 更新文本读数
-  const cntEl = UI('tac-radar-cnt');
-  if (cntEl) cntEl.textContent = threatCount > 0 ? `${threatCount} 威胁` : '空域净空';
-
+  // 更新文本读数（只在值变化时写 DOM）
+  const cntTxt = threatCount > 0 ? `${threatCount} 威胁` : '空域净空';
+  if (_radarDom.cnt !== cntTxt) {
+    const cntEl = UI('tac-radar-cnt');
+    if (cntEl) cntEl.textContent = cntTxt;
+    _radarDom.cnt = cntTxt;
+  }
+  let infoTxt, infoColor;
+  if (threatCount === 0) {
+    infoTxt = '空域清空 · 可返航停机坪';
+    infoColor = '#5fd0a8';
+  } else {
+    const dMeters = Math.round(nearestDist * U2M);
+    infoTxt = `最近威胁: ${nearestClock}点钟 · ${dMeters}m`;
+    infoColor = nearestDist < 35 ? '#ff4d4f' : '#ffc107';
+  }
   const infoEl = UI('tac-radar-info');
   if (infoEl) {
-    if (threatCount === 0) {
-      infoEl.textContent = '空域清空 · 可返航停机坪';
-      infoEl.style.color = '#5fd0a8';
-    } else {
-      const dMeters = Math.round(nearestDist * U2M);
-      infoEl.textContent = `最近威胁: ${nearestClock}点钟 · ${dMeters}m`;
-      infoEl.style.color = nearestDist < 35 ? '#ff4d4f' : '#ffc107';
-    }
+    if (_radarDom.info !== infoTxt) { infoEl.textContent = infoTxt; _radarDom.info = infoTxt; }
+    if (_radarDom.color !== infoColor) { infoEl.style.color = infoColor; _radarDom.color = infoColor; }
+  }
+}
+
+// 2026-11-07：本函数由 _frame 每帧调用，原先无条件写 textContent 与布局属性
+// style.width（每次都触发样式重算）。改为值变化才写，零视觉变化。
+const _farpCache = { txt: '', pct: -1 };
+function _farpWrite(txt, pct) {
+  if (_farpCache.txt !== txt) {
+    const el = UI('farp-hud-txt');
+    if (el) el.textContent = txt;
+    _farpCache.txt = txt;
+  }
+  if (_farpCache.pct !== pct) {
+    const el = UI('farp-hud-fill');
+    if (el) el.style.width = pct + '%';
+    _farpCache.pct = pct;
   }
 }
 
@@ -584,33 +613,28 @@ function updateFarpHud() {
 
   if (rs.rtbOn) {
     if (fEl.style.display !== 'block') fEl.style.display = 'block';
-    const txtEl = UI('farp-hud-txt');
-    if (txtEl) txtEl.textContent = `FARP 战地抢修与弹药再装填... ${Math.round(rs.rtbP * 100)}%`;
-    const fillEl = UI('farp-hud-fill');
-    if (fillEl) fillEl.style.width = `${Math.round(rs.rtbP * 100)}%`;
+    const pct = Math.round(rs.rtbP * 100);
+    _farpWrite(`FARP 战地抢修与弹药再装填... ${pct}%`, pct);
     return;
   }
 
   if (needSupply || distToPad < 14) {
     if (fEl.style.display !== 'block') fEl.style.display = 'block';
     const distM = Math.round(distToPad * U2M);
-    const txtEl = UI('farp-hud-txt');
-    if (txtEl) {
-      if (distToPad < 6) {
-        txtEl.textContent = FLY.state === 'hover' ? '已抵达 FARP · 降落或悬停 3 秒开始再装填' : 'FARP 准备补给中';
-      } else {
-        const dx = 0 - (FLY.x || 0), dz = 0 - (FLY.z || 0);
-        const yaw = FLY.yaw || 0;
-        const rx = dx * Math.cos(yaw) - dz * Math.sin(yaw);
-        const rz = dx * Math.sin(yaw) + dz * Math.cos(yaw);
-        let deg = Math.atan2(rx, rz) * 180 / Math.PI;
-        if (deg < 0) deg += 360;
-        const clock = Math.round(deg / 30) || 12;
-        txtEl.textContent = `返航指引: 前线停机坪 (FARP) ${clock}点钟 · ${distM}m`;
-      }
+    let txt;
+    if (distToPad < 6) {
+      txt = FLY.state === 'hover' ? '已抵达 FARP · 降落或悬停 3 秒开始再装填' : 'FARP 准备补给中';
+    } else {
+      const dx = 0 - (FLY.x || 0), dz = 0 - (FLY.z || 0);
+      const yaw = FLY.yaw || 0;
+      const rx = dx * Math.cos(yaw) - dz * Math.sin(yaw);
+      const rz = dx * Math.sin(yaw) + dz * Math.cos(yaw);
+      let deg = Math.atan2(rx, rz) * 180 / Math.PI;
+      if (deg < 0) deg += 360;
+      const clock = Math.round(deg / 30) || 12;
+      txt = `返航指引: 前线停机坪 (FARP) ${clock}点钟 · ${distM}m`;
     }
-    const fillEl = UI('farp-hud-fill');
-    if (fillEl) fillEl.style.width = '0%';
+    _farpWrite(txt, 0);
   } else {
     if (fEl.style.display !== 'none') fEl.style.display = 'none';
   }

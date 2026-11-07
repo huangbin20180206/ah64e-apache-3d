@@ -82,7 +82,7 @@ function tourTick(ts) {
   while (tour.idx < tour.steps.length && tour.t >= tour.steps[tour.idx].t) {
     const s = tour.steps[tour.idx++];
     if (s.cap) tourCap(s.cap);
-    try { s.fn(); } catch (e) {}
+    try { s.fn(); } catch (e) { console.warn('[tour] 步骤执行失败 idx=' + (tour.idx - 1), e); }
   }
   tour.raf = requestAnimationFrame(tourTick);
 }

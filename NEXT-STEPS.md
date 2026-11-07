@@ -20,9 +20,9 @@ git log --oneline -1    # 此文档写作时为 305dc4f（Hark 接手批）
 ## 二、先跑这三条，确认基线是绿的
 
 ```bash
-node build.mjs                     # 应输出：拓扑检查无反向引用 / id 契约 195-170 / 死引用 0
+node build.mjs                     # 应输出：拓扑检查无反向引用 / id 契约 235 定义·208 引用·死引用 0 / 资源引用 66 全覆盖
 node --check dist/app-check.mjs    # 应 Exit 0
-python -m pytest tools/tests_pure/ # 应 ≥139 passed（此文档写作时为 139；只增不减）
+uv run --with pytest pytest -q tools/tests_pure   # 应 ≥140 passed（2026-11-07 实测 140；只增不减）
 ```
 
 **三条不绿就别往下做**，先把环境问题解决。
