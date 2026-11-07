@@ -28,6 +28,13 @@ jobs:
           node tools/check_dom_ids.mjs
           # Phase 1-B：拓扑检查器自测（build.mjs 内已含真实源码的 assertTopology）
           node tools/check_topology_selftest.mjs
+      - name: Undefined-global shadow report (non-blocking)
+        # 影子检查器只报告不失败（见 tools/check_undefined.mjs 文件头）。
+        # 当前基线约 430 处命中，多为 tokenizer 对短名解构的假阳性；假阳性率
+        # 未降到 <5% 前不接硬门禁。此步让新增笔误在日志与归档 JSON 中可见。
+        run: |
+          node tools/check_undefined.mjs --json > "$RUNNER_TEMP/undefined-report.json"
+          node -e "const r=require(process.env.RUNNER_TEMP+'/undefined-report.json');console.log('::notice::undefined-global 影子报告: '+r.suspects.length+' 个嫌疑符号 / '+r.totalHits+' 处命中（非阻断）')"
       - name: Pure logic tests (no browser, no GPU)
         # tools/tests_pure：node 桩驱动的纯逻辑回归（战役/损伤/敌机/SAM/资源/合并几何），
         # 帧率无关、秒级跑完——此前未进任何门禁，加关卡时无人跑到（见 AUDIT_VERDICT §D）
@@ -92,5 +99,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: apache-browser-test-output
-          path: ${{ runner.temp }}/apache-test-output
+          path: |
+            ${{ runner.temp }}/apache-test-output
+            ${{ runner.temp }}/undefined-report.json
           if-no-files-found: ignore

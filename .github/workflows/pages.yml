@@ -2,8 +2,13 @@ name: deploy-pages
 
 # 把 node build.mjs 产出的 dist/（单文件 HTML + assets/）部署到 GitHub Pages，
 # 让游戏在线可玩。dist/ 被 gitignore，故必须经 CI 构建，而非直接提交产物。
+# 2026-11-07：部署不再与回归并行抢跑——只在 browser-regression 成功完成后触发。
+# 旧版两个 workflow 都监听 push main，回归红了 Pages 照样发布。
+# 手动 workflow_dispatch 保留作应急发布通道（该路径不走回归，需人工确认）。
 on:
-  push:
+  workflow_run:
+    workflows: ["browser-regression"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -19,9 +24,20 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # 只认「main 上的 push 触发、且回归整体成功」；PR / 定时 / 手动回归不触发部署。
+    # deploy 依赖本 job，本 job 被跳过时下游一并跳过。
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # workflow_run 默认 checkout 默认分支最新提交，不是触发回归的那个 SHA；
+          # 必须显式对齐，否则会部署错版本。
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Node
         uses: actions/setup-node@v4

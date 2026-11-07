@@ -79,6 +79,31 @@ function buildApp() {
   return all;
 }
 
+// ---------- 3.5 资源引用存在性检查 ----------
+// 代码/模板里写死的 assets/... 路径必须在磁盘存在、且真的被复制进 dist。
+// 只认带引号的完整路径字面量，并跳过整行注释——文档里的示例、"已删除件"
+// （如 62-detailparts.js 注释里提到的 nose.glb）不是真实引用，不能误报。
+// 动态拼接路径（'assets/audio/sfx/' + name + '.mp3' 等）由下方各段的
+// readdirSync 隐式保证：目录不存在或为空，构建本就会失败。
+function assertAssetRefs() {
+  const appDir = path.join(SRC, 'app');
+  const files = [
+    ...fs.readdirSync(appDir).filter(f => f.endsWith('.js')).map(f => path.join(appDir, f)),
+    path.join(SRC, 'template.html'),
+  ];
+  const re = /['"`](assets\/[A-Za-z0-9_./-]+\.(?:glb|jpg|png|webp|mp3|wav|txt))['"`]/g;
+  const refs = new Set();
+  for (const f of files) {
+    const code = read(f).split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+    for (const m of code.matchAll(re)) refs.add(m[1]);
+  }
+  const missing = [...refs].filter(r => !fs.existsSync(path.join(DIST, r)));
+  if (missing.length) {
+    throw new Error('代码引用的资源未进 dist（文件缺失或复制清单漏项）：' + missing.join(', '));
+  }
+  return refs.size;
+}
+
 // ---------- 主流程 ----------
 // 构建前静态检查 UI(id) 契约：拼错或改 template 漏改会在运行时才炸，
 // 而且往往藏在切场地/进 FPV 之后才走的分支里，冒烟测试抓不到。
@@ -125,11 +150,14 @@ const loaderJs = [
   'THREE.GLTFLoader = class extends GLTFLoader {',
   '  constructor(m) { super(m); this.setMeshoptDecoder(MeshoptDecoder); }',
   '  load(url, onLoad, onProgress, onError) {',
+  '    // 2026-11-07：app 里多处 GLB 的 onError 是空函数，404/解码失败静默降级、',
+  '    // 玩家只看到模型缺失。统一在此补一条带 URL 的告警（原回调照常执行，行为不变）。',
+  '    const _fail = (e) => { console.warn("[GLB] 加载失败: " + url, e); if (onError) onError(e); else console.error(e); };',
   '    if (/apache_v2\\.glb$/.test(url)) {',
-  '      return super.load(url, (g) => { _gqOpen(); if (onLoad) onLoad(g); }, onProgress, (e) => { _gqOpen(); if (onError) onError(e); else console.error(e); });',
+  '      return super.load(url, (g) => { _gqOpen(); if (onLoad) onLoad(g); }, onProgress, (e) => { _gqOpen(); _fail(e); });',
   '    }',
   '    const done = () => { _GQ.active--; _gqPump(); };',
-  '    const f = () => super.load(url, (g) => { done(); if (onLoad) onLoad(g); }, onProgress, (e) => { done(); if (onError) onError(e); else console.error(e); });',
+  '    const f = () => super.load(url, (g) => { done(); if (onLoad) onLoad(g); }, onProgress, (e) => { done(); _fail(e); });',
   '    if (this.priority) { f.p = 1; let i = 0; while (i < _GQ.q.length && _GQ.q[i].p) i++; _GQ.q.splice(i, 0, f); } else _GQ.q.push(f);',
   '    _gqPump();',
   '  }',
@@ -237,6 +265,10 @@ for (const f of fs.readdirSync(path.join(ROOT, 'assets', 'details'))) {
 
 // 供 node --check 做语法体检（内容与注入 buildId 的 appBundle 完全一致）
 fs.writeFileSync(path.join(DIST, 'app-check.mjs'), appBundle);
+
+// 复制清单已全部落盘，此刻校验"代码写了要加载的文件"是否真在产物里。
+// CI 只 checkout 已跟踪文件：本地有、没 git add 的资源会在 CI 构建阶段直接拦下。
+console.log('资源引用检查：' + assertAssetRefs() + ' 个静态引用，dist 全覆盖');
 
 const kb = n => (n / 1024).toFixed(0) + ' KB';
 console.log('dist/index.html  ' + kb(Buffer.byteLength(html)));
