@@ -116,7 +116,9 @@ function _frame(dt, doRender) {
     // 龙弓雷达：±150° 往复扫描
     if (apache.radar) {
       if (S.scan) {
-        S.radarPhase += dt * 0.55;
+        // 2026-11-07：按 2π 取模，避免长时挂机后相位无界增长导致
+        // Math.sin 大参数精度退化（70-hud 的扫掠角本就按 2π 取模，语义一致）。
+        S.radarPhase = (S.radarPhase + dt * 0.55) % (Math.PI * 2);
         apache.radar.rotation.y = Math.sin(S.radarPhase) * (150 * DEG);
       } else {
         apache.radar.rotation.y = lerp(apache.radar.rotation.y, 0, damp(0.06, dt));

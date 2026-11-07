@@ -39,6 +39,7 @@ function mergeHubBlades(hub) {
   const geos = [];
   for (const b of hub.children) { b.updateMatrix(); geos.push(b.geometry.clone().applyMatrix4(b.matrix)); }
   const mg = mergeGeos(geos);
+  disposeMergeInputs(geos, mg);   // 全为 b.geometry.clone().applyMatrix4 的临时件
   if (!mg) return;
   const mat = hub.children[0].material;
   while (hub.children.length) hub.remove(hub.children[0]);

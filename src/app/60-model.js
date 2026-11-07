@@ -667,8 +667,12 @@ class Apache {
     this._shadowProxy = [];
     this._shadowStatic = [];
     for (const b of buckets.values()) {
-      if (b.geos.length < 2) continue;      // 单个 mesh 合了也省不下 draw
+      if (b.geos.length < 2) {              // 单个 mesh 合了也省不下 draw
+        disposeMergeInputs(b.geos, null);   // 临时几何没被消费，照样释放
+        continue;
+      }
       const mg = mergeGeos(b.geos);
+      disposeMergeInputs(b.geos, mg);        // 全为新建的临时 BufferGeometry
       if (!mg) continue;                      // 保底：该桶保持逐 mesh 投影
       mg.computeBoundingSphere();
       const mat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, side: b.side });

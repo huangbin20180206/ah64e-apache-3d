@@ -148,6 +148,7 @@ class WaterReflection {
       }
       for (const b of buckets.values()) {
         const mg = mergeGeos(b.geos);
+        disposeMergeInputs(b.geos, mg);             // 全为 clone 出来的临时几何
         if (!mg) continue;                          // 保底：属性集不齐放弃该桶
         for (const n of b.nodes) { if (n.parent) n.parent.remove(n); }
         const m = new THREE.Mesh(mg, this.mat);

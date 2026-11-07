@@ -28,6 +28,8 @@ jobs:
           node tools/check_dom_ids.mjs
           # Phase 1-B：拓扑检查器自测（build.mjs 内已含真实源码的 assertTopology）
           node tools/check_topology_selftest.mjs
+          # P2-1：构建期注释剥离自证（字符串零漂移 / 整包可编译 / 收益阈值）
+          node tools/strip_comments_selftest.mjs
       - name: Undefined-global shadow report (non-blocking)
         # 影子检查器只报告不失败（见 tools/check_undefined.mjs 文件头）。
         # 当前基线约 430 处命中，多为 tokenizer 对短名解构的假阳性；假阳性率

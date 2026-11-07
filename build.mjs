@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { assertDomIds } from './tools/check_dom_ids.mjs';
 import { assertTopology } from './tools/check_topology.mjs';
+import { stripAppComments } from './tools/strip_comments.mjs';
 
 const ROOT = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
 const SRC = path.join(ROOT, 'src');
@@ -69,13 +70,28 @@ function buildApp() {
   const dir = path.join(SRC, 'app');
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.js')).sort();
   console.log('app 模块顺序：' + files.join(' → '));
-  const all = files.map(f => `\n// ===== ${f} =====\n` + read(path.join(dir, f))).join('\n');
+  // 2026-11-07 P2-1：产物里剥掉「整行独占注释」（app 包 17.4%），源码注释
+  // 完整保留。保守策略与自证见 tools/strip_comments.mjs / _selftest.mjs；
+  // 线上要带注释调试时设 APACHE_KEEP_COMMENTS=1 重建。
+  const keep = process.env.APACHE_KEEP_COMMENTS === '1';
+  let nLines = 0, nBytes = 0;
+  const parts = files.map(f => {
+    const raw = read(path.join(dir, f));
+    if (keep) return `\n// ===== ${f} =====\n` + raw;
+    const r = stripAppComments(raw);
+    nLines += r.removedLines; nBytes += r.removedBytes;
+    return `\n// ===== ${f} =====\n` + r.code;
+  });
+  const all = parts.join('\n');
   // 防 IIFE 破坏：app 代码禁止出现模块语法（会逃逸单 IIFE 共享作用域约定）。
   // from 后跟任意引号内容都算；`import(` 动态导入同样破坏单文件形态
   if (/\bimport\s*[\{(]|from\s*['"]/.test(all)) {
     const bad = files.filter(f => /\bimport\s*[\{(]|from\s*['"]/.test(read(path.join(dir, f))));
     throw new Error('app 模块出现 import 语法（IIFE 约定禁止）：' + bad.join(', '));
   }
+  console.log(keep
+    ? '构建期注释剥离：已关闭（APACHE_KEEP_COMMENTS=1，产物含完整注释）'
+    : `构建期注释剥离：${nLines} 行 / ${(nBytes / 1024).toFixed(1)} KB（APACHE_KEEP_COMMENTS=1 可关闭）`);
   return all;
 }
 
@@ -109,18 +125,23 @@ function assertAssetRefs() {
 // 静默覆盖（后者生效），构建 / node --check / 纯测试全都不报错，只在运行期
 // 表现为「按钮点了没反应」这类哑故障。2026-11-07 的 B4 回归即由此而来
 //（74-tour.js 与 82-cutscene.js 各有一个 tourTogglePause）。
-// const / let / class 重名本身就会 SyntaxError，无需检查；这里只查函数声明。
+// const / let / class 重名本身就会 SyntaxError，无需检查；这里查函数声明与
+// 同样会静默覆盖的顶层 var 声明（2026-11-07 补齐，B4 同源风险）。
 function assertNoDuplicateFunctions() {
   const dir = path.join(SRC, 'app');
   const seen = new Map(), dup = [];
   for (const f of fs.readdirSync(dir).filter(x => x.endsWith('.js')).sort()) {
-    for (const m of read(path.join(dir, f)).matchAll(/^function\s+([A-Za-z_$][\w$]*)\s*\(/gm)) {
-      const n = m[1];
+    const src = read(path.join(dir, f));
+    const names = [
+      ...[...src.matchAll(/^function\s+([A-Za-z_$][\w$]*)\s*\(/gm)].map(m => m[1]),
+      ...[...src.matchAll(/^var\s+([A-Za-z_$][\w$]*)/gm)].map(m => m[1]),
+    ];
+    for (const n of names) {
       if (seen.has(n) && seen.get(n) !== f) dup.push(`${n}: ${seen.get(n)} / ${f}`);
       else seen.set(n, f);
     }
   }
-  if (dup.length) throw new Error('顶层函数重名（单 IIFE 拼接后会静默覆盖）：' + dup.join(' | '));
+  if (dup.length) throw new Error('顶层函数 / var 重名（单 IIFE 拼接后会静默覆盖）：' + dup.join(' | '));
   return seen.size;
 }
 
@@ -132,7 +153,7 @@ function assertNoDuplicateFunctions() {
   const r = assertDomIds(ROOT);
   console.log(`id 契约检查：template ${r.defined.size} 个 / 代码引用 ${r.used.size} 个 / 死引用 0`);
 }
-console.log('顶层函数重名检查：' + assertNoDuplicateFunctions() + ' 个顶层函数，0 重名');
+console.log('顶层声明重名检查：' + assertNoDuplicateFunctions() + ' 个顶层函数 / var，0 重名');
 
 const three = buildThree();
 const bgu = stripModule('BufferGeometryUtils.js');

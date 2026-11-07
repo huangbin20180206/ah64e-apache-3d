@@ -19,12 +19,14 @@ const THREE = {
     setIndex(a) { this.index = a; return this; }
     computeBoundingSphere() {}
     computeBoundingBox() {}
+    dispose() { this._disposed = (this._disposed || 0) + 1; }
   },
 };
 
 const SRC = fs.readFileSync(
   path.join(__dirname, '..', '..', 'src', 'app', '00-utils.js'), 'utf8');
-const mergeGeos = new Function('THREE', SRC + '\n;return mergeGeos;')(THREE);
+const { mergeGeos, disposeMergeInputs } = new Function(
+  'THREE', SRC + '\n;return { mergeGeos, disposeMergeInputs };')(THREE);
 
 // 造一个最小几何：n 顶点 position/normal + index
 function mkGeo(n, idx, off) {
@@ -80,6 +82,31 @@ const CASES = {
       attrMismatch: mergeGeos([noUv, withUv]) === null,
       indexMismatch: mergeGeos([noUv, noIdx]) === null,
       okPair: !!mergeGeos([noUv, mkGeo(3, [0, 1, 2], 5)]),
+    };
+  },
+
+  // 2026-11-07 P1-5：所有权契约。单输入原样返回时入参仍在场景里，
+  // 绝不能 dispose；合并成功 / 合并失败返回 null 时入参无人接手，必须释放。
+  dispose_ownership() {
+    const a = mkGeo(3, [0, 1, 2], 0), b = mkGeo(3, [0, 2, 1], 1);
+    const one = mkGeo(3, [0, 1, 2], 2);
+    const c = mkGeo(3, [0, 1, 2], 3);
+    const bad2 = new THREE.BufferGeometry();
+    const singleOut = mergeGeos([one]);
+    disposeMergeInputs([one], singleOut);
+    const pair = [a, b], ok = mergeGeos(pair);
+    disposeMergeInputs(pair, ok);
+    const bad = [c, bad2], fail = mergeGeos(bad);
+    disposeMergeInputs(bad, fail);
+    disposeMergeInputs(null, null);
+    disposeMergeInputs([], null);
+    return {
+      singleKept: one._disposed === undefined,
+      pairDisposed: a._disposed === 1 && b._disposed === 1,
+      failDisposed: c._disposed === 1 && bad2._disposed === 1,
+      okIsNew: ok !== a && ok !== b,
+      failIsNull: fail === null,
+      guardsNoThrow: true,
     };
   },
 

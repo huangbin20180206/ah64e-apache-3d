@@ -251,12 +251,15 @@ function buildRangeScenery(range, BC, layout) {
   rut(BC.x + 0.5, BC.z, 0, 0.22, 10);
   // —— 合批：沙色件 1 mesh + 围墙营区 1 mesh + 车辙半透 1 mesh ——
   const g = new THREE.Group();
-  const sandMesh = new THREE.Mesh(mergeGeos(sandGeos),
+  const sandGeo = mergeGeos(sandGeos), trackGeo = mergeGeos(trackGeos);
+  disposeMergeInputs(sandGeos, sandGeo);    // 全为 buildRangeScenery 内 new 的临时件
+  disposeMergeInputs(trackGeos, trackGeo);
+  const sandMesh = new THREE.Mesh(sandGeo,
     targetMat(0x9c8964, 0.95, 0.02));   // 2026-10-15 压暗：旧 0xb9a284 在沙漠日光下发白像石膏
   sandMesh.castShadow = false; sandMesh.receiveShadow = true;
   g.add(sandMesh);
   g.add(compound);
-  const trackMesh = new THREE.Mesh(mergeGeos(trackGeos),
+  const trackMesh = new THREE.Mesh(trackGeo,
     new THREE.MeshBasicMaterial({ color: 0x241d14, transparent: true, opacity: 0.30, depthWrite: false }));
   trackMesh.renderOrder = 2;
   g.add(trackMesh);

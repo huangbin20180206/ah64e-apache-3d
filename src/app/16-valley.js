@@ -177,24 +177,18 @@ class CanyonRun {
       group.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       group.visible = false;
       this.scene.add(group);
-      const t = {
-        group, type, mdl, hp, hp0: hp, radius, label: '峡谷伏兵·' + (mdl ? VARIANT_LABEL[mdl] : label), mov: null,
-        pos: group.position.clone(), alive: true, canyon: true, hidden: true,
-        home: { x, z, ry: group.rotation.y, mov: null },
-      };
+      const t = makeTargetRecord(group, {
+        type, mdl, hp, radius, label: '峡谷伏兵·' + (mdl ? VARIANT_LABEL[mdl] : label),
+      }, { canyon: true, hidden: true });
       mergeTargetStatics(t);
       this.units.push(t);
     }
     loadTargetModels(this.scene, this.units.map(targetModelKey)).then(models => {
       for (const t of this.units) if (models[targetModelKey(t)]) applyModelToTarget(t, models[targetModelKey(t)]);
     });
-    this._smokes = this.units.map(t => {
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: this.range._dmgSmoke.material.map, transparent: true, depthWrite: false, opacity: 0 }));
-      sp.visible = false; sp.renderOrder = 3;
-      this.scene.add(sp);
-      return { t, sp, ph: rnd(TAU), y: t.type === 'tank' ? 2.05 : 1.55, s0: t.type === 'tank' ? 3.0 : 2.4 };
-    });
+    this._smokes = this.units.map(t => makeDamageSmoke(this.scene,
+      this.range._dmgSmoke.material.map, t,
+      t.type === 'tank' ? 2.05 : 1.55, t.type === 'tank' ? 3.0 : 2.4));
 
     // —— 崖顶雷达站 ——
     const baseMat = targetMat(0x5b5f52, 0.85, 0.15);
@@ -216,7 +210,9 @@ class CanyonRun {
       bx(2.2, 0.9, 1.6, 0, 0.45, 0);       // 方舱
       bx(0.25, 1.6, 0.25, 0, 1.7, 0);      // 桅杆
       bx(0.5, 0.35, 0.5, 0.8, 1.1, 0.4);   // 发电机
-      const base = new THREE.Mesh(mergeGeos(bgs), baseMat.clone());
+      const baseGeo = mergeGeos(bgs);
+      disposeMergeInputs(bgs, baseGeo);   // bgs 全为本次 new 的 BoxGeometry
+      const base = new THREE.Mesh(baseGeo, baseMat.clone());
       base.castShadow = true;
       g.add(base);
       const dish = new THREE.Group();

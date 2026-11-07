@@ -7,6 +7,7 @@
 //       TARGET_MODELS / targetModelKey / loadTargetModels / applyModelToTarget / mergeTargetStatics
 //       makeWreck / wreckEmber / scorchTexture（P5-G1 真实残骸）
 //       splitTurretGeo / wreckPop（Q3 坦克炮塔掀飞）
+//       makeTargetRecord / makeDamageSmoke（2026-11-07 P2-2 三场地公共工厂）
 // ============================================================
 
 // ---------- 靶标程序化建模 ----------
@@ -21,6 +22,30 @@ function addBox(g, geo, mat, pos, rot = null) {
   if (rot) m.rotation.set(...rot);
   g.add(m);
   return m;
+}
+
+// ---------- 2026-11-07 P2-2：三处建靶的公共记录 / 损伤烟工厂 ----------
+// 16-targets（靶场）、16-town（城镇伏兵）、16-valley（峡谷伏兵）原本各写一份
+// 一模一样的 target 记录与损伤烟 Sprite。抽到这里，保证 hp0 / pos / home /
+// sprite 初值（visible=false、renderOrder=3、opacity=0）不再各自漂移。
+// 场地特有字段走 extra；烟的锚点高度与尺寸仍由各场地按车型给出，数值零变化。
+function makeTargetRecord(group, o, extra) {
+  const mov = o.mov || null;
+  return Object.assign({
+    group, type: o.type, mdl: o.mdl, hp: o.hp, hp0: o.hp, radius: o.radius,
+    label: o.label, mov,
+    pos: group.position.clone(), alive: true,
+    home: { x: group.position.x, z: group.position.z, ry: group.rotation.y, mov },
+  }, extra || {});
+}
+
+function makeDamageSmoke(scene, map, t, y, s0) {
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+    map, transparent: true, depthWrite: false, opacity: 0 }));
+  sp.visible = false;
+  sp.renderOrder = 3;
+  scene.add(sp);
+  return { t, sp, ph: rnd(TAU), y, s0 };
 }
 
 // 装甲靶车：楔形车体 + 侧裙/履带轮 + 炮塔/炮管 + 光电头 + 靶板
@@ -241,7 +266,22 @@ function loadTargetModels(scene, keys) {
 
 // 用 GLB 替换程序化模型：保留原 group 的位置/朝向，清空子节点换壳
 function applyModelToTarget(t, model) {
-  while (t.group.children.length) t.group.remove(t.group.children[0]);
+  // 2026-11-07 P1-5：旧子树的材质是每个靶标独立创建的（程序化兜底走 targetMat()、
+  // 上一次换壳走 material.clone()），被摘掉后无人引用，且这几帧已经上传过 GPU，
+  // 不 dispose 会留下 program / uniform 缓存。几何一律不动：makeTruckTarget 的
+  // 轮胎/轮毂几何在同组内被多个 mesh 共享，GLB 的 clone(true) 更是直接共享
+  // 原始 GLB 几何——误释放会连坐其它同类靶标（noDispose 件同样跳过）。
+  const ownedMats = new Set();
+  while (t.group.children.length) {
+    const c = t.group.children[0];
+    c.traverse(o => {
+      if (!o.isMesh || !o.material || (o.userData && o.userData.noDispose)) return;
+      const ms = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of ms) if (m) ownedMats.add(m);
+    });
+    t.group.remove(c);
+  }
+  for (const m of ownedMats) m.dispose();
   const inst = model.clone(true);
   // 克隆网格材质：防止受击闪光（flashHit）与战损变暗在同类车辆实例间串色
   inst.traverse(c => {
@@ -391,6 +431,9 @@ function mergeTargetStatics(t) {
   let merged = 0;
   for (const [mk, b] of buckets) {
     const mg = mergeGeos(b.geos);
+    // b.geos 全由上面的 m.geometry.clone().applyMatrix4(rel) 新建，无别名；
+    // 单输入原样返回的情况下 disposeMergeInputs 自己会跳过（见 00-utils 契约）。
+    disposeMergeInputs(b.geos, mg);
     if (!mg) continue;                    // 保底：属性集不齐放弃该桶
     for (const n of b.nodes) { if (n.parent) n.parent.remove(n); }
     const m = new THREE.Mesh(mg, mk);

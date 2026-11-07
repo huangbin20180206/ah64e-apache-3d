@@ -151,7 +151,9 @@ class TownDistrict {
     road(0, 0, 35, 2.8);              // 横街（东西）
     road(0, 9.7, 30, 2.2);            // 北巷
     road(0, -9, 3.2, 3);              // 南口：穿过基地北墙门洞
-    const roads = new THREE.Mesh(mergeGeos(roadGeos),
+    const roadGeo = mergeGeos(roadGeos);
+    disposeMergeInputs(roadGeos, roadGeo);   // road() 里逐块 new 的临时平面
+    const roads = new THREE.Mesh(roadGeo,
       new THREE.MeshStandardMaterial({ color: 0x57524a, roughness: 0.95, metalness: 0,
         polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
     roads.receiveShadow = true;
@@ -184,7 +186,9 @@ class TownDistrict {
       }
       // 门（南立面）
       rb(0.7, 1.1, 0.06, -w * 0.18, 0.55, -d / 2 - 0.02);
-      const roof = new THREE.Mesh(mergeGeos(rg), roofMat);
+      const roofGeo = mergeGeos(rg);
+      disposeMergeInputs(rg, roofGeo);   // rb()/tk 均为本次 new 的临时几何
+      const roof = new THREE.Mesh(roofGeo, roofMat);
       roof.castShadow = true; roof.receiveShadow = true;
       bg.add(roof);
       g.add(bg);
@@ -219,12 +223,9 @@ class TownDistrict {
       this.scene.add(group);
       const mov = peek ? { kind: 'peek', hx: C.x + hx, hz: C.z + hz, ox: C.x + ox, oz: C.z + oz,
         st: 'hide', t: 0, v: 2.4 } : null;
-      const t = {
-        group, type, mdl, hp, hp0: hp, radius, label: '城镇伏兵·' + (mdl ? VARIANT_LABEL[mdl] : label), mov,
-        pos: group.position.clone(), alive: true, town: true, cover,
-        hidden: true, _peekOut: false,
-        home: { x: group.position.x, z: group.position.z, ry: group.rotation.y, mov },
-      };
+      const t = makeTargetRecord(group, {
+        type, mdl, hp, radius, label: '城镇伏兵·' + (mdl ? VARIANT_LABEL[mdl] : label), mov,
+      }, { town: true, cover, hidden: true, _peekOut: false });
       mergeTargetStatics(t);
       this.ambush.push(t);
     }
@@ -233,13 +234,9 @@ class TownDistrict {
       for (const t of this.ambush) if (models[targetModelKey(t)]) applyModelToTarget(t, models[targetModelKey(t)]);
     });
     // 损伤烟：与 range 同款 sprite（range._tgtSmokes 每帧纯派生，激活时挂入）
-    this._smokes = this.ambush.map(t => {
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: this.range._dmgSmoke.material.map, transparent: true, depthWrite: false, opacity: 0 }));
-      sp.visible = false; sp.renderOrder = 3;
-      this.scene.add(sp);
-      return { t, sp, ph: rnd(TAU), y: t.type === 'tank' ? 2.05 : 1.55, s0: t.type === 'tank' ? 3.0 : 2.4 };
-    });
+    this._smokes = this.ambush.map(t => makeDamageSmoke(this.scene,
+      this.range._dmgSmoke.material.map, t,
+      t.type === 'tank' ? 2.05 : 1.55, t.type === 'tank' ? 3.0 : 2.4));
   }
 
   // 开关城镇：伏兵挂入/摘出 range.targets（aliveCount/totalCount/命中/SAM 站点自动跟随）
@@ -353,7 +350,9 @@ class TownDistrict {
       bx.translate(b.x + rx, Math.max(0.1, (1 - edge) * Math.min(1.4, b.h * 0.32)) + rnd() * 0.15, b.z + rz);
       geos.push(bx);
     }
-    const rubble = new THREE.Mesh(mergeGeos(geos), targetMat(0x8f8270, 0.98, 0.02));
+    const rubbleGeo = mergeGeos(geos);
+    disposeMergeInputs(geos, rubbleGeo);   // 逐块 new 的 BoxGeometry
+    const rubble = new THREE.Mesh(rubbleGeo, targetMat(0x8f8270, 0.98, 0.02));
     rubble.castShadow = false; rubble.receiveShadow = true;
     this.scene.add(rubble);
     b.rubble = rubble;

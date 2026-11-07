@@ -200,6 +200,8 @@ function vcKit() {
       g.translate(0, 0, -depth / 2);
       return add(g, col, x, y, z, rx, ry, rz);
     },
+    // 不在这里 dispose list：K.list 也对外暴露（48-rescue 直接 mergeGeos(kb.list)），
+    // 由调用方按所有权决定何时释放。
     build: () => { const g = mergeGeos(list); return g; },
   };
 }
@@ -212,9 +214,17 @@ const fmtK = n => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : Str
 // ---------- 静态几何合并（draw call 合批；PERF-AUDIT C1/C2 的工具底座） ----------
 // 把同一 attribute 集的静态几何拼成一个 BufferGeometry（烘焙的局部矩阵已由
 // 调用方 applyMatrix4 进顶点）。vendor 的 BufferGeometryUtils 被内联进
-// loader IIFE 是局部符号，app 侧不可达——这里是专用轻量版，只做拼接不做
+// loader IIFE 是局部符号，app 侧不可达——这里是专用轻量版只做拼接不做
 // 属性运算；attribute 集不一致 / index 有无不一致时返回 null，调用方保底
 // 放弃合并（任何失败路径都退回"不合并"——几何零丢失）。
+//
+// 【所有权契约 · 2026-11-07】mergeGeos 不接管入参：
+//   · list.length >= 2 且合并成功 → 返回全新 BufferGeometry，入参无人接手；
+//   · list.length === 1           → 原样返回 list[0]（仍是入参自己，正在被渲染）；
+//   · 返回 null                   → 入参没被消费，也没人接手。
+// 因此「合并后 dispose 入参」必须走 disposeMergeInputs()，由它挡住第二种情况；
+// 且调用方必须保证入参是本次新建的临时 clone，绝不能是共享几何（GLB clone(true)
+// 共享 geometry、makeTruckTarget 的轮胎几何在同组内共享，都不许传进来）。
 function mergeGeos(list) {
   if (!list || list.length === 0) return null;
   if (list.length === 1) return list[0];
@@ -270,4 +280,14 @@ function mergeGeos(list) {
   out.computeBoundingSphere();
   out.computeBoundingBox();
   return out;
+}
+
+// 合并完成后释放临时输入几何（见上方所有权契约）。
+// merged === list[0] 表示 mergeGeos 走了「单输入原样返回」分支，返回值就是入参、
+// 正在场景里被渲染 —— 必须原样留着。merged === null / 全新的 out 时入参无人
+// 接手，全部释放。调用前请确认 list 全为本次新建、无别名的临时几何。
+function disposeMergeInputs(list, merged) {
+  if (!list || !list.length) return;
+  if (merged === list[0]) return;
+  for (const g of list) if (g && g.dispose) g.dispose();
 }

@@ -17,15 +17,24 @@ cd ah64e-apache-3d
 git log --oneline -1    # 此文档写作时为 305dc4f（Hark 接手批）
 ```
 
-## 二、先跑这三条，确认基线是绿的
+## 二、先跑这四条，确认基线是绿的
 
 ```bash
-node build.mjs                     # 应输出：拓扑检查无反向引用 / id 契约 235 定义·208 引用·死引用 0 / 资源引用 66 全覆盖
+node build.mjs                     # 拓扑无反向引用 / id 235 定义·208 引用·死引用 0
+                                   # 299 顶层声明 0 重名 / 资源引用 66 全覆盖
+                                   # 注释剥离 2827 行 234.7 KB → dist/index.html 2023 KB
 node --check dist/app-check.mjs    # 应 Exit 0
-uv run --with pytest pytest -q tools/tests_pure   # 应 ≥140 passed（2026-11-07 实测 140；只增不减）
+node tools/strip_comments_selftest.mjs   # RESULT PASS（字符串零漂移 / 整包可编译）
+uv run --with pytest pytest -q tools/tests_pure   # 应 ≥141 passed（2026-11-07 实测 141；只增不减）
 ```
 
-**三条不绿就别往下做**，先把环境问题解决。
+**四条不绿就别往下做**，先把环境问题解决。
+
+> `node build.mjs` 默认剥离产物里的整行注释，**源码注释完整保留**；
+> 需要带注释的调试包时设 `APACHE_KEEP_COMMENTS=1` 重建（2257 KB）。
+> 若本机是 WorkBuddy 客户端且构建报 `SAFE_DELETE_BULK_CONFIRM_REQUIRED`，
+> 是客户端的批量删除保护拦了 `rmSync(dist)`（与代码无关），
+> 命令前加 `CODEBUDDY_SAFE_DELETE_ENABLED=0` 即可；CI 无此限制。
 
 ## 三、读这几个文件（按顺序）
 

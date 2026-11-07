@@ -45,6 +45,17 @@ def test_mismatch_fallbacks():
     assert out["okPair"] is True
 
 
+def test_dispose_ownership_contract():
+    """P1-5：单输入原样返回时绝不释放入参；合并成功/失败时入参全部释放。"""
+    out = drive("dispose_ownership")
+    assert out["singleKept"] is True          # mergeGeos 返回 list[0]，仍在渲染
+    assert out["pairDisposed"] is True        # 合并成功 → 全新 out，入参无人接手
+    assert out["failDisposed"] is True        # 合并失败 null → 入参没人接手
+    assert out["okIsNew"] is True
+    assert out["failIsNull"] is True
+    assert out["guardsNoThrow"] is True       # null / 空数组不抛错
+
+
 def test_merge4_multi_base_accumulation():
     """四块拼接：基址逐块累加；跨块顶点位置正确。"""
     out = drive("merge4")

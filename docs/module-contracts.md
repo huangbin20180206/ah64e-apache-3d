@@ -24,6 +24,7 @@
    "clamp",
    "countScene",
    "damp",
+   "disposeMergeInputs",
    "disposeObject3D",
    "easeInOut",
    "easeOut",
@@ -186,6 +187,10 @@
    "aimTurret",
    "applyModelToTarget",
    "loadTargetModels",
+   "makeDamageSmoke",
+
+   "makeTargetRecord",
+
    "makeWreck",
    "mergeTargetStatics",
    "pickVariant",
@@ -199,6 +204,8 @@
    "00-utils.js": [
     "PI",
     "TAU",
+    "disposeMergeInputs",
+
     "mergeGeos",
     "rnd"
    ]
@@ -217,6 +224,8 @@
    "00-utils.js": [
     "PI",
     "TAU",
+    "disposeMergeInputs",
+
     "mergeGeos"
    ],
    "16-targetmodels.js": [
@@ -252,6 +261,10 @@
     "applyModelToTarget",
     "loadTargetModels",
     "makeWreck",
+    "makeDamageSmoke",
+
+    "makeTargetRecord",
+
     "mergeTargetStatics",
     "pickVariant",
     "targetModelKey",
@@ -274,6 +287,8 @@
    "00-utils.js": [
     "PI",
     "disposeObject3D",
+    "disposeMergeInputs",
+
     "mergeGeos",
     "vcKit",
     "vcMat"
@@ -305,6 +320,8 @@
     "PI",
     "TAU",
     "disposeObject3D",
+    "disposeMergeInputs",
+
     "mergeGeos",
     "rnd"
    ],
@@ -317,6 +334,10 @@
     "VARIANT_LABEL",
     "applyModelToTarget",
     "loadTargetModels",
+    "makeDamageSmoke",
+
+    "makeTargetRecord",
+
     "mergeTargetStatics",
     "pickVariant",
     "targetMat",
@@ -355,6 +376,8 @@
     "PI",
     "TAU",
     "disposeObject3D",
+    "disposeMergeInputs",
+
     "mergeGeos",
     "rnd",
     "smoothstep"
@@ -365,6 +388,10 @@
     "VARIANT_LABEL",
     "applyModelToTarget",
     "loadTargetModels",
+    "makeDamageSmoke",
+
+    "makeTargetRecord",
+
     "mergeTargetStatics",
     "pickVariant",
     "targetMat",
@@ -408,6 +435,8 @@
   ],
   "depends": {
    "00-utils.js": [
+    "disposeMergeInputs",
+
     "mergeGeos"
    ],
    "05-config.js": [
@@ -504,6 +533,8 @@
     "TAU",
     "canvas2d",
     "disposeObject3D",
+    "disposeMergeInputs",
+
     "mergeGeos",
     "rnd",
     "tex"
@@ -833,6 +864,8 @@
    "00-utils.js": [
     "PI",
     "clamp",
+    "disposeMergeInputs",
+
     "mergeGeos"
    ],
    "05-config.js": [

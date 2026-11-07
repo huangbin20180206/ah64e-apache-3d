@@ -146,7 +146,11 @@ function _fixPalm(root) {
       parts.push(c);
     }
     const m = mergeGeos(parts);   // 保持原有索引/属性一致（后面 mergeTargetStatics 要求与树干同构）
+    // 注意：parts[0] 是 o.geometry 本身（仍在用），parts[1..] 是 clone —— 入参不是
+    // 「全为临时几何」，这里绝不能调 disposeMergeInputs（见 00-utils 所有权契约）。
+    // 但合并失败时 parts[0] 仍挂在 o 上，两个 clone 彻底无人接手，单独释放。
     if (m) o.geometry = m;
+    else for (const c of parts.slice(1)) c.dispose();
   });
 }
 
@@ -172,6 +176,7 @@ function _crashSite(parent, x, z, ry, def) {
     geos.push(bg);
   }
   const mg = geos.length ? mergeGeos(geos) : null;
+  disposeMergeInputs(geos, mg);   // geos 全为本次 new 的 BoxGeometry，无别名
   if (mg) { const m = new THREE.Mesh(mg, _debrisMat); m.castShadow = m.receiveShadow = true; parent.add(m); }
 }
 

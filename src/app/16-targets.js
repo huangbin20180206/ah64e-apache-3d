@@ -136,12 +136,10 @@ class TargetRange {
         }
         // 2026-10-18：同类按序号轮换变体壳（16-targetmodels TARGET_VARIANTS；只换外观与名称）
         const mdl = pickVariant(type, si);
-        this.targets.push({
-          group, type, mdl, hp, hp0: hp, radius, label: mdl ? VARIANT_LABEL[mdl] : label, mov,
-          pos: group.position.clone(), alive: true,
-          // B2 警报疏散：初始位姿快照（reset 时疏散车辆归位）
-          home: { x: group.position.x, z: group.position.z, ry: group.rotation.y, mov },
-        });
+        // B2 警报疏散：home 是初始位姿快照（reset 时疏散车辆归位）
+        this.targets.push(makeTargetRecord(group, {
+          type, mdl, hp, radius, label: mdl ? VARIANT_LABEL[mdl] : label, mov,
+        }));
       });
     }
     // PERF-AUDIT C2：程序化兜底态同样合批（GLB 就位换壳时会清空重建再合并，
@@ -164,12 +162,8 @@ class TargetRange {
     const dmgAnchors = { tank: 2.05, truck: 1.55, barrel: 0.75 };
     const dmgScales = { tank: 3.0, truck: 2.4, barrel: 1.6 };
     for (const t of this.targets) {
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: this._dmgSmoke.material.map, transparent: true, depthWrite: false, opacity: 0 }));
-      sp.visible = false;
-      sp.renderOrder = 3;
-      this.scene.add(sp);
-      this._tgtSmokes.push({ t, sp, ph: rnd(TAU), y: dmgAnchors[t.type], s0: dmgScales[t.type] });
+      this._tgtSmokes.push(makeDamageSmoke(this.scene, this._dmgSmoke.material.map,
+        t, dmgAnchors[t.type], dmgScales[t.type]));
     }
   }
 
