@@ -182,7 +182,10 @@ try {
   node tools/check_topology_selftest.mjs
   if ($LASTEXITCODE -ne 0) { throw 'TOPOLOGY CHECKER SELFTEST FAILED' }
   # opt1（2026-10-20）：纯逻辑 pytest 进本地门禁（此前只在 CI 跑，本地门禁零引用——孤儿测试）
-  python -m pytest -q tools/tests_pure
+  # 2026-11-08：本机无系统 `python`（只有 py -3 / uv），裸 python 会让整轮门禁
+  # 在 [1/4] BUILD 段直接 FATAL（0 条浏览器测试都没跑到）。改用 NEXT-STEPS.md
+  # 里同一条 uv 通道；测试集合、断言与失败判定完全不变。
+  uv run --with pytest pytest -q tools/tests_pure
   if ($LASTEXITCODE -ne 0) { throw 'PURE LOGIC TESTS FAILED' }
 } catch {
   Write-Host "FATAL: $_"
