@@ -242,7 +242,9 @@ py -3 tools/tests/test_ci_smoke.py              → RESULT PASS / ERRORS: none
   （含 B4 tour 暂停、P3-7 倒影、P5-C 切场武器/残骸清理等本轮改动面）
 ```
 
-> ⚠️ **71 项有头全量回归仍未跑**，按老黄要求留到最终交付前一次性跑完。
+> ⚠️ **有头全量回归仍未跑**，按老黄要求留到最终交付前一次性跑完。
+> 2026-11-08 补：已跑，权威清单实际为 **93 项**（71 是旧数字），
+> 结果 72/93 PASS，详见第九节 9.3。
 > `main` 与 Pages 未动；本节全部改动推在 `feat-visuals-aerodynamics`。
 >
 > 环境坑：本机 `node build.mjs` 的 `fs.rmSync(dist, {recursive:true})` 会被
@@ -330,3 +332,75 @@ Stage A —— 同一页面 4 轮 × `pad / grass / water / desert` 共 16 次�
    没有遗漏热点，不再为「还有优化」制造零收益改动。
 
 **结论：代码 / 配置优化到此收口**，剩余只有唯一一次全量回归与交付记账。
+
+### 9.3 唯一一次 93 项有头全量回归（2026-11-08 08:53–09:14）
+
+按老黄「全量只在最终交付前跑一次」的约束，本轮只跑了一次**有效**全量
+（之前有一次在 `[1/4] BUILD` 段被本机裸 `python` 卡死，0 条浏览器测试，
+不算一轮；已由 `4127a16` 修好并重跑）。
+
+```
+GATE_EXPECT_SHA = 4127a16539f3449a74923e3aac1098eed53c33ad
+run_id          = 20261108-085332-9255   （耗时 21m26s）
+manifest_tests  = 93   dist_tree_sha256 = 072bef8603...
+evidence        = %TEMP%\apache_pw\20261108-085332\evidence-20261108-085332-9255.json
+BUILD           = 拓扑/id/300 顶层声明/66 资源引用/8-8 拓扑自测/142 passed 全绿
+uv offline cache OK   SERVER READY   post consistency: True
+TOTAL           = 72/93 PASS        GATE_EXIT = 1
+```
+
+**21 项 FAIL 全清单**（按执行序）：
+
+```
+test_edge_cases          test_hover_translation   test_orbit_yaw
+test_mobile              test_visual_materials    test_visual_detail
+test_detail_parts        test_detail_fallback     test_challenge_variants
+test_fixes               test_cinematic           test_narrative
+test_input_passthrough   test_camera_owner        test_arcade
+test_samwar              test_narrative_strike    test_air_superiority
+test_town                test_canyon              test_canyon_fp
+```
+
+**归因（硬证据，不猜）**：
+
+- `git log -S 'activeFlarePos'` 与 `git log -S 'mq1_predator'` **都只指向
+  `6e1b804`**（10-30~11-02 工作树遗留功能合入 + MQ-1 资产），
+  `origin/main = 01d4c97` 上两个符号都不存在。
+  - `test_samwar` 的真实 `pageerror`：`70-combat.js:219` 把 `samwar._flare`
+    赋给 `targets.activeFlarePos`，`16-targets.js:581` 却调 `.clone()` ——
+    类型不符，是本分支既有功能批次的真 bug，不是本轮改动。
+  - `test_orbit_yaw` 只关了 `__dbg.air`，但 `65-weapons.js:595` 的
+    `this.narrative` 分支让 MQ-1 巡逻机参与地狱火锁定竞争，抢走了坦克锁。
+  - `test_narrative` 的「叙事物件未全部入视锥」同属该批新增内容。
+- 记忆里点名的既有遗留 `edge_cases / visual_materials / visual_detail /
+  detail_parts`（D 类真环境超时）与 `narrative_strike` N2 全部在清单里，
+  属于**已知旧账**，不是新退化。
+- 其余多为有头 GPU 下的墙钟时序 / 布局敏感失败：`wait_for_function`
+  15s / 5s 超时、`step_until` 超时、`#sel-quality` 不可见、
+  `tour btn not in top icon row`。项目已有 `H.step_until` 游戏时间步进范式
+  可改造，属下一轮工作。
+- 本轮 `9f594dc` 的内容是**纯搬移拆分 + 公共函数收口 + 部署压缩 +
+  拓扑契约同步**，`4127a16` 只换了一条 pytest 启动命令；
+  `strip_comments_selftest` 证明 79 文件字符串字面量零漂移、整包 V8 可编译。
+  72 项 PASS 已覆盖 HUD / 雷达 / 倒影 / 切场清理 / 武器 / 任务 / 救援 /
+  相机 / 音频 / 画质档等本轮改动面。相对 `origin/main` 累计
+  **90 文件 / +6418 −761、13 个提交**，此前一直被「不跑全量」压着，
+  这次是第一次把积压红灯暴露出来。
+
+**交付判断：不合 `main`、不动 Pages。** 既定规则是「跑绿再决定合 main」，
+72/93 未达标；只把 `9f594dc` + `4127a16` 推到功能分支
+`origin/feat-visuals-aerodynamics`。`post consistency: True` 说明这轮
+evidence 有效、工作树在跑测期间未被改动，结果可信。
+
+**下一轮待修清单**（按优先级，均属既有遗留，非本轮回归）：
+
+1. P0 · `activeFlarePos` 类型 bug —— `samwar._flare` 统一成
+   `THREE.Vector3`（或在 `16-targets.js:581` 加类型守卫），消掉真实 pageerror。
+2. P1 · `test_orbit_yaw` 关 `__dbg.narrative.enabled`（与关 `air` 同思路，
+   断言不变）；`test_edge_cases` 先展开画质面板或用 `evaluate` 派发 change。
+3. P1 · `test_narrative_strike` N2 的 standard res 断言（0.85 vs 1.0）
+   与 `test_narrative` 视锥取样点，需与 6e1b804 的新场景布局对齐。
+4. P2 · 把剩余墙钟 `wait_for_function` 改成 `H.step_until` 游戏时间步进，
+   逐项复验；不要一刀切放宽超时。
+5. 复验方式：用 `APACHE_TEST_ONLY` 只跑这 21 项，**不要重复跑 93 项全量**；
+   全绿后再单独跑一次认证轮决定是否合 main。
