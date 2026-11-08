@@ -17,6 +17,7 @@
   "provides": [
    "DEG",
    "PI",
+   "RAD2DEG",
    "STATS",
    "TAU",
    "_rnd",
@@ -34,6 +35,7 @@
    "heightToNormal",
    "invLerp",
    "lerp",
+   "mergeBucketMeshes",
    "mergeGeos",
    "mulberry32",
    "noiseCanvas",
@@ -67,6 +69,7 @@
    "GROUND_PITCH_COMP",
    "GROUND_Y",
    "GUN",
+   "G_U",
    "MODEL_LIFT",
    "MODEL_MIN_Y",
    "PART_GROUPS",
@@ -76,14 +79,13 @@
    "SPIN_DOWN_SEC",
    "SPIN_UP_SEC",
    "TAIL_RATIO",
-   "WATER_Y",
-   "WIND",
-   "qualityPreset",
-   "windVec",
-   "G_U",
    "U2M",
    "U2M_INV",
-   "applySceneAniso"
+   "WATER_Y",
+   "WIND",
+   "applySceneAniso",
+   "qualityPreset",
+   "windVec"
   ],
   "depends": {
    "00-utils.js": [
@@ -188,9 +190,7 @@
    "applyModelToTarget",
    "loadTargetModels",
    "makeDamageSmoke",
-
    "makeTargetRecord",
-
    "makeWreck",
    "mergeTargetStatics",
    "pickVariant",
@@ -204,9 +204,7 @@
    "00-utils.js": [
     "PI",
     "TAU",
-    "disposeMergeInputs",
-
-    "mergeGeos",
+    "mergeBucketMeshes",
     "rnd"
    ]
   }
@@ -225,7 +223,6 @@
     "PI",
     "TAU",
     "disposeMergeInputs",
-
     "mergeGeos"
    ],
    "16-targetmodels.js": [
@@ -262,9 +259,7 @@
     "loadTargetModels",
     "makeWreck",
     "makeDamageSmoke",
-
     "makeTargetRecord",
-
     "mergeTargetStatics",
     "pickVariant",
     "targetModelKey",
@@ -288,7 +283,6 @@
     "PI",
     "disposeObject3D",
     "disposeMergeInputs",
-
     "mergeGeos",
     "vcKit",
     "vcMat"
@@ -321,7 +315,6 @@
     "TAU",
     "disposeObject3D",
     "disposeMergeInputs",
-
     "mergeGeos",
     "rnd"
    ],
@@ -335,9 +328,7 @@
     "applyModelToTarget",
     "loadTargetModels",
     "makeDamageSmoke",
-
     "makeTargetRecord",
-
     "mergeTargetStatics",
     "pickVariant",
     "targetMat",
@@ -377,7 +368,6 @@
     "TAU",
     "disposeObject3D",
     "disposeMergeInputs",
-
     "mergeGeos",
     "rnd",
     "smoothstep"
@@ -389,9 +379,7 @@
     "applyModelToTarget",
     "loadTargetModels",
     "makeDamageSmoke",
-
     "makeTargetRecord",
-
     "mergeTargetStatics",
     "pickVariant",
     "targetMat",
@@ -435,9 +423,7 @@
   ],
   "depends": {
    "00-utils.js": [
-    "disposeMergeInputs",
-
-    "mergeGeos"
+    "mergeBucketMeshes"
    ],
    "05-config.js": [
     "PART_GROUPS"
@@ -534,7 +520,6 @@
     "canvas2d",
     "disposeObject3D",
     "disposeMergeInputs",
-
     "mergeGeos",
     "rnd",
     "tex"
@@ -829,6 +814,7 @@
     "U2M_INV"
    ],
    "00-utils.js": [
+    "disposeMergeInputs",
     "mergeGeos",
     "vcKit",
     "vcMat"
@@ -865,7 +851,6 @@
     "PI",
     "clamp",
     "disposeMergeInputs",
-
     "mergeGeos"
    ],
    "05-config.js": [
@@ -900,8 +885,7 @@
  },
  "65-weapons.js": {
   "provides": [
-   "WeaponRig",
-   "makeGlowTex"
+   "WeaponRig"
   ],
   "depends": {
    "00-utils.js": [
@@ -925,6 +909,21 @@
    ],
    "16-targetmodels.js": [
     "scorchTexture"
+   ],
+   "64-weapontex.js": [
+    "HF_FWD",
+    "SMOKE_TINT",
+    "_HF_TO",
+    "_SMOKE_C",
+    "_W_AIM",
+    "_W_DIR",
+    "_W_MZL",
+    "_W_SPREAD",
+    "_W_TO",
+    "_W_TUR",
+    "_W_TUR2",
+    "makeGlowTex",
+    "makeSmokeTex"
    ]
   }
  },
@@ -1336,15 +1335,15 @@
    "70-labels.js": [
     "updateLabels"
    ],
-   "70-mission.js": [
-    "_tickMission",
-    "_tickMissionMaps"
-   ],
    "70-nightops.js": [
     "_tickNightOps"
    ],
    "70-radio.js": [
     "radioTick"
+   ],
+   "70-missiontick.js": [
+    "_tickMission",
+    "_tickMissionMaps"
    ]
   }
  },
@@ -1353,8 +1352,10 @@
    "MISSION_VARIANTS",
    "TRAIN_NUM",
    "TRAIN_STEPS",
-   "_tickMission",
-   "_tickMissionMaps",
+   "_airSupAnchor",
+   "_airWaveCleared",
+   "_tickFinale",
+   "_tickLevelThreat",
    "applyVariantAmmo",
    "beginMission",
    "completeMission",
@@ -1376,7 +1377,8 @@
    "trainAdvance",
    "trainFinish",
    "trainToastMs",
-   "updateMissionPanel"
+   "updateMissionPanel",
+   "variantGoalMet"
   ],
   "depends": {
    "01-host.js": [
@@ -1835,9 +1837,9 @@
  },
  "74-tour.js": {
   "provides": [
+   "cineChrome",
    "clickEnv",
    "clickTerrain",
-   "cineChrome",
    "syncTourCtl",
    "tour",
    "tourCap",
@@ -2007,6 +2009,26 @@
    ]
   }
  },
+ "81-cutscene-tour.js": {
+  "provides": [
+   "buildMissionTour"
+  ],
+  "depends": {
+   "01-host.js": [
+    "HOST"
+   ],
+   "05-config.js": [
+    "BASE_C"
+   ],
+   "70-app.js": [
+    "S",
+    "air",
+    "enemyAir",
+    "rescue",
+    "targets"
+   ]
+  }
+ },
  "81-narrative.js": {
   "provides": [
    "NarrativeFX"
@@ -2033,6 +2055,9 @@
    "cutscene"
   ],
   "depends": {
+   "81-cutscene-tour.js": [
+    "buildMissionTour"
+   ],
    "00-utils.js": [
     "clamp",
     "easeInOut",
@@ -2217,6 +2242,89 @@
   "depends": {
    "01-host.js": [
     "HOST"
+   ]
+  }
+ },
+ "70-missiontick.js": {
+  "provides": [
+   "_tickMission",
+   "_tickMissionMaps"
+  ],
+  "depends": {
+   "70-mission.js": [
+    "MISSION_VARIANTS",
+    "_airSupAnchor",
+    "_airWaveCleared",
+    "_tickFinale",
+    "_tickLevelThreat",
+    "beginMission",
+    "completeMission",
+    "failMission",
+    "missionTimeout",
+    "showMissionBriefing",
+    "trainAdvance",
+    "trainFinish",
+    "updateMissionPanel",
+    "variantGoalMet"
+   ],
+   "70-app.js": [
+    "S",
+    "W",
+    "air",
+    "apache",
+    "arcade",
+    "course",
+    "enemyAir",
+    "fp",
+    "infantry",
+    "narrative",
+    "rescue",
+    "resources",
+    "rig",
+    "targets",
+    "updateTargetHUD"
+   ],
+   "47-betty.js": [
+    "betty"
+   ],
+   "16-valley.js": [
+    "CANYON_HOVER"
+   ],
+   "45-flight.js": [
+    "FLY"
+   ],
+   "01-host.js": [
+    "HOST",
+    "UI",
+    "toast"
+   ],
+   "70-radio.js": [
+    "radioSay"
+   ]
+  }
+ },
+ "64-weapontex.js": {
+  "provides": [
+   "HF_FWD",
+   "SMOKE_TINT",
+   "_HF_TO",
+   "_SMOKE_C",
+   "_W_AIM",
+   "_W_DIR",
+   "_W_MZL",
+   "_W_SPREAD",
+   "_W_TO",
+   "_W_TUR",
+   "_W_TUR2",
+   "makeGlowTex",
+   "makeSmokeTex"
+  ],
+  "depends": {
+   "00-utils.js": [
+    "TAU",
+    "canvas2d",
+    "mulberry32",
+    "tex"
    ]
   }
  }

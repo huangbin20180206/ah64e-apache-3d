@@ -291,3 +291,29 @@ function disposeMergeInputs(list, merged) {
   if (merged === list[0]) return;
   for (const g of list) if (g && g.dispose) g.dispose();
 }
+
+// ---------- 静态合批的公共收口（2026-11-08 P2-2）----------
+// 16-targetmodels（靶标按材质合批）与 19-reflect（倒影按 attribute 签名合批）
+// 原本各写一遍「mergeGeos → 释放临时几何 → 摘原节点 → 新建 Mesh」。
+// 收口到这里，所有权只在 disposeMergeInputs 里判断一次，避免某处漏释放或
+// 误释放共享几何。bucket 形如 { geos: BufferGeometry[], nodes: Object3D[] }。
+//   opts.material : 材质实例，或 (key, bucket) => 材质
+//   opts.parent   : Object3D，或 (key, bucket) => Object3D
+//   opts.onMesh   : 可选 (mesh, key, bucket) => void，设置阴影 / noMerge 等标志
+// 返回 [{ key, mesh }]；mergeGeos 返回 null 的桶整体跳过（几何零丢失）。
+function mergeBucketMeshes(buckets, opts) {
+  const out = [];
+  for (const [key, b] of buckets) {
+    const mg = mergeGeos(b.geos);
+    disposeMergeInputs(b.geos, mg);
+    if (!mg) continue;
+    for (const n of b.nodes) if (n.parent) n.parent.remove(n);
+    const mat = typeof opts.material === 'function' ? opts.material(key, b) : opts.material;
+    const mesh = new THREE.Mesh(mg, mat);
+    if (opts.onMesh) opts.onMesh(mesh, key, b);
+    const par = typeof opts.parent === 'function' ? opts.parent(key, b) : opts.parent;
+    par.add(mesh);
+    out.push({ key, mesh });
+  }
+  return out;
+}

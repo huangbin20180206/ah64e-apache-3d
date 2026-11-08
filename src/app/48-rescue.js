@@ -44,7 +44,9 @@ class Rescue {
     kb.box(0.2, 0.06, 0.05, VISOR, 0, 1.71, 0.115);                     // 护目镜
     const mat = vcMat(0.85, 0.05);
     const fig = new THREE.Group();
-    this._proc = new THREE.Mesh(mergeGeos(kb.list), mat);
+    const _procGeo = mergeGeos(kb.list);
+    disposeMergeInputs(kb.list, _procGeo);   // vcKit 的 list 全为本次新建、无别名
+    this._proc = new THREE.Mesh(_procGeo, mat);
     fig.add(this._proc);
     // 手臂：枢轴在肩部，零件沿 -Y 下垂
     const arm = (sx) => {
@@ -55,7 +57,9 @@ class Rescue {
       ka.sph(0.052, GLOVE, 0, -0.62, 0);
       const pv = new THREE.Group();
       pv.position.set(sx * 0.235, 1.5, 0);
-      pv.add(new THREE.Mesh(mergeGeos(ka.list), mat));
+      const _armGeo = mergeGeos(ka.list);
+      disposeMergeInputs(ka.list, _armGeo);
+      pv.add(new THREE.Mesh(_armGeo, mat));
       fig.add(pv);
       return pv;
     };
@@ -70,7 +74,9 @@ class Rescue {
     ks.add(new THREE.TubeGeometry(stc, 48, 0.035, 6, true), 0xf0a020);
     ks.add(new THREE.TorusGeometry(0.035, 0.008, 5, 10), 0x9a9ea2, SV[0], SV[1], SV[2]);
     ks.box(0.42, 0.04, 0.02, 0x2e2e2a, 0, 1.3, 0.18);                  // 胸前收紧带
-    this.strap = new THREE.Mesh(mergeGeos(ks.list), mat);
+    const _strapGeo = mergeGeos(ks.list);
+    disposeMergeInputs(ks.list, _strapGeo);
+    this.strap = new THREE.Mesh(_strapGeo, mat);
     this.strap.visible = false;
     fig.add(this.strap);
     fig.scale.setScalar(U2M_INV);
@@ -88,7 +94,9 @@ class Rescue {
       0.034, 0xb9bdc1, 0, -0.26, 0);                                    // 锻钩
     kh.box(0.012, 0.075, 0.02, 0xc9cdd1, -0.038, -0.35, 0, 0, 0, -0.5); // 锁舌
     kh.box(0.02, 0.02, 0.012, 0xf2c419, 0.005, -0.3, 0.022);            // 黄色解锁钮
-    this._hookMesh = new THREE.Mesh(mergeGeos(kh.list), vcMat(0.35, 0.6));
+    const _hookGeo = mergeGeos(kh.list);
+    disposeMergeInputs(kh.list, _hookGeo);
+    this._hookMesh = new THREE.Mesh(_hookGeo, vcMat(0.35, 0.6));
     this._hookMesh.scale.setScalar(U2M_INV);
     this.HOOK_H = HK * U2M_INV;
     this.SV = SV.map(v => v * U2M_INV);                                    // V 形环（u，人物本地）

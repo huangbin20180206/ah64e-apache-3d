@@ -428,21 +428,16 @@ function mergeTargetStatics(t) {
     b.geos.push(geo);
     b.nodes.push(m);
   });
-  let merged = 0;
-  for (const [mk, b] of buckets) {
-    const mg = mergeGeos(b.geos);
-    // b.geos 全由上面的 m.geometry.clone().applyMatrix4(rel) 新建，无别名；
-    // 单输入原样返回的情况下 disposeMergeInputs 自己会跳过（见 00-utils 契约）。
-    disposeMergeInputs(b.geos, mg);
-    if (!mg) continue;                    // 保底：属性集不齐放弃该桶
-    for (const n of b.nodes) { if (n.parent) n.parent.remove(n); }
-    const m = new THREE.Mesh(mg, mk);
-    m.castShadow = true; m.receiveShadow = true;
-    m.userData.noMerge = true;             // 防重复合并（重复调用幂等）
-    g.add(m);
-    merged++;
-  }
-  return merged;
+  // b.geos 全由上面的 clone().applyMatrix4(rel) 新建、无别名；收口函数内部
+  // 统一做合并 / 释放 / 摘节点 / 重建（所有权见 00-utils 契约）。
+  return mergeBucketMeshes(buckets, {
+    material: mk => mk,
+    parent: g,
+    onMesh: m => {
+      m.castShadow = true; m.receiveShadow = true;
+      m.userData.noMerge = true;           // 防重复合并（重复调用幂等）
+    },
+  }).length;
 }
 
 // ---------- P5-G1 真实残骸（2026-10-16）----------

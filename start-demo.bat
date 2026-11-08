@@ -41,5 +41,8 @@ rem 避免"2 秒后开浏览器但服务还没起来"的 404/连接失败（P15-
 rem curl --noproxy *：本机 VPN 代理会拦 localhost（历史教训）。
 start "" /b cmd /c "for /L %%i in (1,1,30) do @(curl.exe -s --noproxy * -o NUL http://localhost:8642/index.html >nul 2>&1 && (start "" http://localhost:8642 & exit /b 0) || timeout /t 1 >nul)"
 
-%PY% -m http.server 8642 --directory dist
+rem 2026-11-08 P2-1 选项 A：改用 tools/serve_dist.py，按 Accept-Encoding
+rem 动态 gzip / brotli 传输内联 HTML（与线上 GitHub Pages CDN 的行为一致）。
+rem 二进制资源（GLB/JPG/WebP/MP3）已各自压过，服务会原样透传不重复压。
+%PY% tools\serve_dist.py --port 8642 --root dist
 pause

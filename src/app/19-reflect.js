@@ -146,16 +146,15 @@ class WaterReflection {
         b.geos.push(geo);
         b.nodes.push(d);
       }
-      for (const b of buckets.values()) {
-        const mg = mergeGeos(b.geos);
-        disposeMergeInputs(b.geos, mg);             // 全为 clone 出来的临时几何
-        if (!mg) continue;                          // 保底：属性集不齐放弃该桶
-        for (const n of b.nodes) { if (n.parent) n.parent.remove(n); }
-        const m = new THREE.Mesh(mg, this.mat);
-        m.castShadow = false; m.receiveShadow = false;
-        this.pivot.add(m);
-        this._mergedMeshes.push(m);
-      }
+      // 与靶标合批共用 00-utils 的收口函数：合并 / 释放临时几何 / 摘节点 / 重建一次做完
+      mergeBucketMeshes(buckets, {
+        material: this.mat,
+        parent: this.pivot,
+        onMesh: m => {
+          m.castShadow = false; m.receiveShadow = false;
+          this._mergedMeshes.push(m);
+        },
+      });
     }
   }
 

@@ -21,12 +21,13 @@ const THREE = {
     computeBoundingBox() {}
     dispose() { this._disposed = (this._disposed || 0) + 1; }
   },
+  Mesh: class { constructor(g, m) { this.geometry = g; this.material = m; this.userData = {}; } },
 };
 
 const SRC = fs.readFileSync(
   path.join(__dirname, '..', '..', 'src', 'app', '00-utils.js'), 'utf8');
-const { mergeGeos, disposeMergeInputs } = new Function(
-  'THREE', SRC + '\n;return { mergeGeos, disposeMergeInputs };')(THREE);
+const { mergeGeos, disposeMergeInputs, mergeBucketMeshes } = new Function(
+  'THREE', SRC + '\n;return { mergeGeos, disposeMergeInputs, mergeBucketMeshes };')(THREE);
 
 // 造一个最小几何：n 顶点 position/normal + index
 function mkGeo(n, idx, off) {
@@ -107,6 +108,40 @@ const CASES = {
       okIsNew: ok !== a && ok !== b,
       failIsNull: fail === null,
       guardsNoThrow: true,
+    };
+  },
+
+  // 2026-11-08 P2-2：静态合批收口函数。成功桶建 mesh + 摘节点 + 释放临时几何；
+  // 单输入桶的几何仍在用、不得释放；失败桶整体跳过且原节点一个都不能摘。
+  merge_buckets() {
+    const added = [];
+    const parent = { add: m => added.push(m), remove: n => { n.removed = true; } };
+    const nd = () => ({ parent, removed: false });
+    const a = mkGeo(3, [0, 1, 2], 0), b = mkGeo(3, [0, 2, 1], 1);
+    const n1 = nd(), n2 = nd();
+    const one = mkGeo(3, [0, 1, 2], 2), n3 = nd();
+    const bad1 = mkGeo(3, [0, 1, 2], 3), bad2 = new THREE.BufferGeometry();
+    const n4 = nd(), n5 = nd();
+    const buckets = new Map([
+      ['ok', { geos: [a, b], nodes: [n1, n2] }],
+      ['single', { geos: [one], nodes: [n3] }],
+      ['bad', { geos: [bad1, bad2], nodes: [n4, n5] }],
+    ]);
+    const out = mergeBucketMeshes(buckets, {
+      material: k => 'MAT_' + k,
+      parent,
+      onMesh: m => { m.castShadow = true; },
+    });
+    return {
+      count: out.length,
+      badSkipped: !out.some(x => x.key === 'bad'),
+      badNodesKept: !n4.removed && !n5.removed,
+      okNodesRemoved: n1.removed && n2.removed,
+      singleNotDisposed: one._disposed === undefined,
+      pairDisposed: a._disposed === 1 && b._disposed === 1,
+      materialByKey: out[0] && out[0].mesh.material === 'MAT_ok',
+      onMeshApplied: out[0] && out[0].mesh.castShadow === true,
+      parentAdded: added.length === 2,
     };
   },
 

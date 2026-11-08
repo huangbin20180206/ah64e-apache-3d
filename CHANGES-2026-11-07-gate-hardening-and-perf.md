@@ -176,6 +176,8 @@ dist/index.html 2254 KB，bundle sha256=c27c5690…
 > 诚实标注：这些临时几何从未上传 GPU，`dispose()` 主要是**契约显式化与峰值内存**，
 > 不是 GPU 显存回收；原计划要求的 `renderer.info.memory` 反复换场实测
 > **本轮未做**（需有头 GPU 全量，按约束留到最终交付前）。
+>
+> 2026-11-08 补：该欠账已在第九节 9.1 完成实测并销账。
 
 ### 8.2 P2-1 · 构建期安全瘦身：2257 KB → 2023 KB
 
@@ -247,3 +249,84 @@ py -3 tools/tests/test_ci_smoke.py              → RESULT PASS / ERRORS: none
 > WorkBuddy 的 `node-safe-delete-shim` 以「一次删 120 个文件 > 阈值 50」拦下
 > （`SAFE_DELETE_BULK_CONFIRM_REQUIRED`，与代码无关）。本轮构建命令统一加
 > `CODEBUDDY_SAFE_DELETE_ENABLED=0` 前缀；CI 无此 shim，不受影响。
+
+---
+
+## 九、收尾复核（2026-11-08）：GPU 显存实测 / 拆分覆盖度 / 交付
+
+### 9.1 P1-5 销账 · `renderer.info.memory` 反复换场实测
+
+第八节留下的「GPU 显存实测本轮未做」在此销账。探针
+`scratch/probe_gpu_mem_v2.py`（一次性脚本，不入库）：无头 Chromium +
+`?nocine=1&nocut=1`；`settle()` 先预热到异步资产加载稳定，再用
+`__dbg.step()` 推进逻辑帧 + 显式 `composer.render()` 强制一帧真实上传
+（`__dbg.step` 走 `_frame(dt, false)` 不含渲染，而 `WebGLInfo.memory`
+只在几何 / 贴图实际上传时计数），随后读
+`renderer.info.memory.geometries / textures` 并遍历 `W.scene` 统计
+live geometry / material / texture / 对象数与对象类型分布。
+
+Stage A —— 同一页面 4 轮 × `pad / grass / water / desert` 共 16 次换场：
+
+| 场地 | 首轮 gpuGeom / gpuTex | 稳定值 | r1 → r3 增量 |
+|---|---|---|---|
+| pad | 129 / 29 | 153 / 40 | 0 / 0 |
+| grass | 133 / 35 | 153 / 40 | 0 / 0 |
+| water | 151 / 37 | 153 / 40 | 0 / 0 |
+| desert | 153 / 40 | 153 / 40 | 0 / 0 |
+
+- 首轮 **+24 geo / +11 tex** 是 `30-world.js::setTerrain()` 首次为每种场地
+  生成并缓存 `terrainMaps`（含 `farTex` / `farNormal` clone）的一次性成本；
+  **其后 12 次换场零增长**。
+- 场景图对象数 **1813**、独立几何 **713**、独立材质与贴图计数在 16 次换场中
+  逐位不变，对象类型分类增量 `none` → `disposeMergeInputs()` 与
+  `mergeBucketMeshes()` 既没误摘仍在渲染的节点，也没留下临时几何。
+  若真有「dispose 了仍在用的共享几何」，下一次 render 会重新上传并让
+  `gpuGeom` 反复跳动，实测完全锁死即反证。
+- Stage B —— 三次**全新 page** 的 boot 基线逐位一致：
+  `gpuGeom=129 / gpuTex=29 / objs=1813`，说明 boot 期整条合批 / dispose 链
+  是确定性的。`composer.render` 全程 `rendered=true`，
+  `console.error` / `pageerror` 零。
+- 判据：以 round1（贴图缓存完成后）为基线 `gpuGeom / gpuTex` 不得增长 +
+  三次 fresh boot 偏差 ≤2 + 零真实错误 → **`RESULT PASS`**。
+
+> 探针局限（不隐瞒）：`settle()` 的严格阈值「连续 3 次四项计数完全一致」
+> 在 12 次预热采样里未达成（游戏运行时对象池 / 动态贴图仍有微抖动），
+> 但取到的快照在后续 16 次换场中逐位不变，基线已稳定；硬判据只取
+> `renderer.info.memory`，不依赖 `settle` 是否返回 True。
+>
+> v1 探针曾报 `objs` 从 1231 涨到 1350、且「重载」后计数与上一页完全相同。
+> v2 改用全新 page（避开同 URL 导航的页面状态复用）+ 预热后复测，两项异常
+> 全部消失：v1 的增长是**采样发生在资产尚未挂载完毕期间**，「重载」也不是
+> 新文档。保留这段记录，避免把未稳定基线误判成显存泄漏、或下个 AI 去
+> 「修」一个不存在的 bug。原始输出：
+> `scratch/gpu_mem_run_v2.log` / `scratch/gpu_mem_report_v2.json`。
+
+### 9.2 拆分与合批覆盖度复核（任务 #14 / #15 销账）
+
+| 项 | 实际落地 | 结论 |
+|---|---|---|
+| `mergeBucketMeshes()` 公共收口 | `16-targetmodels.js::mergeTargetStatics()` + `19-reflect.js` | 已落地 |
+| `60-model.js` shadow proxy 合批 | 未收口，保留独立实现（已接 `disposeMergeInputs()`） | 见理由 2 |
+| `82-cutscene.js` | 1112 → 716 行，拆出 `81-cutscene-tour.js` 408 行（`buildMissionTour()` 清单） | 已落地 |
+| `70-mission.js` | 1138 → 909 行，拆出 `70-missiontick.js` 239 行（帧逻辑） | 已落地 |
+| `65-weapons.js` | 1111 → 1067 行，只拆出 `64-weapontex.js` 56 行（贴图工厂 + 常量） | 见理由 1 |
+
+**明确不继续拆 / 不强行收口的三条理由**（写死，避免被当成欠账）：
+
+1. `65-weapons.js` 是**单个内聚的 `class WeaponRig` 状态机**：22 个方法全部
+   依赖 `this`（`constructor` 176 行、`update` 319 行）。本项目构建把
+   `src/app/*.js` 按数字前缀拼进**同一个 IIFE**，class 体无法跨文件续写；
+   硬拆只能改成后续文件里 `Object.assign(WeaponRig.prototype, {...})`
+   外挂补丁，一个类变成「定义 + 补丁」两段、引入顶层求值顺序依赖，
+   可读性下降且拓扑契约多一层耦合。它不同于 `82-cutscene.js` 那种
+   「导览清单 + 状态机 + 运镜」的混杂文件，拆了没有收益。
+2. `60-model.js` 的 shadow proxy 合批带 `drawRange` / `onBeforeShadow` /
+   `onAfterShadow` 特殊语义，早退分支还要按桶释放临时几何。硬套
+   `mergeBucketMeshes()` 会给公共抽象背上只有一处用到的钩子参数，
+   公共代码反而更复杂。
+3. 全量扫过 `7*.js` 的每帧 DOM 裸写：`70-hud.js::_tickHud()` 已有
+   「RPM 变化才刷 / fps 0.5s 节流 / dataset 值比较」，
+   `70-labels.js::updateLabels()` 已有 Phase 19 的量化缓存。P1 写缓存
+   没有遗漏热点，不再为「还有优化」制造零收益改动。
+
+**结论：代码 / 配置优化到此收口**，剩余只有唯一一次全量回归与交付记账。

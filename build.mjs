@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import zlib from 'node:zlib';
 import { execSync } from 'node:child_process';
 import { assertDomIds } from './tools/check_dom_ids.mjs';
 import { assertTopology } from './tools/check_topology.mjs';
@@ -318,3 +319,16 @@ console.log('  three          ' + kb(Buffer.byteLength(three.js)));
 console.log('  loader         ' + kb(Buffer.byteLength(loaderJs)) + '（解构 ' + needs.length + ' 个符号）');
 console.log('  app            ' + kb(Buffer.byteLength(appJs)));
 console.log('dist/assets/     apache_v2.glb + skin_army.jpg + targets/' + _tgtN + ' glb + details/' + _detN + ' glb + audio/' + _audioN + ' wav + sfx/' + _sfxN + ' mp3 + radio/' + _radioN + ' mp3 + scenery/trees.webp');
+
+// 2026-11-08 P2-1 选项 A：报告部署侧压缩后的真实传输量。线上 GitHub Pages
+// 由 CDN 自动 gzip/brotli，本地 tools/serve_dist.py 复现同一效果。只算体积、
+// 不生成 .gz/.br 到 dist（避免 Pages artifact 里多出用不上的文件）。
+{
+  const raw = Buffer.byteLength(html);
+  const gz = zlib.gzipSync(html, { level: 9 }).length;
+  const br = zlib.brotliCompressSync(html, {
+    params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 11 },
+  }).length;
+  console.log('部署压缩后      gzip ' + kb(gz) + ' / brotli ' + kb(br) +
+    '（相对原始 −' + ((1 - br / raw) * 100).toFixed(1) + '%）');
+}

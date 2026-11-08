@@ -20,21 +20,31 @@ git log --oneline -1    # 此文档写作时为 305dc4f（Hark 接手批）
 ## 二、先跑这四条，确认基线是绿的
 
 ```bash
-node build.mjs                     # 拓扑无反向引用 / id 235 定义·208 引用·死引用 0
-                                   # 299 顶层声明 0 重名 / 资源引用 66 全覆盖
-                                   # 注释剥离 2827 行 234.7 KB → dist/index.html 2023 KB
+CODEBUDDY_SAFE_DELETE_ENABLED=0 node build.mjs
+                                   # 拓扑无反向引用 / id 235 定义·208 引用·死引用 0
+                                   # 300 顶层声明 0 重名 / 资源引用 66 全覆盖
+                                   # 注释剥离 2864 行 237.5 KB → dist/index.html 2024 KB
+                                   # 部署压缩后 gzip 610 KB / brotli 468 KB
 node --check dist/app-check.mjs    # 应 Exit 0
-node tools/strip_comments_selftest.mjs   # RESULT PASS（字符串零漂移 / 整包可编译）
-uv run --with pytest pytest -q tools/tests_pure   # 应 ≥141 passed（2026-11-07 实测 141；只增不减）
+node tools/strip_comments_selftest.mjs   # RESULT PASS（79 文件字符串零漂移 / 整包可编译）
+uv run --with pytest pytest -q tools/tests_pure   # 应 ≥142 passed（2026-11-08 实测 142；只增不减）
 ```
 
 **四条不绿就别往下做**，先把环境问题解决。
 
 > `node build.mjs` 默认剥离产物里的整行注释，**源码注释完整保留**；
-> 需要带注释的调试包时设 `APACHE_KEEP_COMMENTS=1` 重建（2257 KB）。
+> 需要带注释的调试包时设 `APACHE_KEEP_COMMENTS=1` 重建。
 > 若本机是 WorkBuddy 客户端且构建报 `SAFE_DELETE_BULK_CONFIRM_REQUIRED`，
 > 是客户端的批量删除保护拦了 `rmSync(dist)`（与代码无关），
 > 命令前加 `CODEBUDDY_SAFE_DELETE_ENABLED=0` 即可；CI 无此限制。
+>
+> 本地演示 `start-demo.bat` 已改用 `tools/serve_dist.py`：按
+> `Accept-Encoding` 动态 `br > gzip > identity` 传输内联 HTML，二进制
+> GLB / JPG / WebP / MP3 原样透传，与线上 GitHub Pages CDN 行为一致。
+>
+> 2026-11-08 收尾复核（GPU 显存反复换场实测、巨型文件拆分覆盖度、
+> `65-weapons.js` / `60-model.js` 明确不继续拆的理由）见
+> `CHANGES-2026-11-07-gate-hardening-and-perf.md` 第九节。
 
 ## 三、读这几个文件（按顺序）
 

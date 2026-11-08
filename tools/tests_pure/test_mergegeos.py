@@ -56,6 +56,20 @@ def test_dispose_ownership_contract():
     assert out["guardsNoThrow"] is True       # null / 空数组不抛错
 
 
+def test_merge_bucket_meshes_contract():
+    """P2-2 收口：成功桶建 mesh/摘节点/释放临时几何；单输入不释放；失败桶零丢失。"""
+    out = drive("merge_buckets")
+    assert out["count"] == 2                 # ok + single；bad 桶跳过
+    assert out["badSkipped"] is True
+    assert out["badNodesKept"] is True       # 合并失败时原 mesh 必须留在场景
+    assert out["okNodesRemoved"] is True
+    assert out["singleNotDisposed"] is True  # 单输入 = 原几何，仍在渲染
+    assert out["pairDisposed"] is True
+    assert out["materialByKey"] is True
+    assert out["onMeshApplied"] is True
+    assert out["parentAdded"] is True
+
+
 def test_merge4_multi_base_accumulation():
     """四块拼接：基址逐块累加；跨块顶点位置正确。"""
     out = drive("merge4")
