@@ -403,4 +403,97 @@ evidence 有效、工作树在跑测期间未被改动，结果可信。
 4. P2 · 把剩余墙钟 `wait_for_function` 改成 `H.step_until` 游戏时间步进，
    逐项复验；不要一刀切放宽超时。
 5. 复验方式：用 `APACHE_TEST_ONLY` 只跑这 21 项，**不要重复跑 93 项全量**；
-   全绿后再单独跑一次认证轮决定是否合 main。
+   全绿后再单独跑一次认证轮决定是否合 main.
+
+---
+
+## 十、2026-11-09 · 21 项历史红灯全部修完（定向复验 21/21 绿）
+
+老黄指令：「先把没有做完的全部做了我们再跑全量，如果你觉得需要我配置测试
+就可以不跑全量的最好」。本轮把第九节的 21 项 FAIL 全部收口，并**按豁免不重复
+跑 93 项全量**——有头 Playwright 认证轮需 21 分钟且全程抢鼠标焦点，必须用户
+配合；上一轮 `20261108-085332-9255` 已给出 72 项 PASS，本轮只定向复验这 21 项，
+等价覆盖全部 93 项。
+
+### 10.1 只有 2 项是产品真 bug（改 `src/app/`）
+
+| 项 | 根因 | 修法 |
+|---|---|---|
+| `test_samwar` 真实 pageerror `this.activeFlarePos.clone is not a function` | `84-samwar.js:295` 的 `_flare` 是普通对象 `{on,x,y,z,...}`，`70-combat.js:219` 直接塞给契约上是 `THREE.Vector3` 的 `activeFlarePos`，`16-targets.js:581` 调 `.clone()` 必崩 | `70-combat.js` 加模块级 scratch `_swFlareV`，接线层每帧 `_swFlareV.set(f.x,f.y,f.z)` 适配。保留「一枚干扰弹同时诱骗 SAM 与 RPG」玩法，零每帧分配不变 |
+| `test_cinematic` `t=-0.0118` 字幕不出 | `78-cinematic.js:99` 的 `dt=Math.min(0.05, now-last)` 无下界，首帧 rAF 时间戳早于 `cineStart()` 的 `performance.now()` → 时间轴倒退 | 改 `Math.max(0, Math.min(0.05, ...))`；测试同时把固定睡 1200ms 换成字幕条件等待 |
+
+### 10.2 其余 19 项是「产品有意演进后测试期望未同步」
+
+按根因分组（同一根因一次修掉多项，避免逐项试错）：
+
+- **共同根因 A · `endless` 变体**（`70-mission.js:59` 动态追加第 8 个 chip，测试仍等 `=== 7`）：
+  `test_town` / `test_canyon` / `test_canyon_fp` / `test_challenge_variants` /
+  `test_air_superiority` 共 5 项。统一改 `>= 7` 下界，`challenge_variants` 另加
+  7 个关键变体键存在性断言（以后再增变体不会整批超时）。
+- **共同根因 B · `BASE_C` 从 z=42 挪到 75**（`05-config.js:149`）：
+  `test_visual_materials` / `test_visual_detail` / `test_detail_parts` 把飞机设在
+  `z=0`，`bd=75>55` 不在 `16-targets.js:455` 的 AA 交战区，`_threat` 被 else 分支
+  恒写 0、`_dmgSmoke` 派生块整段跳过——**结构性不可达，换 `step_until` 也没用**。
+  统一泊到 `z=33`（bd=42），与 `test_threat_damage` / `test_ci_smoke` 既有泊位一致。
+- **共同根因 C · FPV 右串 X→E**（`46-fpview.js:446`，X 让位火箭）：
+  `test_hover_translation` 的 `KeyX` 改 `KeyE`；`test_fixes` 的 `Z/X` 改 `Z/E`。
+- **共同根因 D · `standard.res=0.85`**（`83-arcade.js:44` 降难度决策）：
+  `test_narrative_strike` N2/N13/N17 全部写死 `hp=2`、`d=1/3`、`d=2/3`、
+  烟浓上界 `0.31`、盘侧倾 `0.09`。改相对判定：hp 下降且 >0；`d` 取产品遥测
+  并与 hp 做 0.003 容差一致性校验；包络/发射架公式/侧倾一律由 `d` 复算。
+- **单项根因**：隐藏 `#sel-quality`（`test_edge_cases` 两处 `select_option` →
+  `evaluate` 派发 change，保留 `q=2` 通道）；narrative MQ-1 抢锁
+  （`test_orbit_yaw` 临时覆写 `__dbg.rig.narrative.nearest`，因 `enabled` 会被
+  每帧 `syncEnabled` 复位）；串行加载竞态（`test_detail_fallback` 只等
+  `loaded>=1`，去掉会被 gun 失败提前放行的 `|| fallback`）；AA 冷却基础常数
+  1.2→1.6（`test_arcade` 改由 `rate` 相对复算区间）；`null` 哨兵与 orbit 缓动
+  （`test_camera_owner` 空值守卫 + 三维收敛阈值 1.5u）；窄屏顶栏绝对阈值
+  （`test_mobile` 改与同排按钮 top 相对判定）；最坏视角机位只写 `t*` 导致阻尼
+  没走完（`test_narrative` 同步写 `phi/theta/dist` 当前值 + 条件等待
+  `camera.z>130`，实测 3/3 入镜）；过场分阶段点击（`test_input_passthrough`
+  连点推进到 prompt 后走产品官方 Esc 通道）。
+
+### 10.3 两个值钱的工程教训
+
+1. **`pg.evaluate` 裸返回含 THREE 场景图循环引用的对象会挂死整个 CDP 连接。**
+   `test_narrative_strike` N8 的 `pg.evaluate("__dbg.narrative.hitTest(...)")` 直接
+   返回 strike 对象，序列化挂起 → 后续所有调用阻塞 → 看门狗 `hard_timeout 300s`。
+   N2 因为包了 `!!` 转布尔才没踩到。用无缓冲步进探针逐行定位到该行后，改成
+   `(() => !!hitTest(...))()`，全段 N8→N17 一次跑通。**测试里调返回复杂对象的
+   游戏 API，一律先转标量。**
+2. **不要用会被每帧覆写的字段当测试开关。** `70-loop.js:360` 每帧
+   `narrative.syncEnabled(...)` 会复位 `enabled` / `group.visible`；关空中候选
+   要么覆写 `nearest()`，要么改上游 `targets.enabled`，不能只赋 `enabled=false`。
+
+### 10.4 验证证据（两轮定向，均未跑全量）
+
+```
+快速门禁：build Exit 0 / syntax Exit 0 / 79 文件字符串零漂移 RESULT PASS /
+          拓扑 8-8 / 142 passed / 300 顶层声明 0 重名 / 66 资源引用全覆盖
+          dist/index.html 2025 KB，gzip 610 KB / brotli 468 KB
+
+轮 1  run_id 20261109-134124-7090  APACHE_TEST_ONLY=21 项
+      TOTAL 18/21 PASS   post consistency: True
+      剩 3 项：input_passthrough（prompt 弹窗语义）/ camera_owner（orbit 阈值）/
+              narrative_strike（N8 序列化挂起）
+轮 2  run_id 20261109-140512-4305  APACHE_TEST_ONLY=3 项
+      TOTAL 3/3 PASS   GATE_EXIT=0   post consistency: True
+      narrative_strike 完整跑到 N17 PASS、ERRORS: none
+```
+
+**合并结论：21/21 定向全绿；加上 `20261108-085332-9255` 的 72 项 PASS，
+93 项已全部有过 PASS 记录。** 但两轮都是 `subset_only`、
+`certification_valid=false`，**不构成一次正式认证轮**——按既定「跑绿再决定合
+main」，`main` 与 Pages 本轮仍不动（`origin/main` 保持 `01d4c97`）。
+
+需要正式认证时只需一条（有头、约 21 分钟、期间不能动鼠标，需老黄配合）：
+```
+$env:GATE_EXPECT_SHA=(git rev-parse HEAD).Trim(); powershell -File tools/run_tests.ps1
+```
+本轮按老黄「需要配置测试就可以不跑全量」的豁免未执行。
+
+### 10.5 变更文件（22 个，全部已提交推送）
+
+`src/app/70-combat.js`、`src/app/78-cinematic.js` +
+`tools/tests/` 下 20 个测试文件（清单见 `git show --stat`）。
+`scratch/` 下的探针、日志一律不入库。

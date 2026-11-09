@@ -35,21 +35,23 @@ def run(pg):
     print('after ArrowRight:', st2)
     assert st2['x'] < st['x'] - 2, ('ArrowRight should strafe toward -X', st2)
 
-    # ③ FPV Z/X 侧飞：进 FPV，X 右侧飞 → -X（yaw=0 机体右）
+    # ③ FPV Z/E 侧飞：进 FPV，E 右侧飞 → -X（yaw=0 机体右）
+    # 2026-11-09：46-fpview.js:446 自 2026-10-30 把右串 X 改为 E（X 让位火箭），
+    # 旧测试按 KeyX 侧飞 → sT 恒 0 → FLY.x 不动，15s 墙钟超时。
     pg.keyboard.press('KeyC')
     pg.wait_for_timeout(900)
     act = pg.evaluate("!!__dbg.fp.active")
     assert act, 'FPV not entered'
     x0 = pg.evaluate("+__dbg.FLY.x.toFixed(1)")
-    pg.keyboard.down('KeyX')
+    pg.keyboard.down('KeyE')
     try:
         pg.wait_for_function("(x0) => __dbg.FLY.x < x0 - 2", arg=x0, timeout=15000)
     finally:
-        pg.keyboard.up('KeyX')
+        pg.keyboard.up('KeyE')
     pg.wait_for_timeout(300)
     x1 = pg.evaluate("+__dbg.FLY.x.toFixed(1)")
-    assert x1 < x0 - 2, ('FPV KeyX should strafe right (-X at yaw 0)', x0, x1)
-    print('FPV strafe X: %s -> %s' % (x0, x1))
+    assert x1 < x0 - 2, ('FPV KeyE should strafe right (-X at yaw 0)', x0, x1)
+    print('FPV strafe E: %s -> %s' % (x0, x1))
     # ④ FPV Z 左侧飞 → +X 回移
     pg.keyboard.down('KeyZ')
     try:

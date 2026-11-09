@@ -32,9 +32,16 @@ try:
 
             assert pg.evaluate("matchMedia('(max-width:820px)').matches"), 'mobile media'
             # 导览按钮已并入右上角图标排（不再有底部重叠问题）
-            btn = pg.evaluate("(()=>{const b=document.getElementById('btn-tour');const r=b.getBoundingClientRect();"
-                              "return {top:+r.top.toFixed(0),inHost:!!b.closest('#top-right')}})()")
-            assert btn['inHost'] and btn['top'] < 80, ('tour btn not in top icon row', btn)
+            # 2026-11-09：窄屏 HUD 遥测项增多会 wrap 成多行，把整条 #top 撑高，
+            # 图标排随 align-items:center 一起下移（实测 top=95）。绝对阈值 80
+            # 是旧顶栏高度的残留；改用「与同排静态图标按钮同高」的相对判定，
+            # 仍真实覆盖「并入图标排、没掉到底部」的意图。
+            btn = pg.evaluate("""(()=>{const b=document.getElementById('btn-tour');
+                const p=document.getElementById('btn-panel');
+                const r=b.getBoundingClientRect(), pr=p.getBoundingClientRect();
+                return {top:+r.top.toFixed(0), peer:+pr.top.toFixed(0),
+                        inHost:!!b.closest('#top-right')}})()""")
+            assert btn['inHost'] and abs(btn['top'] - btn['peer']) <= 2, ('tour btn not in top icon row', btn)
             # 面板默认关闭——先 tap 打开，断言它确实进视口（真触控链路）
             open0 = pg.evaluate("(()=>{const p=document.getElementById('panel');"
                                 "const r=p.getBoundingClientRect();return {visible:r.width>0&&r.left>=0&&r.left<innerWidth}})()")

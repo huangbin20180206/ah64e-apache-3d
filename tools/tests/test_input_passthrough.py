@@ -116,8 +116,23 @@ def run(pg):
     pg.evaluate("__dbg.resetRange(); __dbg.startMission()")
     pg.wait_for_function("() => __dbg.cutsceneState.on", timeout=6000)
     o0 = pg.evaluate("({theta: __dbg.orbit.tTheta, phi: __dbg.orbit.tPhi, dist: __dbg.orbit.tDist})")
-    pg.mouse.down()
-    pg.mouse.up()
+    # 2026-11-09：82-cutscene.js:721-736 起 tour/transit 阶段点击只推进阶段，
+    # 且开场 0.4s 忽略点击；单次 pointerdown 到不了兜底 cutEnd。先连点把过场
+    # 推进到 prompt（每轮留帧给状态机），再走产品官方跳过通道收尾。
+    # prompt 阶段 #briefing-modal 是 inset:0 全屏遮罩（template.html:877-888），
+    # 82-cutscene.js:716-719 规定弹窗内点击不跳过、:656-660 的 Escape 才 cutEnd，
+    # 因此这里用 Esc 收尾；后续断言仍验证「此前的 pointerdown 没吞掉返回镜头」。
+    pg.mouse.move(1100, 700)
+    for _ in range(12):
+        if not pg.evaluate("__dbg.cutsceneState.on"):
+            break
+        if pg.evaluate("__dbg.cutsceneState.step") == 'prompt':
+            break
+        pg.mouse.down()
+        pg.mouse.up()
+        pg.wait_for_timeout(220)
+    if pg.evaluate("__dbg.cutsceneState.on"):
+        pg.keyboard.press('Escape')
     pg.wait_for_function("() => !__dbg.cutsceneState.on", timeout=5000)
     # B6+：setView 的缓动目标由 loop 逐帧逼近——等 tDist 到位再断言（分类器真候选 L122→L126）
     pg.wait_for_function("() => Math.abs(__dbg.orbit.tDist - 12.6) < 3", timeout=15000)

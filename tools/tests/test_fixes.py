@@ -61,7 +61,9 @@ def run(pg):
 
     # ---- ③ FPV 完整提示 + 锁定目标建议武器 ----
     tip = pg.evaluate("document.getElementById('fp-tip').textContent")
-    for kw in ['W/S', 'A/D', 'R/Q', 'Z/X', '左键', '右键', 'F 地狱火', 'C 退出']:
+    # 2026-11-09：46-fpview.js:446 自 2026-10-30 把 FPV 右侧飞从 X 改为 E
+    #（X 让位火箭发射），产品 fp-tip / 帮助表 / toast 均为 Z/E；测试按旧键位断言。
+    for kw in ['W/S', 'A/D', 'R/Q', 'Z/E', '左键', '右键', 'F 地狱火', 'C 退出']:
         assert kw in tip, ('FPV 提示缺键位: %s' % kw, tip)
     assert '灵敏度' in pg.evaluate("document.getElementById('panel').textContent"), '面板缺 FPV 灵敏度滑块'
     # 进 FPV：机头朝 +Z（基地目标在 42u 前方锥内）→ 应锁定目标并给建议武器

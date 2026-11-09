@@ -17,7 +17,9 @@ def run(pg):
     pg.evaluate("document.querySelector('#mode-row [data-mode=\"mission\"]').click()")
     pg.wait_for_timeout(300)
     pg.evaluate("__dbg.startMission()")
-    pg.wait_for_function("() => document.querySelectorAll('#mission-variants .chip').length === 7", timeout=15000)
+    # 2026-11-09：70-mission.js:59 动态追加 endless 变体，可见 chip 已由 7 变 8。
+    # 用下界而非精确数，避免以后再增变体又脆断；关键变体存在性由后续点击断言保证。
+    pg.wait_for_function("() => document.querySelectorAll('#mission-variants .chip').length >= 7", timeout=15000)
     n0 = pg.evaluate("__dbg.targets.totalCount")
     pg.evaluate("document.querySelector('#mission-variants [data-variant=\"urban_strike\"]').click()")
     pg.wait_for_function("() => __dbg.targets.town.active === true", timeout=20000)

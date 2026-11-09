@@ -22,7 +22,8 @@ def run(pg):
 
     # —— A2 系数口值级：veteran 下 coeffs 恒 1.5/1.4，且 AA 接线实际生效 ——
     # 驱动 targets.update 强制敌方 AA 开火：_aaDmgMul 应被写为 1.4（16-targets 读 HOST.arcade），
-    # _aaCool 采集值应落在 (1.2+rnd*1.4)/1.5 的缩放区间 [0.8, 1.733]——若难度未接线（兜底 1）
+    # 2026-11-09：6e1b804 引入 Burst Fire 后 16-targets.js:483 基础常数 1.2→1.6，
+    # _aaCool 区间随之变为 (1.6+rnd*1.4)/1.5 = [1.067, 2.0]——若难度未接线（兜底 1）
     # 则落在 [1.2, 2.6]，上限越界可检出。S4：命中概率不随难度缩放（本断言不涉命中概率）。
     a2 = pg.evaluate("""(() => {
         __dbg.setMissionDifficulty('veteran');
@@ -44,7 +45,11 @@ def run(pg):
     assert abs(a2['rate'] - 1.5) < 1e-9 and abs(a2['dmg'] - 1.4) < 1e-9 and abs(a2['res'] - 1.4) < 1e-9, ('A2 coeffs', a2)
     assert a2['dmgMul'] == 1.4, ('A2 AA接线 _aaDmgMul 未写为 veteran 1.4', a2)   # 16-targets 读 HOST.arcade 验证
     assert a2['n'] >= 5, ('A2 AA 采样数不足', a2)
-    assert a2['min'] >= 0.79 and a2['max'] <= 1.74, ('A2 _aaCool 未缩放至 /1.5 区间（AA 接线/兜底失效）', a2)
+    # 相对判定：用当前 rate 与产品基础常数 1.6 复算区间，常数再调也不会脆断。
+    # 未接线（rate 兜底 1）时 max 会到 3.0，仍被上界检出。
+    lo, hi = 1.6 / a2['rate'] - 0.02, (1.6 + 1.4) / a2['rate'] + 0.02
+    assert a2['min'] >= lo and a2['max'] <= hi, (
+        'A2 _aaCool 未缩放至 /1.5 区间（AA 接线/兜底失效）', a2, (lo, hi))
     print('A2 OK:', a2)
 
     # —— A3 击毁得分 = 公式复算（同页 evaluate 内复算 @ veteran scoreMul 1.5）——

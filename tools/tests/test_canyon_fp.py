@@ -37,7 +37,8 @@ def run(pg):
     pg.evaluate("document.querySelector('#mode-row [data-mode=\"mission\"]').click()")
     H.step(pg, 0.3)
     pg.evaluate("__dbg.startMission()")
-    H.step_until(pg, "() => document.querySelectorAll('#mission-variants .chip').length === 7", 15)
+    # 2026-11-09：endless 变体使可见 chip 由 7 变 8（70-mission.js:59），改用下界。
+    H.step_until(pg, "() => document.querySelectorAll('#mission-variants .chip').length >= 7", 15)
     pg.evaluate("document.querySelector('#mission-variants [data-variant=\"canyon_run\"]').click()")
     H.step_until(pg, "() => __dbg.targets.canyon.active === true", 20)
     pg.evaluate(SETUP)

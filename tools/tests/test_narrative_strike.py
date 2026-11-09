@@ -30,15 +30,18 @@ def run(pg):
     print('N1 PASS: 三设施 alive + hp=hp0 + radarAlive')
 
     # ---- N2: 命中未毁——防空车 hp3 打 1 发 → hp 降、仍存活、无 killEvent ----
-    # 防空车世界坐标 (12, 0, 69)；standard 抗打击 res=1.0，机炮威力 1 → 扣 1
+    # 防空车世界坐标 (12, 0, 69)。2026-11-09：83-arcade.js:44 的 standard
+    # 抗打击系数 res=0.85（2026-10-14「降低点难度」决策），81-narrative.js:462
+    # 按 power/res 扣血 → 3-1/0.85=1.82，不是旧断言写死的 2。改用相对判定，
+    # 难度表再调也不会脆断（N8 的 veteran 精确值复算仍覆盖数值链路）。
     hit_sam = "__dbg.narrative.hitTest({ x: 12, y: 0.8, z: 69 }, 1)"
     ok = pg.evaluate("(() => !!%s)()" % hit_sam)
     assert ok, ('N2: 应命中防空车（radius 2.0 覆盖）',)
     n2 = pg.evaluate("__dbg.narrative.state()")
     sam2 = next(s for s in n2['strikes'] if s['key'] == 'sam')
-    assert abs(sam2['hp'] - 2) < 1e-6 and sam2['alive'], ('N2: 防空车受击后 hp 3→2 且存活', sam2)
+    assert 0 < sam2['hp'] < hp0['sam'] and sam2['alive'], ('N2: 防空车受击后 hp 下降且存活', sam2)
     assert n2['killEvent'] is False, ('N2: 未摧毁不应产 killEvent', n2)
-    print('N2 PASS: 防空车 hp 3→2、存活、无 killEvent')
+    print('N2 PASS: 防空车 hp 3→%.2f、存活、无 killEvent' % sam2['hp'])
 
     # ---- N5+N3+N6: SEAD 闭环 + 雷达摧毁计分 + sead 成就（任务局） ----
     # 起任务局 → 玩家悬停反击区（z=33，距基地 BASE_C 42u）→ samwar 建锁交战（radar 存活）→
@@ -121,7 +124,10 @@ def run(pg):
     pg.evaluate("(() => { __dbg.S.mode='mission'; __dbg.startMission('standard'); __dbg.S._mission.difficulty='veteran'; })()")
     pg.wait_for_function("() => __dbg.narrative.state().enabled", timeout=5000)
     hpb = pg.evaluate("__dbg.narrative.state().strikes.find(s => s.key==='sam').hp")
-    pg.evaluate("__dbg.narrative.hitTest({ x: 12, y: 0.8, z: 69 }, 1)")
+    # 2026-11-09：hitTest 返回 strike 对象（含 THREE 场景图循环引用），
+    # 裸 evaluate 会让 Playwright 序列化挂死直到看门狗（实测 hard_timeout
+    # 300s、后续所有 CDP 调用全部阻塞）。与 N2 同款用 !! 转成布尔再返回。
+    pg.evaluate("(() => !!__dbg.narrative.hitTest({ x: 12, y: 0.8, z: 69 }, 1))()")
     hpa = pg.evaluate("__dbg.narrative.state().strikes.find(s => s.key==='sam').hp")
     ded = hpb - hpa
     print('N8 veteran 扣减:', round(ded, 4), '(期望≈%.4f)' % (1 / 1.4))
@@ -263,7 +269,8 @@ def run(pg):
       return { punch: fx.punch, hp, before, after };
     })()""")
     print('N13 命中读数:', w13)
-    assert abs(w13['hp'] - 2) < 1e-6, ('N13: 防空车应受击未毁（hp 3→2）', w13)
+    # 同 N2：standard res=0.85 下 hp=1.82，不写死 2。
+    assert 0 < w13['hp'] < 3, ('N13: 防空车应受击未毁（hp 已下降且 >0）', w13)
     assert w13['punch'] > 0, ('N13: 命中应置受击脉冲计时器（0.12s）', w13)
     if w13['before'] >= 0:
         assert w13['after'] > w13['before'], ('N13: 命中点火花应复用 puff 池发射（可见数 +1）', w13)
@@ -468,14 +475,21 @@ def run(pg):
     assert len(a17['tubes']) == 4, ('N17: 应有 4 根发射架引用', a17)
     for t in a17['tubes']:
         assert abs(t['rx'] - t['bx']) < 1e-6 and abs(t['bx'] + 0.35) < 1e-6, ('N17: 发射架姿态应=基线 -0.35', a17)
-    # ② 打防空车 1 发（hp3→2，d=1/3）：hurt 置位、d 精确、软烟点亮在 d=1/3 包络、
-    #    发射架按公式下垂；雷达/弹药堆不受波及（遥测原子读）
+    # ② 打防空车 1 发：hurt 置位、d 精确、软烟点亮在包络、发射架按公式下垂；
+    #    雷达/弹药堆不受波及（遥测原子读）。
+    # 2026-11-09：standard res=0.85 使每发扣 1/0.85≈1.176，d 不再是写死的
+    # 1/3 与 2/3。一律用 state() 返回的实际 hp 反推 d=1-hp/hp0，公式与包络
+    # 断言全部随之复算——数值链路仍被逐项验证，只是不再依赖旧系数。
     h17 = pg.evaluate("""(() => {
       __dbg.narrative.hitTest({ x: 12, y: 0.8, z: 69 }, 1);
       return __dbg.narrative.state().damaged;
     })()""")
     dm17 = {x['key']: x for x in h17}
-    assert dm17['sam']['hurt'] and abs(dm17['sam']['d'] - 1 / 3) < 1e-3, ('N17: 防空车应置损伤态 d≈0.333', h17)
+    # state() 的 hp/d 都已 toFixed 取整，由 hp 反推 d 会有 ~0.002 量化误差：
+    # 用产品遥测 d 作后续公式真值，另做一次带容差的 hp→d 一致性校验。
+    d17 = dm17['sam']['d']
+    assert dm17['sam']['hurt'] and 0 < d17 < 1 \
+        and abs(d17 - (1 - dm17['sam']['hp'] / 3)) < 0.003, ('N17: 防空车损伤态 d 应与 hp 一致', h17, d17)
     assert (not dm17['radar']['hurt']) and (not dm17['ammo']['hurt']), ('N17: 未受击设施不得置损伤态', h17)
     pg.wait_for_function("() => __dbg.narrative.group.getObjectByName('narrative-dmgsmoke-sam').visible === true", timeout=5000)
     v17 = pg.evaluate("""(() => {
@@ -487,21 +501,26 @@ def run(pg):
       return { op: sp.material.opacity, tubes,
                dishZ: n.group.getObjectByName('narrative-radar-dish').rotation.z };
     })()""")
-    assert 0.13 <= v17['op'] <= 0.31, ('N17: d=1/3 烟浓应在包络 [(0.16+0.4/3)·0.5, (0.16+0.4/3)·1.0]', v17)
+    env17 = 0.16 + 0.4 * d17
+    assert env17 * 0.5 - 0.02 <= v17['op'] <= env17 + 0.02, ('N17: 烟浓应在 (0.16+0.4d) 包络内', v17, d17)
     for t in v17['tubes']:
-        assert abs(t['rx'] - (-0.35 + (1 / 3) * 0.55 * t['dp'])) < 1e-3 and t['rx'] > -0.35, ('N17: 发射架应按公式下垂', v17)
+        assert abs(t['rx'] - (-0.35 + d17 * 0.55 * t['dp'])) < 1e-3 and t['rx'] > -0.35, ('N17: 发射架应按公式下垂', v17, d17)
     assert abs(v17['dishZ']) < 1e-6, ('N17: 雷达未受击不应侧倾', v17)
-    print('N17 置态 OK: d=1/3 烟亮 + 发射架下垂（公式精确复算）')
-    # ③ 再打 1 发（hp2→1，d=2/3）：受创程度抬升（d 单调升 + 包络右移 + 下垂加深）；
-    #    再打雷达 1 发（hp2→1，d=0.5）：盘侧倾精确 0.09 + 雷达软烟亮
+    print('N17 置态 OK: d=%.3f 烟亮 + 发射架下垂（公式精确复算）' % d17)
+    # ③ 再打 1 发 + 打雷达 1 发：受创程度抬升（d 单调升 + 包络右移 + 下垂加深）；
+    #    期望 d 一律由实际 hp 反推（res=0.85 下 sam≈0.784 / radar≈0.588）。
     h17b = pg.evaluate("""(() => {
       __dbg.narrative.hitTest({ x: 12, y: 0.8, z: 69 }, 1);
       __dbg.narrative.hitTest({ x: -16, y: 0.8, z: 79 }, 1);
       return __dbg.narrative.state().damaged;
     })()""")
     dm17b = {x['key']: x for x in h17b}
-    assert dm17b['sam']['hurt'] and abs(dm17b['sam']['d'] - 2 / 3) < 1e-3, ('N17: 防空车受创应加深 d≈0.667', h17b)
-    assert dm17b['radar']['hurt'] and abs(dm17b['radar']['d'] - 0.5) < 1e-3, ('N17: 雷达应置损伤态 d=0.5', h17b)
+    d17b = dm17b['sam']['d']
+    dr17 = dm17b['radar']['d']
+    assert dm17b['sam']['hurt'] and 0 < d17b < 1 \
+        and abs(d17b - (1 - dm17b['sam']['hp'] / 3)) < 0.003, ('N17: 防空车受创 d 应与 hp 一致', h17b, d17b)
+    assert dm17b['radar']['hurt'] and 0 < dr17 < 1 \
+        and abs(dr17 - (1 - dm17b['radar']['hp'] / 2)) < 0.003, ('N17: 雷达损伤态 d 应与 hp 一致', h17b, dr17)
     assert dm17b['sam']['d'] > dm17['sam']['d'], ('N17: 受创程度应随 hp 下降单调上升', (dm17, dm17b))
     pg.wait_for_function("""() => __dbg.narrative.group.getObjectByName('narrative-dmgsmoke-radar').visible === true
       && __dbg.narrative.group.getObjectByName('narrative-radar-dish').rotation.z > 0.089""", timeout=5000)
@@ -514,11 +533,12 @@ def run(pg):
       return { opSam: samSp.material.opacity, tubes,
                dishZ: n.group.getObjectByName('narrative-radar-dish').rotation.z };
     })()""")
-    assert 0.20 <= v17b['opSam'] <= 0.44, ('N17: d=2/3 烟浓应在包络 [0.4267·0.5, 0.4267]', v17b)
+    env17b = 0.16 + 0.4 * d17b
+    assert env17b * 0.5 - 0.02 <= v17b['opSam'] <= env17b + 0.02, ('N17: 烟浓应在 (0.16+0.4d) 包络内', v17b, d17b)
     for t in v17b['tubes']:
-        assert abs(t['rx'] - (-0.35 + (2 / 3) * 0.55 * t['dp'])) < 1e-3, ('N17: 发射架下垂应随 d 加深', v17b)
-    assert abs(v17b['dishZ'] - 0.09) < 1e-6, ('N17: 雷达盘侧倾应精确 = d·0.18 = 0.09', v17b)
-    print('N17 程度抬升 OK: d 1/3→2/3 包络右移 + 盘侧倾 0.090')
+        assert abs(t['rx'] - (-0.35 + d17b * 0.55 * t['dp'])) < 1e-3, ('N17: 发射架下垂应随 d 加深', v17b, d17b)
+    assert abs(v17b['dishZ'] - dr17 * 0.18) < 1e-3, ('N17: 雷达盘侧倾应 = d·0.18', v17b, dr17)
+    print('N17 程度抬升 OK: d %.3f→%.3f 包络右移 + 盘侧倾 %.3f' % (d17, d17b, v17b['dishZ']))
     # ④ 复位清零：resetRange → hurt 全 false / d=0 / 软烟全灭 / 姿态精确归位
     pg.evaluate("__dbg.resetRange()")
     pg.wait_for_function("""() => !__dbg.narrative.group.getObjectByName('narrative-dmgsmoke-sam').visible

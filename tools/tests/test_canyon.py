@@ -20,7 +20,8 @@ def run(pg):
     pg.evaluate("document.querySelector('#mode-row [data-mode=\"mission\"]').click()")
     pg.wait_for_timeout(300)
     pg.evaluate("__dbg.startMission()")
-    pg.wait_for_function("() => document.querySelectorAll('#mission-variants .chip').length === 7", timeout=15000)
+    # 2026-11-09：endless 变体使可见 chip 由 7 变 8（70-mission.js:59），改用下界。
+    pg.wait_for_function("() => document.querySelectorAll('#mission-variants .chip').length >= 7", timeout=15000)
     n0 = pg.evaluate("({ n: __dbg.targets.totalCount, hover: __dbg.FLY.HOVER })")
     pg.evaluate("document.querySelector('#mission-variants [data-variant=\"canyon_run\"]').click()")
     pg.wait_for_function("() => __dbg.targets.canyon.active === true && Math.abs(__dbg.FLY.z - __dbg.targets.canyon.spawn.z) < 1e-6", timeout=20000)

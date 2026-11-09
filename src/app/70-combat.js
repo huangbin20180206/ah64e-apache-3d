@@ -14,6 +14,12 @@ const _swPrev = { x: 0, y: 0, z: 0, has: false };                  // 上帧机�
 const _eaEnv = { dt: 0, heli: { x: 0, y: 0, z: 0 }, stability: 1,
   aim: { x: 0, y: 0, z: 1 }, aaRate: 1, aaDmg: 1, res: 1 };
 const _eaF = new THREE.Vector3();
+// 2026-11-09：干扰弹坐标适配 scratch。84-samwar 的 _flare 是普通对象字面量
+// {on,x,y,z,vx,vy,vz,t}（每帧改写 x/y/z 自由落体），而 16-targets.js:581 的
+// activeFlarePos 契约是 THREE.Vector3（要 .clone()）。接线层在此转成 Vector3，
+// 每帧 set() 跟随下落，避免「一枚干扰弹同时诱骗 SAM 与地面 RPG」的玩法因类型
+// 不符抛 pageerror。零每帧分配纪律不变。
+const _swFlareV = new THREE.Vector3();
 const _rsEnv = { dt: 0, active: false, strength: 0, homeDist: 0, alt: 0, stability: 1, variant: 'standard' };
 
 // Phase 19：命中方位换算到机体系并喂给 86-damage（确定性扇区分配）。
@@ -216,7 +222,8 @@ function _tickSamwar(dt) {
     const swd = arcade ? arcade.coeffs(S._mission) : null;
     E.aaRate = swd ? swd.aaRate : 1; E.aaDmg = swd ? swd.aaDmg : 1;
     if (targets && samwar._flare && samwar._flare.on) {
-      targets.activeFlarePos = samwar._flare;
+      const f = samwar._flare;
+      targets.activeFlarePos = _swFlareV.set(f.x, f.y, f.z);
     } else if (targets) {
       targets.activeFlarePos = null;
     }

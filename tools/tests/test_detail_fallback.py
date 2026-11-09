@@ -51,7 +51,11 @@ def _run():
             pg.wait_for_function("() => !!(window.__dbg && __dbg.apache && __dbg.dp)", timeout=60000)
             pg.evaluate("document.querySelector('#hint-close') && document.querySelector('#hint-close').click()")
             pg.wait_for_timeout(300)
-            pg.wait_for_function("() => __dbg.dp.stats().loaded >= 1 || __dbg.dp.stats().fallback === true", timeout=15000)
+            # 2026-11-09 D8 竞态修复：62-detailparts 是串行 for...await，gun 失败瞬间
+            # 就把 fallback 置 true，此时 wheels 尚未开始加载。原等待条件带
+            # "|| fallback===true" 会被过早放行，读到 loaded=0。只等真正结算完的
+            # 件数（与下方 loaded==1 断言自洽）。
+            pg.wait_for_function("() => __dbg.dp.stats().loaded >= 1", timeout=15000)
             st = pg.evaluate("__dbg.dp.stats()")
             print('D8_STATS:', st)
             assert st['loaded'] == 1, ('D8: gun 失败应 1 件加载', st)

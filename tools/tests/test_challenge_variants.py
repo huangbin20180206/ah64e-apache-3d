@@ -23,10 +23,16 @@ def run(pg):
     pg.evaluate("__dbg.startMission()")                 # 默认标准
     # B6+：等简报真正渲染完再断言，而非固定睡 400ms——#mission-body 由 loop-reachable
     # 路径写（70-app.js:1049/1068），负载下固定睡会读到旧面板（分类器真候选 L24→L30）
-    H.step_until(pg, """() => document.querySelectorAll('#mission-variants .chip').length === 7
+    # 2026-11-09：70-mission.js:59 动态追加 endless 变体，可见 chip 已由 7 变 8。
+    # 用下界 + 关键键存在性断言，避免「再增一个变体就整批超时」的脆断。
+    H.step_until(pg, """() => document.querySelectorAll('#mission-variants .chip').length >= 7
         && document.getElementById('mission-body').innerHTML.indexOf('完成条件') >= 0""", 15)
     chips = pg.evaluate("() => [...document.querySelectorAll('#mission-variants .chip')].map(c => ({k:c.dataset.variant, on:c.classList.contains('on'), role:c.getAttribute('role'), checked:c.getAttribute('aria-checked')}))")
-    assert len(chips) == 7, ('C1: 简报应有 7 个变体 chip（Phase 24 增 sead_strike；C005 增 air_superiority；玩法批 C 增 urban_strike；玩法批 D 增 canyon_run）', chips)
+    keys = [c['k'] for c in chips]
+    for k in ('standard', 'timed_rescue', 'limited_ammo', 'sead_strike',
+              'air_superiority', 'urban_strike', 'canyon_run'):
+        assert k in keys, ('C1: 关键任务变体缺失 ' + k, chips)
+    assert len(chips) >= 7, ('C1: 简报变体 chip 不应少于 7（现含无尽生存 endless）', chips)
     assert chips[0]['k'] == 'standard' and chips[0]['on'] and chips[0]['checked'] == 'true', ('C1: 默认选中标准', chips)
     assert chips[0]['role'] == 'radio', ('C1: 变体 chip 应 role=radio', chips)
     b0 = pg.evaluate("document.getElementById('mission-body').innerHTML")

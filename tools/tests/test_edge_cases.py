@@ -18,9 +18,18 @@ def run(pg):
     }""")
     assert missing == [], ('特效子对象缺 setQuality', missing)
 
+    # 2026-11-09：P4e 把 #sel-quality 移进 display:none 的隐藏后端
+    #（src/template.html:1240），可见 UI 是 #qual-row .chip。Playwright 的
+    # select_option 要求元素可见，隐藏控件会一直等到 30s 超时。改为与项目
+    # 其它测试一致的 evaluate 派发 change（含 '2' 极致档——它不在可见 chip 里，
+    # 仍须走隐藏后端，因此不能直接点 chip）。
+    def set_quality(v):
+        pg.evaluate("""(v) => { const s = document.getElementById('sel-quality');
+            s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); }""", v)
+
     seen = {}
     for value, levels in [('0.75', 2), ('1', 4), ('1.5', 4), ('2', 4)]:
-        pg.select_option('#sel-quality', value)
+        set_quality(value)
         pg.wait_for_timeout(120)
         state = pg.evaluate("""() => ({
           quality: __dbg.S.quality,
@@ -134,7 +143,7 @@ def run(pg):
         "document.querySelector('#terrain-row [data-terrain=\"water\"]').click()"), '切场地')
     expect_qcool(lambda: pg.evaluate(
         "document.querySelector('#env-row [data-env=\"night\"]').click()"), '切环境')
-    expect_qcool(lambda: pg.select_option('#sel-quality', '0.75'), '手动画质')
+    expect_qcool(lambda: set_quality('0.75'), '手动画质')
     # 切回 pad + 恢复画质（恢复测试前置状态）
     pg.evaluate("document.querySelector('#terrain-row [data-terrain=\"pad\"]').click()")
     pg.wait_for_timeout(200)

@@ -46,14 +46,17 @@ def run(pg):
 
     # 6) 最终闭环加强：最坏视角 draw-call 增量验证——把相机移入基地（所有叙事
     #    对象入视锥），比较叙事开/关的 renderer.info.render.calls（增量 ≤8）
+    # 2026-11-09：原代码只写 t* 目标值，靠 damping 逐帧逼近（50-controls.js:142-146）。
+    # 有头全量回归帧率极低时 1.5s 墙钟只跑了 1~2 帧，相机停在初始近距姿态
+    #（实测 camPos [14,10.7,91]），3 个物件只有 1 个入画——不是布局回归。
+    # 直接同步写当前值 + 清 fly 补间；dist 取 maxDist=90（50-controls.js:20）。
     pg.evaluate("""() => {
       const o = __dbg.orbit;
       o.tTarget.set(0, 1, 75); o.target.copy(o.tTarget);   // 基地中心
-      o.tPhi = 0.8; o.tDist = 100; o.tTheta = 0.3;          // 远距俯视：水平半宽
-                                                             // 100·sin0.8·tan17°≈22u
-                                                             // > 基地对象最大偏移 18.8u → 全入镜
+      o.fly = null;
+      o.tPhi = o.phi = 0.8; o.tDist = o.dist = 90; o.tTheta = o.theta = 0.3;
     }""")
-    pg.wait_for_timeout(1500)
+    pg.wait_for_function("() => __dbg.W.camera.position.z > 130", timeout=15000)
     # 确认待测叙事物件真实入视锥（复核修复：不得负 delta 或对象未入镜却算通过）：
     # 用 NDC 投影验证雷达盘/防空车/巡逻编队在画面内（禁 THREE 构造器——经
     # __dbg.W.camera 的 vectorToNDC 或现有实例）

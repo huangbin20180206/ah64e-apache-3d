@@ -79,7 +79,12 @@ def run(pg):
     pg.wait_for_timeout(250)
     pg.evaluate("__dbg.beginMission()")
     pg.wait_for_timeout(200)
-    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=0;
+    # 2026-11-09：BASE_C 从 z=42 挪到 z=75（05-config.js:149），x=0,z=0 时
+    # bd=75 > 55，不在 16-targets.js:455 的 AA 交战区内，_threat 每帧被 else
+    # 分支恒写 0、_dmgSmoke 派生块整段跳过——与帧率/墙钟无关的结构性不可达。
+    # 把飞机泊到 z=33（bd=42 ∈ (8,55)，与 test_threat_damage / test_ci_smoke
+    # 的既有泊位一致）恢复测试原本要验证的 P8 链路。
+    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=33;
       F.yaw=0; F.pitch=0; F.roll=0; F.comp=0; __dbg.S._alt=0; __dbg.S.running=true; })()""")
     # 条件等待替代固定 400ms（2026-09-09 修）：威胁出现依赖任务推进与距离判定，
     # 固定墙钟在负载下会偶发超时；超时即失败，不会掩盖真实回归。

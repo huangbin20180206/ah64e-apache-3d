@@ -49,7 +49,8 @@ def run(pg):
     pg.evaluate("document.querySelector('#mode-row [data-mode=\"mission\"]').click()")
     pg.wait_for_timeout(300)
     pg.evaluate("__dbg.startMission()")
-    pg.wait_for_function("""() => document.querySelectorAll('#mission-variants .chip').length === 7
+    # 2026-11-09：endless 变体使可见 chip 由 7 变 8（70-mission.js:59），改用下界。
+    pg.wait_for_function("""() => document.querySelectorAll('#mission-variants .chip').length >= 7
         && document.getElementById('mission-body').innerHTML.indexOf('完成条件') >= 0""", timeout=15000)
     pg.evaluate("document.querySelector('#mission-variants [data-variant=\"air_superiority\"]').click()")
     pg.wait_for_function("() => __dbg.mission.variant === 'air_superiority'", timeout=10000)

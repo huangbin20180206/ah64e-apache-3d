@@ -34,8 +34,13 @@ def run(pg):
     print('D: yaw %s -> %s (%.2f)' % (y1, y2, y2 - y1))
     # 转向后武器可锁基地目标：基地在机头 +Z 正前方（中心 42u），yaw 归零正对
     # 暂时关掉空中目标（角偏移竞争下靶机可能恰在锥内贴轴，关掉保证确定性）
+    # 2026-11-09：6e1b804 新增 narrative MQ-1 巡逻机，是第三类空中候选
+    #（65-weapons.js:595）。不能只关 __dbg.air：narrative.enabled 会被 70-loop
+    # 每帧 syncEnabled() 复位，所以改为临时覆写锁定读的 nearest()（跨帧有效、可恢复）。
     pg.evaluate("__dbg.FLY.yaw = 0; __dbg.apache.root.rotation.y = 0")
     pg.evaluate("__dbg.air.enabled = false")
+    pg.evaluate("""(() => { const n = __dbg.rig.narrative;
+        if (n && !n.__savedNearest) { n.__savedNearest = n.nearest; n.nearest = () => null; } })()""")
     pg.wait_for_timeout(300)
     pg.evaluate("__dbg.rig.hfAmmo = Math.max(__dbg.rig.hfAmmo, 1)")
     n0 = pg.evaluate("__dbg.rig.flying.length")
@@ -48,6 +53,8 @@ def run(pg):
     assert ok, ('launchHf failed after turn', lock)
     assert lock and not lock['air'] and ('装甲' in lock['label'] or lock['type'] == 'tank'), (
         'turn did not bring tank into lock cone', lock)
+    pg.evaluate("""(() => { const n = __dbg.rig.narrative;
+        if (n && n.__savedNearest) { n.nearest = n.__savedNearest; delete n.__savedNearest; } })()""")
     pg.evaluate("__dbg.air.enabled = true")   # 恢复
     print('PASS: yaw works + tank sector reachable after turn')
 

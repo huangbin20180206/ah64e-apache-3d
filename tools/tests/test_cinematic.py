@@ -30,7 +30,13 @@ def run(pg):
     print('S1 现场:', st)
     assert st['on'] and st['mode'] and st['guide'] == -1 and st['panelHide'], ('S1: 开场未正确启动', st)
     assert st['barH'] > 40, ('S1: letterbox 黑边高度异常', st)
-    pg.wait_for_timeout(1200)
+    # 2026-11-09：cinema.t 由 rAF 帧累加并被 dt<=0.05 钳制，与墙钟解耦；有头
+    # 全量回归下固定睡 1200ms 可能只推进了几帧，字幕阈值 0.6s 尚未越过。
+    # 改条件等待（与同文件 :38/:41 的 B6+ 状态等待范式一致）。
+    pg.wait_for_function("""() => {
+        const e = document.getElementById('cinema-sub');
+        return e.classList.contains('show') && e.textContent.indexOf('APACHE') >= 0;
+    }""", timeout=15000)
     sub = pg.evaluate("(() => ({ show: document.getElementById('cinema-sub').classList.contains('show'), txt: document.getElementById('cinema-sub').textContent }))()")
     assert sub['show'] and 'APACHE' in sub['txt'], ('S1: 字幕未出现', sub)
     # Esc 跳过 → 控制权交接 + S._guide=1 衔接首访引导

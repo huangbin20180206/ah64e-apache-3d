@@ -110,7 +110,10 @@ def run(pg):
     pg.wait_for_timeout(250)
     pg.evaluate("__dbg.beginMission()")
     pg.wait_for_timeout(200)
-    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=0;
+    # 2026-11-09：同 test_visual_materials M6 —— BASE_C.z=75，z=0 时 bd=75
+    # 不在 AA 交战区（16-targets.js:455），_threat/_dmgSmoke 结构性不可达。
+    # 泊到 z=33（bd=42 ∈ (8,55)，与 test_threat_damage 既有泊位一致）。
+    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=33;
       F.yaw=0; F.pitch=0; F.roll=0; F.comp=0; __dbg.S._alt=0; __dbg.S.running=true; })()""")
     # B6+：_threat 由 16-targets.js:440/442 updater 每帧写（分类器真候选 L115→L116）
     pg.wait_for_function("() => __dbg.targets._threat >= 1", timeout=15000)

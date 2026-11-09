@@ -23,7 +23,7 @@ git log --oneline -1    # 此文档写作时为 305dc4f（Hark 接手批）
 CODEBUDDY_SAFE_DELETE_ENABLED=0 node build.mjs
                                    # 拓扑无反向引用 / id 235 定义·208 引用·死引用 0
                                    # 300 顶层声明 0 重名 / 资源引用 66 全覆盖
-                                   # 注释剥离 2864 行 237.5 KB → dist/index.html 2024 KB
+                                   # 注释剥离 2871 行 238.1 KB → dist/index.html 2025 KB
                                    # 部署压缩后 gzip 610 KB / brotli 468 KB
 node --check dist/app-check.mjs    # 应 Exit 0
 node tools/strip_comments_selftest.mjs   # RESULT PASS（79 文件字符串零漂移 / 整包可编译）
@@ -45,6 +45,13 @@ uv run --with pytest pytest -q tools/tests_pure   # 应 ≥142 passed（2026-11-
 > 2026-11-08 收尾复核（GPU 显存反复换场实测、巨型文件拆分覆盖度、
 > `65-weapons.js` / `60-model.js` 明确不继续拆的理由）见
 > `CHANGES-2026-11-07-gate-hardening-and-perf.md` 第九节。
+>
+> 2026-11-09：全量认证暴露的 21 项历史红灯已全部修完，两轮
+> `APACHE_TEST_ONLY` 定向复验合计 21/21 PASS（产品侧只有 2 处真 bug：
+> 干扰弹 Vector3 适配、cinematic `dt` 下界）。根因分类、两轮 evidence
+> 与「未跑正式认证轮、故不合 main」的判断见同一文档**第十节**。
+> 需要正式认证时跑 `powershell -File tools/run_tests.ps1`（有头 ~21 分钟、
+> 期间不能动鼠标），并先设 `$env:GATE_EXPECT_SHA=(git rev-parse HEAD).Trim()`。
 
 ## 三、读这几个文件（按顺序）
 

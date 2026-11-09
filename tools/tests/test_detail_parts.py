@@ -151,7 +151,10 @@ def run(pg):
     pg.wait_for_timeout(250)
     pg.evaluate("__dbg.beginMission()")
     pg.wait_for_timeout(200)
-    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=0;
+    # 2026-11-09：同 test_visual_materials M6 —— BASE_C.z=75，z=0 时 bd=75
+    # 不在 AA 交战区（16-targets.js:455），_dmgSmoke 派生块整段跳过。
+    # 泊到 z=33（bd=42 ∈ (8,55)）恢复 P8 链路。
+    pg.evaluate("""(() => { const F=__dbg.FLY; F.state='hover'; F.alt=14; F.x=0; F.z=33;
       F.yaw=0; F.pitch=0; F.roll=0; F.comp=0; __dbg.S._alt=0; __dbg.S.running=true; })()""")
     # 条件等待替代固定 450ms（2026-09-09 修）：同 test_visual_materials M6
     pg.wait_for_function("() => __dbg.targets._threat >= 1", timeout=8000)

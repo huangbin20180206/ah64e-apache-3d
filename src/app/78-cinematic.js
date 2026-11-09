@@ -96,7 +96,10 @@ function cineEnd(skipped) {
 
 function cineTick(now) {
   if (!cinema.on) return;
-  const dt = Math.min(0.05, (now - cinema.last) / 1000 || 0.016);
+  // 2026-11-09：rAF 帧开始时间戳可能早于 cineStart() 帧内取的 performance.now()，
+  // 首帧 now-last 为负会让 cinema.t 回退到负值，关键帧插值倒退、字幕时间轴延后。
+  // 加下界钳制（只防回退，不改变正常帧的上界 0.05）。
+  const dt = Math.max(0, Math.min(0.05, (now - cinema.last) / 1000 || 0.016));
   cinema.last = now;
   cinema.t += dt;
   const t = cinema.t;
